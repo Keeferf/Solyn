@@ -1,50 +1,22 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+// src/App.tsx (updated)
+import Sidebar from "./components/Sidebar";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div className="flex min-h-screen bg-black">
+      <Sidebar />
+      <main className="flex-1 ml-64 min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="max-w-2xl text-center space-y-4">
+          <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-(--color-purple-accent) to-white bg-clip-text text-transparent">
+            Solyn
+          </h1>
+          <p className="text-lg md:text-xl leading-relaxed max-w-lg mx-auto text-white">
+            A clarity-driven AI for solving complex problems and simplifying
+            everyday work.
+          </p>
+        </div>
+      </main>
+    </div>
   );
 }
 
