@@ -1,7 +1,21 @@
+// src/components/sidebar/Sidebar.tsx
 import { SidebarItem } from "./SidebarItem";
 import { NAVIGATION_ITEMS, FOOTER_ITEMS } from "./SidebarNavigation";
 
-export const Sidebar = () => {
+interface SidebarProps {
+  onNavigate?: (view: "chat" | "models") => void;
+  currentView?: "chat" | "models";
+}
+
+export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
+  const handleNavigation = (id: string) => {
+    if (id === "models") {
+      onNavigate?.("models");
+    } else if (id === "new-chat" || id === "chats" || id === "search") {
+      onNavigate?.("chat");
+    }
+  };
+
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/10 flex flex-col p-4">
       {/* Logo area */}
@@ -18,7 +32,13 @@ export const Sidebar = () => {
             key={item.id}
             icon={<item.icon size={20} />}
             label={item.label}
-            active={item.active}
+            active={
+              (item.id === "models" && currentView === "models") ||
+              (item.id !== "models" &&
+                currentView === "chat" &&
+                item.id === "new-chat")
+            }
+            onClick={() => handleNavigation(item.id)}
           />
         ))}
         <div className="pt-4 mt-4 border-t border-white/10">
