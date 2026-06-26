@@ -4,6 +4,7 @@ interface SidebarItemProps {
   active?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  badge?: string;
 }
 
 export const SidebarItem = ({
@@ -12,6 +13,7 @@ export const SidebarItem = ({
   active = false,
   disabled = false,
   onClick,
+  badge,
 }: SidebarItemProps) => {
   return (
     <button
@@ -24,7 +26,12 @@ export const SidebarItem = ({
       `}
     >
       <span className="shrink-0">{icon}</span>
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm font-medium flex-1 text-left">{label}</span>
+      {badge && (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-(--color-purple-accent)/20 text-(--color-purple-accent)">
+          {badge}
+        </span>
+      )}
     </button>
   );
 };
