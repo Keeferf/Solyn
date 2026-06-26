@@ -1,5 +1,5 @@
 import { Sidebar } from "@/components/sidebar/Sidebar";
-import { ChatInterface } from "@/components/ChatInterface";
+import { ChatInterface } from "@/components/chat/ChatInterface";
 
 export const App = () => {
   return (
