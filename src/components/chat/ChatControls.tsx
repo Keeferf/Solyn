@@ -1,4 +1,4 @@
-import { FiSearch, FiCode, FiPaperclip, FiArrowUp } from "react-icons/fi";
+import { FiSearch, FiTerminal, FiPaperclip, FiArrowUp } from "react-icons/fi";
 import { ToggleButton } from "./ToggleButton";
 import { ModelSelector } from "./ModelSelector";
 import { ModeToggle } from "./ModeToggle";
@@ -69,7 +69,7 @@ export const ChatControls = ({
         <ToggleButton
           isActive={isCodeEnabled}
           onClick={onCodeToggle}
-          icon={<FiCode size={18} />}
+          icon={<FiTerminal size={18} />}
         />
         <input
           ref={fileInputRef}
