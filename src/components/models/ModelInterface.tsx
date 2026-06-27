@@ -1,4 +1,3 @@
-// src/components/models/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import {
   FiSearch,
@@ -32,9 +31,9 @@ interface AvailableModel {
 export const ModelInterface = () => {
   const [installedModels, setInstalledModels] = useState<OllamaModel[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([
+  const [availableModels] = useState<AvailableModel[]>([
     { name: "llama3.2", description: "Meta's Llama 3.2 3B model" },
     { name: "llama3.2:1b", description: "Meta's Llama 3.2 1B model" },
     { name: "mistral", description: "Mistral 7B model" },
@@ -132,15 +131,6 @@ export const ModelInterface = () => {
     return gb > 1
       ? `${gb.toFixed(2)} GB`
       : `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
   };
 
   const filteredModels = availableModels.filter(
