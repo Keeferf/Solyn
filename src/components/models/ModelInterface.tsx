@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FiDownload,
   FiCheck,
@@ -6,9 +6,10 @@ import {
   FiAlertCircle,
   FiServer,
   FiExternalLink,
+  FiTerminal,
 } from "react-icons/fi";
 import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core"; // Changed from '@tauri-apps/api/tauri'
+import { invoke } from "@tauri-apps/api/core";
 
 type InstallStatus =
   | "Idle"
@@ -23,6 +24,15 @@ interface InstallProgress {
   progress: number;
   message: string;
   error?: string;
+  log?: string;
+}
+
+interface InstallInfo {
+  platform: string;
+  method: string;
+  command: string;
+  estimated_time: string;
+  models_note: string;
 }
 
 export const ModelInterface = () => {
@@ -31,29 +41,37 @@ export const ModelInterface = () => {
     null,
   );
   const [ollamaVersion, setOllamaVersion] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<string>("");
+  const [installInfo, setInstallInfo] = useState<InstallInfo | null>(null);
   const [installProgress, setInstallProgress] = useState<InstallProgress>({
     status: "Idle",
     progress: 0,
     message: "",
   });
   const [isInstalling, setIsInstalling] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   // Check Ollama installation on mount
   useEffect(() => {
     checkOllamaInstallation();
-    getPlatform();
+    fetchInstallInfo();
 
     // Listen for installation progress
     const unlisten = listen<InstallProgress>("install-progress", (event) => {
-      setInstallProgress(event.payload);
+      const payload = event.payload;
+      setInstallProgress(payload);
 
-      if (event.payload.status === "Completed") {
+      // Add log message if present
+      if (payload.log) {
+        setLogs((prev) => [...prev, payload.log!]);
+      }
+
+      if (payload.status === "Completed") {
         setIsInstalling(false);
         checkOllamaInstallation();
       }
 
-      if (event.payload.status === "Error") {
+      if (payload.status === "Error") {
         setIsInstalling(false);
       }
     });
@@ -63,12 +81,19 @@ export const ModelInterface = () => {
     };
   }, []);
 
-  const getPlatform = async () => {
+  // Auto-scroll log container to bottom
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logs]);
+
+  const fetchInstallInfo = async () => {
     try {
-      const platformInfo = await invoke<string>("get_platform_info");
-      setPlatform(platformInfo);
+      const info = await invoke<InstallInfo>("get_install_info");
+      setInstallInfo(info);
     } catch (error) {
-      console.error("Failed to get platform info:", error);
+      console.error("Failed to get install info:", error);
     }
   };
 
@@ -92,10 +117,11 @@ export const ModelInterface = () => {
 
   const handleInstallOllama = async () => {
     setIsInstalling(true);
+    setLogs([]);
     setInstallProgress({
-      status: "Downloading",
+      status: "Installing",
       progress: 0,
-      message: "Starting download...",
+      message: "Starting installation...",
     });
 
     try {
@@ -114,7 +140,8 @@ export const ModelInterface = () => {
   };
 
   const getPlatformDisplay = () => {
-    switch (platform) {
+    if (!installInfo) return "Your Platform";
+    switch (installInfo.platform) {
       case "windows":
         return "Windows";
       case "macos":
@@ -122,7 +149,7 @@ export const ModelInterface = () => {
       case "linux":
         return "Linux";
       default:
-        return "Your Platform";
+        return installInfo.platform;
     }
   };
 
@@ -158,24 +185,42 @@ export const ModelInterface = () => {
             started with Solyn.
           </p>
 
-          {installProgress.status === "Idle" && (
+          {installProgress.status === "Idle" && installInfo && (
             <div className="space-y-6">
               <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-left">
                 <h3 className="text-sm font-semibold text-white/80 mb-3">
-                  📦 Installation Details
+                  Installation Details
                 </h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-white/60">
-                    <span>Platform</span>
-                    <span className="text-white">{getPlatformDisplay()}</span>
+                  <div className="flex justify-between text-white/60 gap-4">
+                    <span className="shrink-0">Platform</span>
+                    <span className="text-white text-right">
+                      {getPlatformDisplay()}
+                    </span>
                   </div>
-                  <div className="flex justify-between text-white/60">
-                    <span>Download Size</span>
-                    <span className="text-white">~500 MB</span>
+                  <div className="flex justify-between text-white/60 gap-4">
+                    <span className="shrink-0">Method</span>
+                    <span className="text-white text-right">
+                      {installInfo.method}
+                    </span>
                   </div>
-                  <div className="flex justify-between text-white/60">
-                    <span>Installation Time</span>
-                    <span className="text-white">~2-3 minutes</span>
+                  <div className="flex justify-between text-white/60 gap-4">
+                    <span className="shrink-0">Command</span>
+                    <span className="text-white text-right font-mono text-xs break-all">
+                      {installInfo.command}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-white/60 gap-4">
+                    <span className="shrink-0">Estimated Time</span>
+                    <span className="text-white text-right">
+                      {installInfo.estimated_time}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-white/60 gap-4">
+                    <span className="shrink-0">Models</span>
+                    <span className="text-white/80 text-right text-xs">
+                      {installInfo.models_note}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -207,22 +252,64 @@ export const ModelInterface = () => {
           {(installProgress.status === "Downloading" ||
             installProgress.status === "Verifying" ||
             installProgress.status === "Installing") && (
-            <div className="space-y-4">
-              <div className="relative w-full bg-white/10 rounded-full h-3 overflow-hidden">
-                <div
-                  className="absolute left-0 top-0 h-full bg-(--color-purple-accent) transition-all duration-300"
-                  style={{ width: `${installProgress.progress}%` }}
-                />
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="relative w-full bg-white/10 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="absolute left-0 top-0 h-full bg-(--color-purple-accent) transition-all duration-500"
+                    style={{ width: `${installProgress.progress}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                  <FiLoader
+                    className="animate-spin text-(--color-purple-accent)"
+                    size={20}
+                  />
+                  <span className="text-white/80">
+                    {installProgress.message}
+                  </span>
+                </div>
+                <div className="text-sm text-white/40">
+                  {installProgress.progress}% complete
+                </div>
               </div>
-              <div className="flex items-center justify-center gap-3">
-                <FiLoader
-                  className="animate-spin text-(--color-purple-accent)"
-                  size={20}
-                />
-                <span className="text-white/80">{installProgress.message}</span>
-              </div>
-              <div className="text-sm text-white/40">
-                {installProgress.progress}%
+
+              {/* Log output terminal */}
+              {logs.length > 0 && (
+                <div className="bg-black/40 border border-white/10 rounded-xl p-4 text-left">
+                  <div className="flex items-center gap-2 mb-2 text-white/40 text-xs">
+                    <FiTerminal size={12} />
+                    <span>Installation Log</span>
+                  </div>
+                  <div
+                    ref={logContainerRef}
+                    className="max-h-48 overflow-y-auto font-mono text-xs space-y-1"
+                  >
+                    {logs.map((log, index) => (
+                      <div
+                        key={index}
+                        className={`${
+                          log.startsWith("⚠️")
+                            ? "text-yellow-400"
+                            : log.startsWith("✅")
+                              ? "text-green-400"
+                              : log.startsWith("📥")
+                                ? "text-blue-400"
+                                : "text-white/60"
+                        }`}
+                      >
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left">
+                <p className="text-xs text-white/40">
+                  ⚠️ The installation may require administrator privileges.
+                  Please approve any system prompts that appear.
+                </p>
               </div>
             </div>
           )}
@@ -232,7 +319,7 @@ export const ModelInterface = () => {
               <div className="flex items-center justify-center gap-3 text-green-400">
                 <FiCheck size={24} />
                 <span className="text-lg font-medium">
-                  Installation Complete!
+                  Installation Complete! 🎉
                 </span>
               </div>
               <p className="text-white/60">{installProgress.message}</p>
@@ -256,11 +343,23 @@ export const ModelInterface = () => {
               </p>
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left text-sm text-white/60">
                 <h4 className="font-semibold text-white/80 mb-2">
-                  Manual Installation Steps:
+                  🔧 Troubleshooting:
                 </h4>
                 <div className="space-y-2">
                   <p>
-                    1. Visit{" "}
+                    <span className="text-white/80">
+                      1. Manual Installation:
+                    </span>
+                    <br />
+                    Open terminal and run:
+                    <br />
+                    <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono block mt-1 whitespace-pre-wrap break-all">
+                      {installInfo?.command ||
+                        "curl -fsSL https://ollama.com/install.sh | sh"}
+                    </code>
+                  </p>
+                  <p>
+                    <span className="text-white/80">2. Visit </span>
                     <a
                       href="https://ollama.com/download"
                       target="_blank"
@@ -270,9 +369,6 @@ export const ModelInterface = () => {
                       ollama.com/download
                     </a>
                   </p>
-                  <p>2. Download the installer for {getPlatformDisplay()}</p>
-                  <p>3. Run the installer and follow the prompts</p>
-                  <p>4. After installation, restart Solyn</p>
                 </div>
               </div>
               <button
@@ -282,6 +378,7 @@ export const ModelInterface = () => {
                     progress: 0,
                     message: "",
                   });
+                  setLogs([]);
                 }}
                 className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-all"
               >
@@ -325,6 +422,7 @@ export const ModelInterface = () => {
             onClick={() => {
               setIsOllamaInstalled(false);
               setInstallProgress({ status: "Idle", progress: 0, message: "" });
+              setLogs([]);
             }}
             className="text-(--color-purple-accent) hover:underline"
           >
