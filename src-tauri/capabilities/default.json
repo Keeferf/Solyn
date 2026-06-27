@@ -7,6 +7,9 @@
     "shell:allow-execute",
     "shell:allow-open",
     "shell:default",
-    "opener:default"
+    "opener:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:event:allow-unlisten"
   ]
 }
