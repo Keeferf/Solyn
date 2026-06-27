@@ -57,27 +57,48 @@ export const ModelInterface = () => {
     fetchInstallInfo();
 
     // Listen for installation progress
-    const unlisten = listen<InstallProgress>("install-progress", (event) => {
-      const payload = event.payload;
-      setInstallProgress(payload);
+    const setupListener = async () => {
+      try {
+        console.log("Setting up install-progress listener...");
+        const unlisten = await listen<InstallProgress>(
+          "install-progress",
+          (event) => {
+            console.log("Received install-progress event:", event.payload);
+            const payload = event.payload;
+            setInstallProgress(payload);
 
-      // Add log message if present
-      if (payload.log) {
-        setLogs((prev) => [...prev, payload.log!]);
-      }
+            // Add log message if present
+            if (payload.log) {
+              console.log("Adding log:", payload.log);
+              setLogs((prev) => [...prev, payload.log!]);
+            }
 
-      if (payload.status === "Completed") {
-        setIsInstalling(false);
-        checkOllamaInstallation();
-      }
+            if (payload.status === "Completed") {
+              console.log("Installation completed!");
+              setIsInstalling(false);
+              checkOllamaInstallation();
+            }
 
-      if (payload.status === "Error") {
-        setIsInstalling(false);
+            if (payload.status === "Error") {
+              console.log("Installation error:", payload.error);
+              setIsInstalling(false);
+            }
+          },
+        );
+        console.log("Listener set up successfully");
+        return unlisten;
+      } catch (error) {
+        console.error("Failed to set up listener:", error);
+        return () => {};
       }
-    });
+    };
+
+    const unlistenPromise = setupListener();
 
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenPromise.then((fn) => {
+        if (fn) fn();
+      });
     };
   }, []);
 
@@ -116,6 +137,7 @@ export const ModelInterface = () => {
   };
 
   const handleInstallOllama = async () => {
+    console.log("Starting installation...");
     setIsInstalling(true);
     setLogs([]);
     setInstallProgress({
@@ -126,6 +148,7 @@ export const ModelInterface = () => {
 
     try {
       await invoke("download_ollama");
+      console.log("Installation command completed");
     } catch (error) {
       console.error("Installation failed:", error);
       setInstallProgress({
@@ -279,7 +302,7 @@ export const ModelInterface = () => {
                 <div className="bg-black/40 border border-white/10 rounded-xl p-4 text-left">
                   <div className="flex items-center gap-2 mb-2 text-white/40 text-xs">
                     <FiTerminal size={12} />
-                    <span>Installation Log</span>
+                    <span>Installation Log ({logs.length} lines)</span>
                   </div>
                   <div
                     ref={logContainerRef}
@@ -293,9 +316,11 @@ export const ModelInterface = () => {
                             ? "text-yellow-400"
                             : log.startsWith("✅")
                               ? "text-green-400"
-                              : log.startsWith("📥")
+                              : log.startsWith("📥") || log.startsWith("📦")
                                 ? "text-blue-400"
-                                : "text-white/60"
+                                : log.startsWith("❌")
+                                  ? "text-red-400"
+                                  : "text-white/60"
                         }`}
                       >
                         {log}
