@@ -7,7 +7,8 @@ import {
   FiServer,
   FiExternalLink,
   FiTerminal,
-  FiX,
+  FiChevronDown,
+  FiChevronUp,
 } from "react-icons/fi";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -272,7 +273,7 @@ export const ModelInterface = () => {
               <button
                 onClick={handleDownloadOllama}
                 disabled={isDownloading}
-                className="px-8 py-3 bg-(--color-purple-accent) hover:bg-(--color-purple-accent)/80 disabled:opacity-50 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 mx-auto"
+                className="px-8 py-3 bg-(--color-purple-accent) hover:bg-(--color-purple-accent)/80 disabled:opacity-50 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer"
               >
                 <FiDownload size={18} />
                 Download Ollama for {getPlatformDisplay()}
@@ -331,11 +332,17 @@ export const ModelInterface = () => {
                       lines)
                     </span>
                   </div>
-                  <button className="text-white/30 hover:text-white/60 transition-colors">
+                  <button
+                    className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsTerminalExpanded(!isTerminalExpanded);
+                    }}
+                  >
                     {isTerminalExpanded ? (
-                      <FiX size={16} />
+                      <FiChevronUp size={18} />
                     ) : (
-                      <FiTerminal size={16} />
+                      <FiChevronDown size={18} />
                     )}
                   </button>
                 </div>

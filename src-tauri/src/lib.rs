@@ -152,6 +152,27 @@ fn get_platform() -> String {
     }
 }
 
+// Helper function to clean output lines
+fn clean_output_line(line: &str) -> String {
+    let trimmed = line.trim();
+    
+    // Remove common prefixes that might be added by the script or shell
+    let cleaned = trimmed
+        .trim_start_matches("> ")
+        .trim_start_matches(">>> ")
+        .trim_start_matches(">> ")
+        .trim_start_matches("$ ")
+        .trim_start_matches("# ")
+        .trim_start_matches("VERBOSE: ");
+    
+    // If the line is just a prefix character or empty, return empty
+    if cleaned.is_empty() || cleaned == ">" || cleaned == ">>>" || cleaned == ">>" {
+        return String::new();
+    }
+    
+    cleaned.to_string()
+}
+
 async fn download_windows(window: &tauri::WebviewWindow) -> Result<(), String> {
     emit_terminal_output(window, "Starting Ollama installation for Windows...", "info");
     
@@ -178,9 +199,12 @@ async fn download_windows(window: &tauri::WebviewWindow) -> Result<(), String> {
         for line in reader.lines() {
             if let Ok(line) = line {
                 if !line.is_empty() {
-                    emit_terminal_output(&window_clone, &line, "stdout");
-                    // Also update progress based on simple heuristics
-                    update_progress_from_line(&window_clone, &line);
+                    let cleaned_line = clean_output_line(&line);
+                    if !cleaned_line.is_empty() {
+                        emit_terminal_output(&window_clone, &cleaned_line, "stdout");
+                        // Also update progress based on simple heuristics
+                        update_progress_from_line(&window_clone, &cleaned_line);
+                    }
                 }
             }
         }
@@ -192,8 +216,11 @@ async fn download_windows(window: &tauri::WebviewWindow) -> Result<(), String> {
         for line in reader.lines() {
             if let Ok(line) = line {
                 if !line.is_empty() {
-                    emit_terminal_output(&window_clone2, &line, "stderr");
-                    update_progress_from_line(&window_clone2, &line);
+                    let cleaned_line = clean_output_line(&line);
+                    if !cleaned_line.is_empty() {
+                        emit_terminal_output(&window_clone2, &cleaned_line, "stderr");
+                        update_progress_from_line(&window_clone2, &cleaned_line);
+                    }
                 }
             }
         }
@@ -231,8 +258,11 @@ async fn download_macos(window: &tauri::WebviewWindow) -> Result<(), String> {
         for line in reader.lines() {
             if let Ok(line) = line {
                 if !line.is_empty() {
-                    emit_terminal_output(&window_clone, &line, "stdout");
-                    update_progress_from_line(&window_clone, &line);
+                    let cleaned_line = clean_output_line(&line);
+                    if !cleaned_line.is_empty() {
+                        emit_terminal_output(&window_clone, &cleaned_line, "stdout");
+                        update_progress_from_line(&window_clone, &cleaned_line);
+                    }
                 }
             }
         }
@@ -244,8 +274,11 @@ async fn download_macos(window: &tauri::WebviewWindow) -> Result<(), String> {
         for line in reader.lines() {
             if let Ok(line) = line {
                 if !line.is_empty() {
-                    emit_terminal_output(&window_clone2, &line, "stderr");
-                    update_progress_from_line(&window_clone2, &line);
+                    let cleaned_line = clean_output_line(&line);
+                    if !cleaned_line.is_empty() {
+                        emit_terminal_output(&window_clone2, &cleaned_line, "stderr");
+                        update_progress_from_line(&window_clone2, &cleaned_line);
+                    }
                 }
             }
         }
@@ -283,8 +316,11 @@ async fn download_linux(window: &tauri::WebviewWindow) -> Result<(), String> {
         for line in reader.lines() {
             if let Ok(line) = line {
                 if !line.is_empty() {
-                    emit_terminal_output(&window_clone, &line, "stdout");
-                    update_progress_from_line(&window_clone, &line);
+                    let cleaned_line = clean_output_line(&line);
+                    if !cleaned_line.is_empty() {
+                        emit_terminal_output(&window_clone, &cleaned_line, "stdout");
+                        update_progress_from_line(&window_clone, &cleaned_line);
+                    }
                 }
             }
         }
@@ -296,8 +332,11 @@ async fn download_linux(window: &tauri::WebviewWindow) -> Result<(), String> {
         for line in reader.lines() {
             if let Ok(line) = line {
                 if !line.is_empty() {
-                    emit_terminal_output(&window_clone2, &line, "stderr");
-                    update_progress_from_line(&window_clone2, &line);
+                    let cleaned_line = clean_output_line(&line);
+                    if !cleaned_line.is_empty() {
+                        emit_terminal_output(&window_clone2, &cleaned_line, "stderr");
+                        update_progress_from_line(&window_clone2, &cleaned_line);
+                    }
                 }
             }
         }
@@ -333,8 +372,14 @@ fn update_progress_from_line(window: &tauri::WebviewWindow, line: &str) {
 }
 
 fn emit_terminal_output(window: &tauri::WebviewWindow, line: &str, stream_type: &str) {
+    // The line is already cleaned in the calling functions, but we'll apply it again just in case
+    let cleaned_line = clean_output_line(line);
+    if cleaned_line.is_empty() {
+        return;
+    }
+    
     let _ = window.emit("terminal-output", TerminalOutput {
-        line: line.to_string(),
+        line: cleaned_line,
         stream: stream_type.to_string(),
     });
 }
