@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { ModelInterface } from "@/components/models/ModelInterface";
+import { OllamaProvider } from "@/contexts/OllamaContext";
 
 type View = "chat" | "models";
 
@@ -34,12 +35,14 @@ export const App = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-black">
-      <Sidebar onNavigate={setCurrentView} currentView={currentView} />
-      <main className="flex-1 ml-64 min-h-screen flex flex-col items-center justify-center p-4">
-        {renderContent()}
-      </main>
-    </div>
+    <OllamaProvider>
+      <div className="flex min-h-screen bg-black">
+        <Sidebar onNavigate={setCurrentView} currentView={currentView} />
+        <main className="flex-1 ml-64 min-h-screen flex flex-col items-center justify-center p-4">
+          {renderContent()}
+        </main>
+      </div>
+    </OllamaProvider>
   );
 };
 

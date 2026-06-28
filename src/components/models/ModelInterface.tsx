@@ -1,3 +1,4 @@
+// src/components/models/ModelInterface.tsx
 import { useState, useEffect, useRef } from "react";
 import {
   FiDownload,
@@ -12,6 +13,7 @@ import {
 } from "react-icons/fi";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { useOllama } from "@/contexts/OllamaContext";
 
 type DownloadStatus = "Idle" | "Downloading" | "Completed" | "Error";
 
@@ -34,11 +36,10 @@ interface TerminalOutput {
 }
 
 export const ModelInterface = () => {
-  const [loading, setLoading] = useState(true);
-  const [isOllamaInstalled, setIsOllamaInstalled] = useState<boolean | null>(
-    null,
-  );
-  const [ollamaVersion, setOllamaVersion] = useState<string | null>(null);
+  // Use the context instead of local state
+  const { isOllamaInstalled, ollamaVersion, loading, refreshOllamaStatus } =
+    useOllama();
+
   const [installInfo, setInstallInfo] = useState<InstallInfo | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({
     status: "Idle",
@@ -59,7 +60,6 @@ export const ModelInterface = () => {
   }, [terminalLines]);
 
   useEffect(() => {
-    checkOllamaInstallation();
     fetchInstallInfo();
 
     const setupListeners = async () => {
@@ -71,8 +71,9 @@ export const ModelInterface = () => {
 
           if (payload.status === "Completed") {
             setIsDownloading(false);
+            // Refresh the Ollama status after installation completes
             setTimeout(() => {
-              checkOllamaInstallation();
+              refreshOllamaStatus();
             }, 2000);
           }
 
@@ -102,7 +103,7 @@ export const ModelInterface = () => {
         if (fn) fn();
       });
     };
-  }, []);
+  }, [refreshOllamaStatus]);
 
   const fetchInstallInfo = async () => {
     try {
@@ -110,23 +111,6 @@ export const ModelInterface = () => {
       setInstallInfo(info);
     } catch {
       // Silent fail
-    }
-  };
-
-  const checkOllamaInstallation = async () => {
-    setLoading(true);
-    try {
-      const installed = await invoke<boolean>("check_ollama_installed");
-      setIsOllamaInstalled(installed);
-
-      if (installed) {
-        const version = await invoke<string>("get_ollama_version");
-        setOllamaVersion(version);
-      }
-    } catch {
-      setIsOllamaInstalled(false);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -213,6 +197,7 @@ export const ModelInterface = () => {
     }
   };
 
+  // Loading state from context
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto w-full p-6 flex items-center justify-center h-64">
@@ -224,6 +209,7 @@ export const ModelInterface = () => {
     );
   }
 
+  // Ollama not installed state
   if (isOllamaInstalled === false) {
     return (
       <div className="max-w-5xl mx-auto w-full p-6">
@@ -386,10 +372,18 @@ export const ModelInterface = () => {
                     </span>
                   </div>
                   <button
-                    onClick={() => window.location.reload()}
+                    onClick={() => {
+                      refreshOllamaStatus();
+                      setDownloadProgress({
+                        status: "Idle",
+                        progress: 0,
+                        message: "",
+                      });
+                      setTerminalLines([]);
+                    }}
                     className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-all"
                   >
-                    Refresh to Continue
+                    Continue
                   </button>
                 </div>
               )}
@@ -458,6 +452,7 @@ export const ModelInterface = () => {
     );
   }
 
+  // Ollama installed state
   return (
     <div className="max-w-5xl mx-auto w-full p-6">
       <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
@@ -486,7 +481,8 @@ export const ModelInterface = () => {
           <span>Need to reinstall? </span>
           <button
             onClick={() => {
-              setIsOllamaInstalled(false);
+              // Force a recheck by refreshing the status
+              refreshOllamaStatus();
               setDownloadProgress({
                 status: "Idle",
                 progress: 0,
