@@ -169,16 +169,17 @@ export const ModelInterface = () => {
 
   // Filter function to remove verbose PowerShell messages
   const shouldShowLine = (line: string): boolean => {
-    // Filter out PowerShell verbose messages
-    if (line.includes("VERBOSE:") && line.includes("payload")) return false;
-    if (line.includes("VERBOSE:") && line.includes("response of content type"))
+    // Filter out all PowerShell VERBOSE messages
+    if (line.includes("VERBOSE:")) return false;
+
+    // Filter out specific verbose messages even if they don't have VERBOSE: prefix
+    if (line.includes("GET with") && line.includes("payload")) return false;
+    if (line.includes("received") && line.includes("response of content type"))
       return false;
-    if (line.includes("VERBOSE:") && line.includes("GET with")) return false;
 
     // Filter out empty lines
     if (line.trim() === "") return false;
 
-    // You can add more filters here as needed
     return true;
   };
 
