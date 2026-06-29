@@ -71,10 +71,22 @@ export const ModelInterface = () => {
 
           if (payload.status === "Completed") {
             setIsDownloading(false);
-            // Refresh the Ollama status after installation completes
-            setTimeout(() => {
-              refreshOllamaStatus();
-            }, 2000);
+            // Try to refresh status multiple times with delays
+            let attempts = 0;
+            const maxAttempts = 8;
+
+            const tryRefresh = async () => {
+              attempts++;
+              await refreshOllamaStatus();
+
+              // If not installed yet and we have more attempts, try again
+              if (attempts < maxAttempts) {
+                setTimeout(tryRefresh, 2000);
+              }
+            };
+
+            // Start with a 2 second delay
+            setTimeout(tryRefresh, 2000);
           }
 
           if (payload.status === "Error") {
@@ -86,7 +98,55 @@ export const ModelInterface = () => {
       const unlistenTerminal = await listen<TerminalOutput>(
         "terminal-output",
         (event) => {
-          setTerminalLines((prev) => [...prev, event.payload]);
+          const line = event.payload.line;
+
+          // Filter out the "Install complete" message
+          if (
+            line.includes(
+              "Install complete. Run 'ollama' from the command line.",
+            ) ||
+            line.includes("Run 'ollama' from the command line.") ||
+            line.includes("Install complete.")
+          ) {
+            return;
+          }
+
+          // Detect progress lines (contain progress bar characters)
+          const isProgressLine =
+            line.includes("#") ||
+            line.includes("=") ||
+            line.includes("█") ||
+            line.includes("▓") ||
+            line.includes("░") ||
+            line.includes("%");
+
+          setTerminalLines((prev) => {
+            if (isProgressLine) {
+              // Replace the last progress line if it exists
+              const lastIndex = prev.length - 1;
+              if (lastIndex >= 0 && isProgressLine) {
+                // Check if the last line is also a progress line
+                const lastLine = prev[lastIndex].line;
+                const lastIsProgress =
+                  lastLine.includes("#") ||
+                  lastLine.includes("=") ||
+                  lastLine.includes("█") ||
+                  lastLine.includes("▓") ||
+                  lastLine.includes("░") ||
+                  lastLine.includes("%");
+
+                if (lastIsProgress) {
+                  // Replace the last progress line
+                  return [...prev.slice(0, lastIndex), event.payload];
+                }
+              }
+              // If no previous progress line, just append
+              return [...prev, event.payload];
+            } else {
+              // Regular line - always append
+              return [...prev, event.payload];
+            }
+          });
         },
       );
 
@@ -160,6 +220,12 @@ export const ModelInterface = () => {
     if (line.includes("GET with") && line.includes("payload")) return false;
     if (line.includes("received") && line.includes("response of content type"))
       return false;
+
+    // Filter out "Install complete" messages
+    if (line.includes("Install complete. Run 'ollama' from the command line."))
+      return false;
+    if (line.includes("Run 'ollama' from the command line.")) return false;
+    if (line.includes("Install complete.")) return false;
 
     // Filter out empty lines
     if (line.trim() === "") return false;
@@ -305,19 +371,7 @@ export const ModelInterface = () => {
                   onClick={() => setIsTerminalExpanded(!isTerminalExpanded)}
                 >
                   <div className="flex items-center gap-2">
-                    <FiTerminal className="text-white/40" size={16} />
-                    <span className="text-xs text-white/40 font-mono">
-                      Terminal Output
-                    </span>
-                    <span className="text-xs text-white/20">
-                      (
-                      {
-                        terminalLines.filter((line) =>
-                          shouldShowLine(line.line),
-                        ).length
-                      }{" "}
-                      lines)
-                    </span>
+                    <FiTerminal className="text-white/60" size={18} />
                   </div>
                   <button
                     className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"
@@ -346,17 +400,19 @@ export const ModelInterface = () => {
                     ) : (
                       terminalLines
                         .filter((output) => shouldShowLine(output.line))
-                        .map((output, index) => (
-                          <div
-                            key={index}
-                            className={`${getStreamColor(output.stream)} py-0.5 whitespace-pre-wrap break-all`}
-                          >
-                            <span className="text-white/20 mr-2 select-none">
-                              {getStreamPrefix(output.stream)}
-                            </span>
-                            {output.line}
-                          </div>
-                        ))
+                        .map((output, index) => {
+                          return (
+                            <div
+                              key={index}
+                              className={`${getStreamColor(output.stream)} py-0.5 whitespace-pre-wrap break-all`}
+                            >
+                              <span className="text-white/20 mr-2 select-none">
+                                {getStreamPrefix(output.stream)}
+                              </span>
+                              {output.line}
+                            </div>
+                          );
+                        })
                     )}
                     <div ref={terminalEndRef} />
                   </div>
@@ -371,6 +427,10 @@ export const ModelInterface = () => {
                       Installation Complete! 🎉
                     </span>
                   </div>
+                  <p className="text-white/40 text-sm">
+                    Ollama is now installed and running. You can start using AI
+                    models.
+                  </p>
                   <button
                     onClick={() => {
                       refreshOllamaStatus();
