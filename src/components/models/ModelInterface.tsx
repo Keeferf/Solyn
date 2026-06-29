@@ -86,7 +86,44 @@ export const ModelInterface = () => {
       const unlistenTerminal = await listen<TerminalOutput>(
         "terminal-output",
         (event) => {
-          setTerminalLines((prev) => [...prev, event.payload]);
+          const line = event.payload.line;
+
+          // Detect progress lines (contain progress bar characters)
+          const isProgressLine =
+            line.includes("#") ||
+            line.includes("=") ||
+            line.includes("█") ||
+            line.includes("▓") ||
+            line.includes("░") ||
+            line.includes("%");
+
+          setTerminalLines((prev) => {
+            if (isProgressLine) {
+              // Replace the last progress line if it exists
+              const lastIndex = prev.length - 1;
+              if (lastIndex >= 0 && isProgressLine) {
+                // Check if the last line is also a progress line
+                const lastLine = prev[lastIndex].line;
+                const lastIsProgress =
+                  lastLine.includes("#") ||
+                  lastLine.includes("=") ||
+                  lastLine.includes("█") ||
+                  lastLine.includes("▓") ||
+                  lastLine.includes("░") ||
+                  lastLine.includes("%");
+
+                if (lastIsProgress) {
+                  // Replace the last progress line
+                  return [...prev.slice(0, lastIndex), event.payload];
+                }
+              }
+              // If no previous progress line, just append
+              return [...prev, event.payload];
+            } else {
+              // Regular line - always append
+              return [...prev, event.payload];
+            }
+          });
         },
       );
 
@@ -346,17 +383,19 @@ export const ModelInterface = () => {
                     ) : (
                       terminalLines
                         .filter((output) => shouldShowLine(output.line))
-                        .map((output, index) => (
-                          <div
-                            key={index}
-                            className={`${getStreamColor(output.stream)} py-0.5 whitespace-pre-wrap break-all`}
-                          >
-                            <span className="text-white/20 mr-2 select-none">
-                              {getStreamPrefix(output.stream)}
-                            </span>
-                            {output.line}
-                          </div>
-                        ))
+                        .map((output, index) => {
+                          return (
+                            <div
+                              key={index}
+                              className={`${getStreamColor(output.stream)} py-0.5 whitespace-pre-wrap break-all`}
+                            >
+                              <span className="text-white/20 mr-2 select-none">
+                                {getStreamPrefix(output.stream)}
+                              </span>
+                              {output.line}
+                            </div>
+                          );
+                        })
                     )}
                     <div ref={terminalEndRef} />
                   </div>

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader};
 use tauri::{Emitter, Manager};
+use tauri_plugin_shell::ShellExt;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DownloadProgress {
@@ -29,7 +29,7 @@ pub struct InstallInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TerminalOutput {
     pub line: String,
-    pub stream: String, // "stdout" or "stderr"
+    pub stream: String, // "stdout", "stderr", "info", "success"
 }
 
 #[tauri::command]
@@ -106,12 +106,7 @@ async fn download_ollama(app_handle: tauri::AppHandle) -> Result<String, String>
         None,
     );
 
-    let download_result = match platform.as_str() {
-        "windows" => download_windows(&window).await,
-        "macos" => download_macos(&window).await,
-        "linux" => download_linux(&window).await,
-        _ => Err("Unsupported platform".to_string()),
-    };
+    let download_result = download_with_pty(&app_handle, &window, &platform).await;
 
     if let Err(e) = download_result {
         emit_progress(
@@ -170,209 +165,135 @@ fn clean_output_line(line: &str) -> String {
         return String::new();
     }
     
+    // Remove specific verbose messages
+    if cleaned.contains("GET with") && cleaned.contains("payload") {
+        return String::new();
+    }
+    if cleaned.contains("received") && cleaned.contains("response of content type") {
+        return String::new();
+    }
+    
     cleaned.to_string()
 }
 
-async fn download_windows(window: &tauri::WebviewWindow) -> Result<(), String> {
-    emit_terminal_output(window, "Starting Ollama installation for Windows...", "info");
+// Helper function to strip ANSI escape sequences
+fn strip_ansi_escapes(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    let mut in_escape = false;
+    let mut in_bracket = false;
     
-    let mut child = Command::new("powershell")
-        .args(&[
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            "& { $ProgressPreference = 'Continue'; $VerbosePreference = 'Continue'; irm https://ollama.com/install.ps1 | iex }",
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to start PowerShell: {}", e))?;
-
-    let stdout = child.stdout.take().expect("Failed to capture stdout");
-    let stderr = child.stderr.take().expect("Failed to capture stderr");
-
-    // Spawn tasks to stream output
-    let window_clone = window.clone();
-    tokio::spawn(async move {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    let cleaned_line = clean_output_line(&line);
-                    if !cleaned_line.is_empty() {
-                        emit_terminal_output(&window_clone, &cleaned_line, "stdout");
-                        // Also update progress based on simple heuristics
-                        update_progress_from_line(&window_clone, &cleaned_line);
-                    }
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            in_escape = true;
+            in_bracket = false;
+            continue;
+        }
+        
+        if in_escape {
+            if c == '[' {
+                in_bracket = true;
+                continue;
+            }
+            
+            if in_bracket {
+                // Check if we're at the end of an ANSI sequence
+                if c.is_ascii_alphabetic() || c == '@' {
+                    in_escape = false;
+                    in_bracket = false;
+                    continue;
+                }
+                continue;
+            } else {
+                // Single character escape
+                if c.is_ascii_alphabetic() {
+                    in_escape = false;
+                    continue;
                 }
             }
+        } else {
+            result.push(c);
         }
-    });
-
-    let window_clone2 = window.clone();
-    tokio::spawn(async move {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    let cleaned_line = clean_output_line(&line);
-                    if !cleaned_line.is_empty() {
-                        emit_terminal_output(&window_clone2, &cleaned_line, "stderr");
-                        update_progress_from_line(&window_clone2, &cleaned_line);
-                    }
-                }
-            }
-        }
-    });
-
-    let status = child
-        .wait()
-        .map_err(|e| format!("Failed to wait for installation: {}", e))?;
-
-    if !status.success() {
-        return Err("Installation script exited with error".to_string());
     }
-
-    emit_terminal_output(window, "✓ Installation completed successfully!", "success");
-    Ok(())
+    
+    result
 }
 
-async fn download_macos(window: &tauri::WebviewWindow) -> Result<(), String> {
-    emit_terminal_output(window, "Starting Ollama installation for macOS...", "info");
-    
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg("curl -fsSL https://ollama.com/install.sh | sh")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to run installation script: {}", e))?;
-
-    let stdout = child.stdout.take().expect("Failed to capture stdout");
-    let stderr = child.stderr.take().expect("Failed to capture stderr");
-
+async fn download_with_pty(
+    app_handle: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    platform: &str,
+) -> Result<(), String> {
     let window_clone = window.clone();
-    tokio::spawn(async move {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    let cleaned_line = clean_output_line(&line);
-                    if !cleaned_line.is_empty() {
-                        emit_terminal_output(&window_clone, &cleaned_line, "stdout");
-                        update_progress_from_line(&window_clone, &cleaned_line);
+    let shell = app_handle.shell();
+    
+    let (shell_cmd, script_cmd) = match platform {
+        "windows" => ("powershell", "irm https://ollama.com/install.ps1 | iex"),
+        "macos" => ("sh", "curl -fsSL https://ollama.com/install.sh | sh"),
+        "linux" => ("sh", "curl -fsSL https://ollama.com/install.sh | sh"),
+        _ => return Err("Unsupported platform".to_string()),
+    };
+
+    emit_terminal_output(&window_clone, format!("Running installer for {}", platform).as_str(), "info");
+
+    let (mut rx, _child) = shell
+        .command(shell_cmd)
+        .args(&["-c", script_cmd])
+        .spawn()
+        .map_err(|e| format!("Failed to spawn process: {}", e))?;
+
+    // Stream output in real-time
+    while let Some(event) = rx.recv().await {
+        match event {
+            tauri_plugin_shell::process::CommandEvent::Stdout(data) => {
+                if let Ok(text) = String::from_utf8(data) {
+                    for line in text.lines() {
+                        let stripped = strip_ansi_escapes(line);
+                        let cleaned = clean_output_line(&stripped);
+                        
+                        if !cleaned.is_empty() {
+                            emit_terminal_output(&window_clone, &cleaned, "stdout");
+                        }
                     }
                 }
             }
-        }
-    });
-
-    let window_clone2 = window.clone();
-    tokio::spawn(async move {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    let cleaned_line = clean_output_line(&line);
-                    if !cleaned_line.is_empty() {
-                        emit_terminal_output(&window_clone2, &cleaned_line, "stderr");
-                        update_progress_from_line(&window_clone2, &cleaned_line);
+            tauri_plugin_shell::process::CommandEvent::Stderr(data) => {
+                if let Ok(text) = String::from_utf8(data) {
+                    for line in text.lines() {
+                        let stripped = strip_ansi_escapes(line);
+                        let cleaned = clean_output_line(&stripped);
+                        
+                        if !cleaned.is_empty() {
+                            emit_terminal_output(&window_clone, &cleaned, "stderr");
+                        }
                     }
                 }
             }
+            tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
+                let msg = if status.code == Some(0) {
+                    "Process completed successfully"
+                } else {
+                    "Process terminated with error"
+                };
+                emit_terminal_output(&window_clone, msg, "info");
+            }
+            _ => {}
         }
-    });
-
-    let status = child
-        .wait()
-        .map_err(|e| format!("Failed to wait for installation: {}", e))?;
-
-    if !status.success() {
-        return Err("Installation failed".to_string());
     }
 
-    emit_terminal_output(window, "✓ Installation completed successfully!", "success");
-    Ok(())
-}
-
-async fn download_linux(window: &tauri::WebviewWindow) -> Result<(), String> {
-    emit_terminal_output(window, "Starting Ollama installation for Linux...", "info");
-    
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg("curl -fsSL https://ollama.com/install.sh | sh")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to run installation script: {}", e))?;
-
-    let stdout = child.stdout.take().expect("Failed to capture stdout");
-    let stderr = child.stderr.take().expect("Failed to capture stderr");
-
-    let window_clone = window.clone();
-    tokio::spawn(async move {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    let cleaned_line = clean_output_line(&line);
-                    if !cleaned_line.is_empty() {
-                        emit_terminal_output(&window_clone, &cleaned_line, "stdout");
-                        update_progress_from_line(&window_clone, &cleaned_line);
-                    }
-                }
-            }
-        }
-    });
-
-    let window_clone2 = window.clone();
-    tokio::spawn(async move {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    let cleaned_line = clean_output_line(&line);
-                    if !cleaned_line.is_empty() {
-                        emit_terminal_output(&window_clone2, &cleaned_line, "stderr");
-                        update_progress_from_line(&window_clone2, &cleaned_line);
-                    }
-                }
-            }
-        }
-    });
-
-    let status = child
-        .wait()
-        .map_err(|e| format!("Failed to wait for installation: {}", e))?;
-
-    if !status.success() {
-        return Err("Installation failed".to_string());
-    }
-
-    emit_terminal_output(window, "✓ Installation completed successfully!", "success");
-    Ok(())
-}
-
-fn update_progress_from_line(window: &tauri::WebviewWindow, line: &str) {
-    // Simple heuristics to show progress without complex parsing
-    let lower = line.to_lowercase();
-    
-    if lower.contains("download") || lower.contains("curl") {
-        emit_progress(window, DownloadStatus::Downloading, 20, "Downloading...".to_string(), Some(line));
-    } else if lower.contains("install") && !lower.contains("uninstall") {
-        emit_progress(window, DownloadStatus::Downloading, 50, "Installing...".to_string(), Some(line));
-    } else if lower.contains("extract") || lower.contains("unzip") {
-        emit_progress(window, DownloadStatus::Downloading, 60, "Extracting files...".to_string(), Some(line));
-    } else if lower.contains("service") || lower.contains("start") {
-        emit_progress(window, DownloadStatus::Downloading, 75, "Starting services...".to_string(), Some(line));
-    } else if lower.contains("complete") || lower.contains("success") || lower.contains("installed") {
-        emit_progress(window, DownloadStatus::Downloading, 90, "Finalizing...".to_string(), Some(line));
+    // Verify installation
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    if let Ok(true) = check_ollama_installed().await {
+        emit_terminal_output(&window, "✓ Ollama verified and running!", "success");
+        Ok(())
+    } else {
+        emit_terminal_output(&window, "⚠️ Installation may be complete but Ollama verification failed.", "info");
+        emit_terminal_output(&window, "Please run 'ollama serve' manually if needed.", "info");
+        Ok(())
     }
 }
 
 fn emit_terminal_output(window: &tauri::WebviewWindow, line: &str, stream_type: &str) {
-    // The line is already cleaned in the calling functions, but we'll apply it again just in case
     let cleaned_line = clean_output_line(line);
     if cleaned_line.is_empty() {
         return;
