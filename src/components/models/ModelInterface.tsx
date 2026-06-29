@@ -1,4 +1,3 @@
-// src/components/models/ModelInterface.tsx
 import { useState, useEffect, useRef } from "react";
 import {
   FiDownload,
@@ -342,19 +341,7 @@ export const ModelInterface = () => {
                   onClick={() => setIsTerminalExpanded(!isTerminalExpanded)}
                 >
                   <div className="flex items-center gap-2">
-                    <FiTerminal className="text-white/40" size={16} />
-                    <span className="text-xs text-white/40 font-mono">
-                      Terminal Output
-                    </span>
-                    <span className="text-xs text-white/20">
-                      (
-                      {
-                        terminalLines.filter((line) =>
-                          shouldShowLine(line.line),
-                        ).length
-                      }{" "}
-                      lines)
-                    </span>
+                    <FiTerminal className="text-white/60" size={18} />
                   </div>
                   <button
                     className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"

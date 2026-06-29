@@ -30,6 +30,7 @@ pub struct InstallInfo {
 pub struct TerminalOutput {
     pub line: String,
     pub stream: String, // "stdout", "stderr", "info", "success"
+    pub is_progress: bool, // indicates this is a progress line that should replace the last one
 }
 
 #[tauri::command]
@@ -219,6 +220,50 @@ fn strip_ansi_escapes(text: &str) -> String {
     result
 }
 
+// Helper function to process output stream, handling both \n and \r correctly
+fn process_output_stream(window: &tauri::WebviewWindow, text: &str, stream_type: &str) {
+    let mut current_line = String::new();
+    
+    for ch in text.chars() {
+        match ch {
+            '\r' => {
+                // Carriage return: emit current line as a progress line and reset
+                if !current_line.is_empty() {
+                    let stripped = strip_ansi_escapes(&current_line);
+                    let cleaned = clean_output_line(&stripped);
+                    if !cleaned.is_empty() {
+                        emit_terminal_output(window, &cleaned, stream_type, true);
+                    }
+                }
+                current_line.clear();
+            }
+            '\n' => {
+                // Newline: emit current line as a regular line and reset
+                if !current_line.is_empty() {
+                    let stripped = strip_ansi_escapes(&current_line);
+                    let cleaned = clean_output_line(&stripped);
+                    if !cleaned.is_empty() {
+                        emit_terminal_output(window, &cleaned, stream_type, false);
+                    }
+                }
+                current_line.clear();
+            }
+            _ => {
+                current_line.push(ch);
+            }
+        }
+    }
+    
+    // Emit any remaining buffered content
+    if !current_line.is_empty() {
+        let stripped = strip_ansi_escapes(&current_line);
+        let cleaned = clean_output_line(&stripped);
+        if !cleaned.is_empty() {
+            emit_terminal_output(window, &cleaned, stream_type, true);
+        }
+    }
+}
+
 async fn download_with_pty(
     app_handle: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
@@ -234,7 +279,7 @@ async fn download_with_pty(
         _ => return Err("Unsupported platform".to_string()),
     };
 
-    emit_terminal_output(&window_clone, format!("Running installer for {}", platform).as_str(), "info");
+    emit_terminal_output(&window_clone, format!("Running installer for {}", platform).as_str(), "info", false);
 
     let (mut rx, _child) = shell
         .command(shell_cmd)
@@ -247,26 +292,12 @@ async fn download_with_pty(
         match event {
             tauri_plugin_shell::process::CommandEvent::Stdout(data) => {
                 if let Ok(text) = String::from_utf8(data) {
-                    for line in text.lines() {
-                        let stripped = strip_ansi_escapes(line);
-                        let cleaned = clean_output_line(&stripped);
-                        
-                        if !cleaned.is_empty() {
-                            emit_terminal_output(&window_clone, &cleaned, "stdout");
-                        }
-                    }
+                    process_output_stream(&window_clone, &text, "stdout");
                 }
             }
             tauri_plugin_shell::process::CommandEvent::Stderr(data) => {
                 if let Ok(text) = String::from_utf8(data) {
-                    for line in text.lines() {
-                        let stripped = strip_ansi_escapes(line);
-                        let cleaned = clean_output_line(&stripped);
-                        
-                        if !cleaned.is_empty() {
-                            emit_terminal_output(&window_clone, &cleaned, "stderr");
-                        }
-                    }
+                    process_output_stream(&window_clone, &text, "stderr");
                 }
             }
             tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
@@ -275,7 +306,7 @@ async fn download_with_pty(
                 } else {
                     "Process terminated with error"
                 };
-                emit_terminal_output(&window_clone, msg, "info");
+                emit_terminal_output(&window_clone, msg, "info", false);
             }
             _ => {}
         }
@@ -284,16 +315,16 @@ async fn download_with_pty(
     // Verify installation
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
     if let Ok(true) = check_ollama_installed().await {
-        emit_terminal_output(&window, "✓ Ollama verified and running!", "success");
+        emit_terminal_output(&window, "✓ Ollama verified and running!", "success", false);
         Ok(())
     } else {
-        emit_terminal_output(&window, "⚠️ Installation may be complete but Ollama verification failed.", "info");
-        emit_terminal_output(&window, "Please run 'ollama serve' manually if needed.", "info");
+        emit_terminal_output(&window, "⚠️ Installation may be complete but Ollama verification failed.", "info", false);
+        emit_terminal_output(&window, "Please run 'ollama serve' manually if needed.", "info", false);
         Ok(())
     }
 }
 
-fn emit_terminal_output(window: &tauri::WebviewWindow, line: &str, stream_type: &str) {
+fn emit_terminal_output(window: &tauri::WebviewWindow, line: &str, stream_type: &str, is_progress: bool) {
     let cleaned_line = clean_output_line(line);
     if cleaned_line.is_empty() {
         return;
@@ -302,6 +333,7 @@ fn emit_terminal_output(window: &tauri::WebviewWindow, line: &str, stream_type: 
     let _ = window.emit("terminal-output", TerminalOutput {
         line: cleaned_line,
         stream: stream_type.to_string(),
+        is_progress,
     });
 }
 
