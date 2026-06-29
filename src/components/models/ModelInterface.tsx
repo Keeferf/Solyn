@@ -1,4 +1,3 @@
-// src/components/models/ModelInterface.tsx
 import { useState, useEffect, useRef } from "react";
 import {
   FiDownload,
@@ -36,9 +35,8 @@ interface TerminalOutput {
 }
 
 export const ModelInterface = () => {
-  // Use the context instead of local state
-  const { isOllamaInstalled, ollamaVersion, loading, refreshOllamaStatus } =
-    useOllama();
+  // Use the context for Ollama status - no loading state needed here
+  const { isOllamaInstalled, ollamaVersion, refreshOllamaStatus } = useOllama();
 
   const [installInfo, setInstallInfo] = useState<InstallInfo | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({
@@ -263,19 +261,7 @@ export const ModelInterface = () => {
     }
   };
 
-  // Loading state from context
-  if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto w-full p-6 flex items-center justify-center h-64">
-        <div className="flex items-center gap-3 text-white/60">
-          <FiLoader className="animate-spin" size={24} />
-          <span>Checking Ollama status...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Always show the installation UI, regardless of whether Ollama is installed
+  // No loading state - just render the UI based on context state
   return (
     <div className="max-w-5xl mx-auto w-full p-6">
       <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
