@@ -32,6 +32,34 @@ pub struct TerminalOutput {
     pub is_progress: bool, // indicates this is a progress line that should replace the last one
 }
 
+// New structs for model management
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OllamaModel {
+    pub name: String,
+    pub modified_at: String,
+    pub size: u64,
+    pub digest: String,
+    pub details: Option<ModelDetails>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModelDetails {
+    pub parent_model: String,
+    pub format: String,
+    pub family: String,
+    pub families: Option<Vec<String>>,
+    pub parameter_size: String,
+    pub quantization_level: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModelPullProgress {
+    pub status: String,
+    pub digest: Option<String>,
+    pub total: Option<u64>,
+    pub completed: Option<u64>,
+}
+
 #[tauri::command]
 async fn check_ollama_installed() -> Result<bool, String> {
     match get_ollama_version().await {
@@ -71,15 +99,15 @@ async fn get_install_info() -> Result<InstallInfo, String> {
     let (command, estimated_time) = match platform.as_str() {
         "windows" => (
             "irm https://ollama.com/install.ps1 | iex".to_string(),
-            "~5 minutes".to_string(), // Updated to ~5 minutes
+            "~5 minutes".to_string(),
         ),
         "macos" => (
             "curl -fsSL https://ollama.com/install.sh | sh".to_string(),
-            "~5 minutes".to_string(), // Updated to ~5 minutes
+            "~5 minutes".to_string(),
         ),
         "linux" => (
             "curl -fsSL https://ollama.com/install.sh | sh".to_string(),
-            "~5 minutes".to_string(), // Updated to ~5 minutes
+            "~5 minutes".to_string(),
         ),
         _ => return Err("Unsupported platform".to_string()),
     };
@@ -133,6 +161,166 @@ async fn download_ollama(app_handle: tauri::AppHandle) -> Result<String, String>
 #[tauri::command]
 fn get_platform_info() -> String {
     get_platform()
+}
+
+#[tauri::command]
+async fn list_ollama_models() -> Result<Vec<OllamaModel>, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get("http://localhost:11434/api/tags")
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to Ollama: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err("Failed to get models from Ollama".to_string());
+    }
+
+    let json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let models = json["models"]
+        .as_array()
+        .ok_or("Invalid response format")?
+        .iter()
+        .filter_map(|model| {
+            let name = model["name"].as_str()?.to_string();
+            let modified_at = model["modified_at"].as_str()?.to_string();
+            let size = model["size"].as_u64()?;
+            let digest = model["digest"].as_str()?.to_string();
+            
+            // Build details separately to avoid using ? in the closure
+            let details = model["details"].as_object().map(|d| {
+                ModelDetails {
+                    parent_model: d.get("parent_model")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
+                    format: d.get("format")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
+                    family: d.get("family")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
+                    families: d.get("families")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|f| f.as_str().map(|s| s.to_string()))
+                                .collect::<Vec<String>>()
+                        }),
+                    parameter_size: d.get("parameter_size")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
+                    quantization_level: d.get("quantization_level")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
+                }
+            });
+
+            Some(OllamaModel {
+                name,
+                modified_at,
+                size,
+                digest,
+                details,
+            })
+        })
+        .collect();
+
+    Ok(models)
+}
+
+#[tauri::command]
+async fn pull_ollama_model(
+    app_handle: tauri::AppHandle,
+    model_name: String,
+) -> Result<String, String> {
+    let window = app_handle
+        .get_webview_window("main")
+        .ok_or("Main window not found")?;
+
+    // Start the pull in a background task
+    let window_clone = window.clone();
+    let model_name_clone = model_name.clone();
+    
+    tokio::spawn(async move {
+        let client = reqwest::Client::new();
+        let pull_url = "http://localhost:11434/api/pull";
+        
+        let payload = serde_json::json!({
+            "name": model_name_clone,
+            "stream": true
+        });
+
+        let response = match client
+            .post(pull_url)
+            .json(&payload)
+            .send()
+            .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                let _ = window_clone.emit("model-pull-error", format!("Failed to start pull: {}", e));
+                return;
+            }
+        };
+
+        if !response.status().is_success() {
+            let _ = window_clone.emit("model-pull-error", format!("Pull failed with status: {}", response.status()));
+            return;
+        }
+
+        // Process streaming response
+        let stream = response.bytes_stream();
+        use futures_util::StreamExt;
+        use std::pin::pin;
+        
+        let mut stream = pin!(stream);
+        while let Some(chunk) = stream.next().await {
+            if let Ok(chunk) = chunk {
+                if let Ok(text) = String::from_utf8(chunk.to_vec()) {
+                    for line in text.lines() {
+                        if let Ok(progress) = serde_json::from_str::<ModelPullProgress>(line) {
+                            let _ = window_clone.emit("model-pull-progress", progress);
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    Ok(format!("Started pulling model: {}", model_name))
+}
+
+#[tauri::command]
+async fn delete_ollama_model(model_name: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let delete_url = "http://localhost:11434/api/delete";
+    
+    let payload = serde_json::json!({
+        "name": model_name
+    });
+
+    let response = client
+        .delete(delete_url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to delete model: {}", e))?;
+
+    if response.status().is_success() {
+        Ok("Model deleted successfully".to_string())
+    } else {
+        Err(format!("Failed to delete model: {}", response.status()))
+    }
 }
 
 fn get_platform() -> String {
@@ -408,6 +596,9 @@ pub fn run() {
             download_ollama,
             get_platform_info,
             get_install_info,
+            list_ollama_models,
+            pull_ollama_model,
+            delete_ollama_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
