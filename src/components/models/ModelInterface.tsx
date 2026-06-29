@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
   FiDownload,
-  FiCheck,
   FiLoader,
   FiAlertCircle,
   FiServer,
@@ -409,9 +408,8 @@ export const ModelInterface = () => {
             {downloadProgress.status === "Completed" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-center gap-3 text-green-400">
-                  <FiCheck size={24} />
                   <span className="text-lg font-medium">
-                    Installation Complete! 🎉
+                    Installation Complete!
                   </span>
                 </div>
                 <p className="text-white/40 text-sm">
