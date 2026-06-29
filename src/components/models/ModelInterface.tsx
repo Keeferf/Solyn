@@ -275,286 +275,237 @@ export const ModelInterface = () => {
     );
   }
 
-  // Ollama not installed state
-  if (isOllamaInstalled === false) {
-    return (
-      <div className="max-w-5xl mx-auto w-full p-6">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-(--color-purple-accent)/20 rounded-full flex items-center justify-center">
-              <FiServer className="w-10 h-10 text-(--color-purple-accent)" />
-            </div>
-          </div>
-
-          <h2 className="text-2xl font-bold text-white mb-3">
-            Ollama Not Installed
-          </h2>
-
-          <p className="text-white/60 max-w-md mx-auto mb-8">
-            Ollama is required to run AI models locally. Download it now to get
-            started with Solyn.
-          </p>
-
-          {downloadProgress.status === "Idle" && installInfo && (
-            <div className="space-y-6">
-              <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-left">
-                <h3 className="text-sm font-semibold text-white/80 mb-3">
-                  Download Details
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-white/60 gap-4">
-                    <span className="shrink-0">Platform</span>
-                    <span className="text-white text-right">
-                      {getPlatformDisplay()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-white/60 gap-4">
-                    <span className="shrink-0">Command</span>
-                    <span className="text-white text-right font-mono text-xs break-all">
-                      {installInfo.command}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-white/60 gap-4">
-                    <span className="shrink-0">Estimated Time</span>
-                    <span className="text-white text-right">
-                      {installInfo.estimated_time}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleDownloadOllama}
-                disabled={isDownloading}
-                className="px-8 py-3 bg-(--color-purple-accent) hover:bg-(--color-purple-accent)/80 disabled:opacity-50 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer"
-              >
-                <FiDownload size={18} />
-                Download Ollama for {getPlatformDisplay()}
-              </button>
-
-              <div className="text-xs text-white/30">
-                <span className="block">Or manually download from </span>
-                <a
-                  href="https://ollama.com/download"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-(--color-purple-accent) hover:underline inline-flex items-center gap-1"
-                >
-                  ollama.com/download
-                  <FiExternalLink size={12} />
-                </a>
-              </div>
-            </div>
-          )}
-
-          {(downloadProgress.status === "Downloading" ||
-            downloadProgress.status === "Completed" ||
-            downloadProgress.status === "Error") && (
-            <div className="space-y-6">
-              {/* Installing status with loader */}
-              {downloadProgress.status === "Downloading" && (
-                <div className="flex items-center justify-center gap-3 py-2">
-                  <FiLoader
-                    className="animate-spin text-(--color-purple-accent)"
-                    size={20}
-                  />
-                  <span className="text-white/80 font-medium">
-                    Installing, please wait...
-                  </span>
-                </div>
-              )}
-
-              {/* Terminal output */}
-              <div className="bg-black/60 border border-white/10 rounded-xl overflow-hidden">
-                <div
-                  className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
-                  onClick={() => setIsTerminalExpanded(!isTerminalExpanded)}
-                >
-                  <div className="flex items-center gap-2">
-                    <FiTerminal className="text-white/60" size={18} />
-                  </div>
-                  <button
-                    className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsTerminalExpanded(!isTerminalExpanded);
-                    }}
-                  >
-                    {isTerminalExpanded ? (
-                      <FiChevronUp size={18} />
-                    ) : (
-                      <FiChevronDown size={18} />
-                    )}
-                  </button>
-                </div>
-
-                {isTerminalExpanded && (
-                  <div
-                    ref={terminalContainerRef}
-                    className="max-h-64 overflow-y-auto p-3 text-left font-mono text-xs"
-                  >
-                    {terminalLines.filter((output) =>
-                      shouldShowLine(output.line),
-                    ).length === 0 ? (
-                      <p className="text-white/20">Waiting for output...</p>
-                    ) : (
-                      terminalLines
-                        .filter((output) => shouldShowLine(output.line))
-                        .map((output, index) => {
-                          return (
-                            <div
-                              key={index}
-                              className={`${getStreamColor(output.stream)} py-0.5 whitespace-pre-wrap break-all`}
-                            >
-                              <span className="text-white/20 mr-2 select-none">
-                                {getStreamPrefix(output.stream)}
-                              </span>
-                              {output.line}
-                            </div>
-                          );
-                        })
-                    )}
-                    <div ref={terminalEndRef} />
-                  </div>
-                )}
-              </div>
-
-              {downloadProgress.status === "Completed" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center gap-3 text-green-400">
-                    <FiCheck size={24} />
-                    <span className="text-lg font-medium">
-                      Installation Complete! 🎉
-                    </span>
-                  </div>
-                  <p className="text-white/40 text-sm">
-                    Ollama is now installed and running. You can start using AI
-                    models.
-                  </p>
-                  <button
-                    onClick={() => {
-                      refreshOllamaStatus();
-                      setDownloadProgress({
-                        status: "Idle",
-                        progress: 0,
-                        message: "",
-                      });
-                      setTerminalLines([]);
-                    }}
-                    className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-all"
-                  >
-                    Continue
-                  </button>
-                </div>
-              )}
-
-              {downloadProgress.status === "Error" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center gap-3 text-red-400">
-                    <FiAlertCircle size={24} />
-                    <span className="text-lg font-medium">
-                      Installation Failed
-                    </span>
-                  </div>
-                  <p className="text-white/60">
-                    {downloadProgress.log || "An unknown error occurred."}
-                  </p>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left text-sm text-white/60">
-                    <h4 className="font-semibold text-white/80 mb-2">
-                      🔧 Troubleshooting:
-                    </h4>
-                    <div className="space-y-2">
-                      <p>
-                        <span className="text-white/80">
-                          1. Manual Download:
-                        </span>
-                        <br />
-                        Open terminal and run:
-                        <br />
-                        <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono block mt-1 whitespace-pre-wrap break-all">
-                          {installInfo?.command ||
-                            "curl -fsSL https://ollama.com/install.sh | sh"}
-                        </code>
-                      </p>
-                      <p>
-                        <span className="text-white/80">2. Visit </span>
-                        <a
-                          href="https://ollama.com/download"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-(--color-purple-accent) hover:underline"
-                        >
-                          ollama.com/download
-                        </a>
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setDownloadProgress({
-                        status: "Idle",
-                        progress: 0,
-                        message: "",
-                      });
-                      setTerminalLines([]);
-                      setIsTerminalExpanded(true);
-                    }}
-                    className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-all"
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Ollama installed state
+  // Always show the installation UI, regardless of whether Ollama is installed
   return (
     <div className="max-w-5xl mx-auto w-full p-6">
       <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
         <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center">
-            <FiCheck className="w-10 h-10 text-green-400" />
+          <div className="w-20 h-20 bg-(--color-purple-accent)/20 rounded-full flex items-center justify-center">
+            <FiServer className="w-10 h-10 text-(--color-purple-accent)" />
           </div>
         </div>
 
         <h2 className="text-2xl font-bold text-white mb-3">
-          Ollama is Ready! 🎉
+          {isOllamaInstalled ? "Ollama is Installed" : "Ollama Not Installed"}
         </h2>
 
-        <p className="text-white/60 max-w-md mx-auto mb-2">
-          Ollama{" "}
-          {ollamaVersion && (
-            <span className="text-white font-mono">v{ollamaVersion}</span>
-          )}{" "}
-          is installed and running.
-        </p>
-        <p className="text-white/40 text-sm">
-          You can now download and use AI models.
+        <p className="text-white/60 max-w-md mx-auto mb-8">
+          {isOllamaInstalled
+            ? `Ollama ${ollamaVersion ? `v${ollamaVersion} ` : ""}is installed and running. You can reinstall if needed.`
+            : "Ollama is required to run AI models locally. Download it now to get started with Solyn."}
         </p>
 
-        <div className="mt-6 text-xs text-white/30">
-          <span>Need to reinstall? </span>
-          <button
-            onClick={() => {
-              // Force a recheck by refreshing the status
-              refreshOllamaStatus();
-              setDownloadProgress({
-                status: "Idle",
-                progress: 0,
-                message: "",
-              });
-              setTerminalLines([]);
-            }}
-            className="text-(--color-purple-accent) hover:underline"
-          >
-            Click here
-          </button>
-        </div>
+        {downloadProgress.status === "Idle" && installInfo && (
+          <div className="space-y-6">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-left">
+              <h3 className="text-sm font-semibold text-white/80 mb-3">
+                Download Details
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-white/60 gap-4">
+                  <span className="shrink-0">Platform</span>
+                  <span className="text-white text-right">
+                    {getPlatformDisplay()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-white/60 gap-4">
+                  <span className="shrink-0">Command</span>
+                  <span className="text-white text-right font-mono text-xs break-all">
+                    {installInfo.command}
+                  </span>
+                </div>
+                <div className="flex justify-between text-white/60 gap-4">
+                  <span className="shrink-0">Estimated Time</span>
+                  <span className="text-white text-right">
+                    {installInfo.estimated_time}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleDownloadOllama}
+              disabled={isDownloading}
+              className="px-8 py-3 bg-(--color-purple-accent) hover:bg-(--color-purple-accent)/80 disabled:opacity-50 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer"
+            >
+              <FiDownload size={18} />
+              {isOllamaInstalled
+                ? "Reinstall Ollama"
+                : `Download Ollama for ${getPlatformDisplay()}`}
+            </button>
+
+            <div className="text-xs text-white/30">
+              <span className="block">Or manually download from </span>
+              <a
+                href="https://ollama.com/download"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-(--color-purple-accent) hover:underline inline-flex items-center gap-1"
+              >
+                ollama.com/download
+                <FiExternalLink size={12} />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {(downloadProgress.status === "Downloading" ||
+          downloadProgress.status === "Completed" ||
+          downloadProgress.status === "Error") && (
+          <div className="space-y-6">
+            {/* Installing status with loader */}
+            {downloadProgress.status === "Downloading" && (
+              <div className="flex items-center justify-center gap-3 py-2">
+                <FiLoader
+                  className="animate-spin text-(--color-purple-accent)"
+                  size={20}
+                />
+                <span className="text-white/80 font-medium">
+                  Installing, please wait...
+                </span>
+              </div>
+            )}
+
+            {/* Terminal output */}
+            <div className="bg-black/60 border border-white/10 rounded-xl overflow-hidden">
+              <div
+                className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
+                onClick={() => setIsTerminalExpanded(!isTerminalExpanded)}
+              >
+                <div className="flex items-center gap-2">
+                  <FiTerminal className="text-white/60" size={18} />
+                </div>
+                <button
+                  className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsTerminalExpanded(!isTerminalExpanded);
+                  }}
+                >
+                  {isTerminalExpanded ? (
+                    <FiChevronUp size={18} />
+                  ) : (
+                    <FiChevronDown size={18} />
+                  )}
+                </button>
+              </div>
+
+              {isTerminalExpanded && (
+                <div
+                  ref={terminalContainerRef}
+                  className="max-h-64 overflow-y-auto p-3 text-left font-mono text-xs"
+                >
+                  {terminalLines.filter((output) => shouldShowLine(output.line))
+                    .length === 0 ? (
+                    <p className="text-white/20">Waiting for output...</p>
+                  ) : (
+                    terminalLines
+                      .filter((output) => shouldShowLine(output.line))
+                      .map((output, index) => {
+                        return (
+                          <div
+                            key={index}
+                            className={`${getStreamColor(output.stream)} py-0.5 whitespace-pre-wrap break-all`}
+                          >
+                            <span className="text-white/20 mr-2 select-none">
+                              {getStreamPrefix(output.stream)}
+                            </span>
+                            {output.line}
+                          </div>
+                        );
+                      })
+                  )}
+                  <div ref={terminalEndRef} />
+                </div>
+              )}
+            </div>
+
+            {downloadProgress.status === "Completed" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center gap-3 text-green-400">
+                  <FiCheck size={24} />
+                  <span className="text-lg font-medium">
+                    Installation Complete! 🎉
+                  </span>
+                </div>
+                <p className="text-white/40 text-sm">
+                  Ollama is now installed and running. You can start using AI
+                  models.
+                </p>
+                <button
+                  onClick={() => {
+                    refreshOllamaStatus();
+                    setDownloadProgress({
+                      status: "Idle",
+                      progress: 0,
+                      message: "",
+                    });
+                    setTerminalLines([]);
+                  }}
+                  className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-all"
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+
+            {downloadProgress.status === "Error" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center gap-3 text-red-400">
+                  <FiAlertCircle size={24} />
+                  <span className="text-lg font-medium">
+                    Installation Failed
+                  </span>
+                </div>
+                <p className="text-white/60">
+                  {downloadProgress.log || "An unknown error occurred."}
+                </p>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left text-sm text-white/60">
+                  <h4 className="font-semibold text-white/80 mb-2">
+                    🔧 Troubleshooting:
+                  </h4>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="text-white/80">1. Manual Download:</span>
+                      <br />
+                      Open terminal and run:
+                      <br />
+                      <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono block mt-1 whitespace-pre-wrap break-all">
+                        {installInfo?.command ||
+                          "curl -fsSL https://ollama.com/install.sh | sh"}
+                      </code>
+                    </p>
+                    <p>
+                      <span className="text-white/80">2. Visit </span>
+                      <a
+                        href="https://ollama.com/download"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-(--color-purple-accent) hover:underline"
+                      >
+                        ollama.com/download
+                      </a>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setDownloadProgress({
+                      status: "Idle",
+                      progress: 0,
+                      message: "",
+                    });
+                    setTerminalLines([]);
+                    setIsTerminalExpanded(true);
+                  }}
+                  className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-all"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
