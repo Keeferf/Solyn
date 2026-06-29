@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DownloadProgress {
     pub progress: u8,
@@ -160,9 +159,16 @@ fn clean_output_line(line: &str) -> String {
         .trim_start_matches("$ ")
         .trim_start_matches("# ")
         .trim_start_matches("VERBOSE: ");
-    
-    // If the line is just a prefix character or empty, return empty
-    if cleaned.is_empty() || cleaned == ">" || cleaned == ">>>" || cleaned == ">>" {
+
+    // Filter out specific messages we don't want to show
+    if cleaned.is_empty() 
+        || cleaned == ">" 
+        || cleaned == ">>>" 
+        || cleaned == ">>" 
+        || cleaned.contains("Install complete. Run 'ollama' from the command line.")
+        || cleaned.contains("Run 'ollama' from the command line.")
+        || cleaned.contains("Install complete.")
+    {
         return String::new();
     }
     
@@ -279,7 +285,7 @@ async fn download_with_pty(
         _ => return Err("Unsupported platform".to_string()),
     };
 
-    emit_terminal_output(&window_clone, format!("Running installer for {}", platform).as_str(), "info", false);
+    emit_terminal_output(&window_clone, &format!("Running installer for {}", platform), "info", false);
 
     let (mut rx, _child) = shell
         .command(shell_cmd)
@@ -302,7 +308,7 @@ async fn download_with_pty(
             }
             tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
                 let msg = if status.code == Some(0) {
-                    "Process completed successfully"
+                    "Installation script completed"
                 } else {
                     "Process terminated with error"
                 };
@@ -312,15 +318,52 @@ async fn download_with_pty(
         }
     }
 
-    // Verify installation
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    if let Ok(true) = check_ollama_installed().await {
-        emit_terminal_output(&window, "✓ Ollama verified and running!", "success", false);
-        Ok(())
-    } else {
-        emit_terminal_output(&window, "⚠️ Installation may be complete but Ollama verification failed.", "info", false);
-        emit_terminal_output(&window, "Please run 'ollama serve' manually if needed.", "info", false);
-        Ok(())
+    // Verify installation with retries
+    emit_terminal_output(window, "Verifying Ollama installation...", "info", false);
+    
+    let max_attempts = 15; // Try 15 times (30 seconds total with 2 second delays)
+    let mut attempts = 0;
+    
+    while attempts < max_attempts {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        attempts += 1;
+        
+        match check_ollama_installed().await {
+            Ok(true) => {
+                emit_terminal_output(window, "✓ Ollama verified and running!", "success", false);
+                return Ok(());
+            }
+            Ok(false) => {
+                // Still not running, continue waiting
+                if attempts < max_attempts && attempts % 3 == 0 {
+                    emit_terminal_output(window, &format!("Waiting for Ollama to start... (attempt {}/{})", attempts, max_attempts), "info", false);
+                }
+            }
+            Err(_e) => {
+                // Error checking, continue waiting
+                if attempts < max_attempts && attempts % 3 == 0 {
+                    emit_terminal_output(window, &format!("Checking Ollama status... (attempt {}/{})", attempts, max_attempts), "info", false);
+                }
+            }
+        }
+    }
+    
+    // If we've exhausted all attempts, do one final check
+    emit_terminal_output(window, "Performing final verification check...", "info", false);
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    
+    match check_ollama_installed().await {
+        Ok(true) => {
+            emit_terminal_output(window, "✓ Ollama verified and running!", "success", false);
+            Ok(())
+        }
+        _ => {
+            emit_terminal_output(window, "⚠️ Ollama installation completed but verification timed out.", "info", false);
+            emit_terminal_output(window, "The installation should be complete. You can try refreshing the page.", "info", false);
+            emit_terminal_output(window, "💡 If you see this message repeatedly, Ollama may need to be started manually.", "info", false);
+            // Still return success since installation likely completed
+            Ok(())
+        }
     }
 }
 

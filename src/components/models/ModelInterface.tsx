@@ -1,3 +1,4 @@
+// src/components/models/ModelInterface.tsx
 import { useState, useEffect, useRef } from "react";
 import {
   FiDownload,
@@ -70,10 +71,22 @@ export const ModelInterface = () => {
 
           if (payload.status === "Completed") {
             setIsDownloading(false);
-            // Refresh the Ollama status after installation completes
-            setTimeout(() => {
-              refreshOllamaStatus();
-            }, 2000);
+            // Try to refresh status multiple times with delays
+            let attempts = 0;
+            const maxAttempts = 8;
+
+            const tryRefresh = async () => {
+              attempts++;
+              await refreshOllamaStatus();
+
+              // If not installed yet and we have more attempts, try again
+              if (attempts < maxAttempts) {
+                setTimeout(tryRefresh, 2000);
+              }
+            };
+
+            // Start with a 2 second delay
+            setTimeout(tryRefresh, 2000);
           }
 
           if (payload.status === "Error") {
@@ -86,6 +99,17 @@ export const ModelInterface = () => {
         "terminal-output",
         (event) => {
           const line = event.payload.line;
+
+          // Filter out the "Install complete" message
+          if (
+            line.includes(
+              "Install complete. Run 'ollama' from the command line.",
+            ) ||
+            line.includes("Run 'ollama' from the command line.") ||
+            line.includes("Install complete.")
+          ) {
+            return;
+          }
 
           // Detect progress lines (contain progress bar characters)
           const isProgressLine =
@@ -196,6 +220,12 @@ export const ModelInterface = () => {
     if (line.includes("GET with") && line.includes("payload")) return false;
     if (line.includes("received") && line.includes("response of content type"))
       return false;
+
+    // Filter out "Install complete" messages
+    if (line.includes("Install complete. Run 'ollama' from the command line."))
+      return false;
+    if (line.includes("Run 'ollama' from the command line.")) return false;
+    if (line.includes("Install complete.")) return false;
 
     // Filter out empty lines
     if (line.trim() === "") return false;
@@ -397,6 +427,10 @@ export const ModelInterface = () => {
                       Installation Complete! 🎉
                     </span>
                   </div>
+                  <p className="text-white/40 text-sm">
+                    Ollama is now installed and running. You can start using AI
+                    models.
+                  </p>
                   <button
                     onClick={() => {
                       refreshOllamaStatus();
