@@ -71,15 +71,15 @@ async fn get_install_info() -> Result<InstallInfo, String> {
     let (command, estimated_time) = match platform.as_str() {
         "windows" => (
             "irm https://ollama.com/install.ps1 | iex".to_string(),
-            "2-3 minutes".to_string(),
+            "~5 minutes".to_string(), // Updated to ~5 minutes
         ),
         "macos" => (
             "curl -fsSL https://ollama.com/install.sh | sh".to_string(),
-            "2-3 minutes".to_string(),
+            "~5 minutes".to_string(), // Updated to ~5 minutes
         ),
         "linux" => (
             "curl -fsSL https://ollama.com/install.sh | sh".to_string(),
-            "2-3 minutes".to_string(),
+            "~5 minutes".to_string(), // Updated to ~5 minutes
         ),
         _ => return Err("Unsupported platform".to_string()),
     };
@@ -330,7 +330,7 @@ async fn download_with_pty(
         
         match check_ollama_installed().await {
             Ok(true) => {
-                emit_terminal_output(window, "✓ Ollama verified and running!", "success", false);
+                emit_terminal_output(window, "Ollama verified and running", "success", false);
                 return Ok(());
             }
             Ok(false) => {
