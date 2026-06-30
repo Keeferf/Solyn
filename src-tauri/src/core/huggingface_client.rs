@@ -34,10 +34,6 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
                     format!("https://huggingface.co/resolve/main/{}", filename)
                 };
                 
-                // Debug log to see what's being extracted
-                println!("GGUF file: {}, size: {} bytes ({:.2} MB)", 
-                    filename, size, size as f64 / 1024.0 / 1024.0);
-                
                 gguf_files.push(GGUFFileInfo {
                     filename: filename.to_string(),
                     size,
@@ -70,9 +66,6 @@ pub async fn fetch_hugging_face_models(
         limit, offset
     );
     
-    println!("Fetching models from URL: {}", url);
-    println!("Page: {}, Limit: {}, Offset: {}", page, limit, offset);
-    
     let response = client
         .get(&url)
         .header("User-Agent", "SolynApp/1.0")
@@ -100,26 +93,6 @@ pub async fn fetch_hugging_face_models(
     } else {
         return Err("Invalid response format - expected array or object with 'models' field".to_string());
     };
-    
-    println!("Found {} items in response for page {}", items.len(), page);
-    
-    // Debug: Log first few model IDs to verify pagination
-    if !items.is_empty() {
-        let first_ids: Vec<String> = items
-            .iter()
-            .take(3)
-            .filter_map(|item| item["id"].as_str().map(|s| s.to_string()))
-            .collect();
-        println!("First {} model IDs on page {}: {:?}", first_ids.len(), page, first_ids);
-    }
-    
-    // Debug the first item to see structure
-    if let Some(first_item) = items.first() {
-        println!("First item structure: {:?}", first_item);
-        if let Some(siblings) = first_item.get("siblings") {
-            println!("First item siblings: {:?}", siblings);
-        }
-    }
     
     for item in items {
         let id = item["id"].as_str().unwrap_or("").to_string();
@@ -166,7 +139,6 @@ pub async fn fetch_hugging_face_models(
         models.push(model);
     }
     
-    println!("Returning {} models with GGUF files for page {}", models.len(), page);
     Ok(models)
 }
 
@@ -175,8 +147,6 @@ pub async fn get_total_model_count() -> Result<usize, String> {
     
     // Use the same filter for consistency
     let url = "https://huggingface.co/api/models?filter=gguf&limit=1000";
-    
-    println!("Fetching total model count from: {}", url);
     
     let response = client
         .get(url)
@@ -204,6 +174,5 @@ pub async fn get_total_model_count() -> Result<usize, String> {
         0
     };
     
-    println!("Total model count: {}", count);
     Ok(count)
 }

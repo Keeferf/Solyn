@@ -14,8 +14,6 @@ pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String>
     // Use the full=true parameter to get all siblings
     let info_url = format!("https://huggingface.co/api/models/{}?full=true", model_id);
     
-    println!("Fetching GGUF metadata for model: {}", model_id);
-    
     let response = client
         .get(&info_url)
         .header("User-Agent", "SolynApp/1.0")
@@ -50,11 +48,6 @@ pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String>
     }
     
     let selected_file = gguf_files.first().cloned().unwrap();
-    println!("Selected GGUF file: {} ({:.2} MB)", 
-        selected_file.filename, 
-        selected_file.size as f64 / 1024.0 / 1024.0
-    );
-    
     Ok(selected_file)
 }
 
@@ -79,8 +72,6 @@ pub async fn download_gguf_model(
             model_id, gguf_metadata.filename
         )
     };
-    
-    println!("Downloading from URL: {}", file_url);
     
     broadcast_model_acquisition_progress(
         window,
@@ -140,6 +131,5 @@ pub async fn download_gguf_model(
     let result = format!("Successfully downloaded {} ({:.1} MB) to {}", 
         gguf_metadata.filename, file_size_mb, download_dir.display());
     
-    println!("{}", result);
     Ok(result)
 }
