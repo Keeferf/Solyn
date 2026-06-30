@@ -1,4 +1,4 @@
-/* src/index.css (updated) */
+/* src/index.css */
 @import "tailwindcss";
 
 /* CSS Custom Properties for colors */
@@ -27,4 +27,24 @@ body {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-purple-accent);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-purple-accent);
+  opacity: 0.8;
 }

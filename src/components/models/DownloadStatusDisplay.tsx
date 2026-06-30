@@ -1,8 +1,15 @@
 // src/components/models/DownloadStatusDisplay.tsx
-import { FiLoader, FiCheckCircle, FiXCircle, FiDownload } from "react-icons/fi";
+import {
+  FiLoader,
+  FiCheckCircle,
+  FiXCircle,
+  FiDownload,
+  FiFile,
+} from "react-icons/fi";
 
 interface DownloadStatusDisplayProps {
   modelId: string;
+  filename: string; // Added filename
   progress: number;
   message: string;
   status: string;
@@ -10,6 +17,7 @@ interface DownloadStatusDisplayProps {
 
 export const DownloadStatusDisplay = ({
   modelId,
+  filename,
   progress,
   message,
   status,
@@ -40,13 +48,36 @@ export const DownloadStatusDisplay = ({
     }
   };
 
+  // Helper to extract quantization from filename
+  const getQuantizationLabel = (filename: string): string => {
+    const match = filename.match(
+      /Q[0-9]_[0-9K]|Q[0-9]_[0-9]|F[0-9]{2}|[IQ][0-9]_[0-9]/,
+    );
+    if (match) return match[0];
+    if (filename.includes("q4")) return "Q4";
+    if (filename.includes("q5")) return "Q5";
+    if (filename.includes("q8")) return "Q8";
+    if (filename.includes("f16")) return "F16";
+    if (filename.includes("f32")) return "F32";
+    return "GGUF";
+  };
+
   return (
     <div className={`border rounded-lg p-4 ${getStatusColor()} transition-all`}>
       <div className="flex items-center gap-3 mb-2">
         {getStatusIcon()}
         <div className="flex-1 min-w-0">
-          <p className="text-white font-medium truncate">{modelId}</p>
-          <p className="text-white/60 text-sm truncate">{message}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-white font-medium truncate">{modelId}</p>
+            <span className="text-xs text-white/30 bg-white/5 px-2 py-0.5 rounded-full whitespace-nowrap">
+              {getQuantizationLabel(filename)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FiFile className="text-white/30" size={12} />
+            <p className="text-white/60 text-sm truncate">{filename}</p>
+          </div>
+          <p className="text-white/40 text-xs mt-0.5">{message}</p>
         </div>
         <span className="text-white/40 text-sm font-mono">{progress}%</span>
       </div>

@@ -2,6 +2,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+export interface GGUFFile {
+  filename: string;
+  size: number;
+  quantization: string;
+  url: string;
+}
+
 export interface HFModel {
   id: string;
   model_id: string;
@@ -11,12 +18,7 @@ export interface HFModel {
   likes?: number;
   description?: string;
   tags: string[];
-  gguf_files: {
-    filename: string;
-    size: number;
-    quantization: string;
-    url: string;
-  }[];
+  gguf_files: GGUFFile[];
 }
 
 // Backend type matching Rust's HuggingFaceModelListing
@@ -64,7 +66,9 @@ export const useHuggingFaceModels = () => {
       setLoading(true);
       setError(null);
       try {
-        console.log(`Fetching models page ${page}...`);
+        console.log(
+          `🔄 Fetching models page ${page} with limit ${modelsPerPage}...`,
+        );
         const response = await invoke<BackendModel[]>(
           "fetch_huggingface_models",
           {
@@ -73,16 +77,27 @@ export const useHuggingFaceModels = () => {
           },
         );
 
-        console.log(`Received ${response.length} models from backend`);
+        console.log(
+          `📦 Received ${response.length} models from backend for page ${page}`,
+        );
+
+        // Log first few model IDs to verify pagination
+        if (response.length > 0) {
+          const firstIds = response.slice(0, 3).map((m) => m.model_id || m.id);
+          console.log(`🔍 First 3 model IDs on page ${page}:`, firstIds);
+        }
+
         const transformedModels = response.map(transformModel);
-        console.log("Transformed models:", transformedModels);
+        console.log(
+          `✅ Transformed ${transformedModels.length} models for page ${page}`,
+        );
         setModels(transformedModels);
 
         // Fetch total count
         try {
           const total = await invoke<number>("get_huggingface_model_count");
           setTotalModels(total);
-          console.log(`Total models: ${total}`);
+          console.log(`📊 Total models available: ${total}`);
         } catch (countErr) {
           console.error("Failed to fetch total count:", countErr);
           // If we can't get total, use a default
@@ -91,7 +106,7 @@ export const useHuggingFaceModels = () => {
 
         setCurrentPage(page);
       } catch (err) {
-        console.error("Failed to fetch models:", err);
+        console.error(`❌ Failed to fetch models for page ${page}:`, err);
         setError(String(err));
       } finally {
         setLoading(false);

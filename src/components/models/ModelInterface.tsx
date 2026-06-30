@@ -8,10 +8,14 @@ import { useHuggingFaceModels } from "./hooks/useHuggingFaceModels";
 
 interface DownloadProgress {
   model_id: string;
+  filename: string;
   status: string;
   progress: number;
   message: string;
 }
+
+// Key for tracking downloads includes filename
+type DownloadKey = string; // format: "model_id::filename"
 
 export const ModelInterface = () => {
   const {
@@ -27,12 +31,17 @@ export const ModelInterface = () => {
     fetchModels,
   } = useHuggingFaceModels();
 
-  const [downloadingModels, setDownloadingModels] = useState<Set<string>>(
+  const [downloadingModels, setDownloadingModels] = useState<Set<DownloadKey>>(
     new Set(),
   );
   const [downloadProgress, setDownloadProgress] = useState<
-    Map<string, DownloadProgress>
+    Map<DownloadKey, DownloadProgress>
   >(new Map());
+
+  // Helper to create unique key
+  const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
+    return `${modelId}::${filename}`;
+  };
 
   // Listen for download progress events
   useEffect(() => {
@@ -46,21 +55,21 @@ export const ModelInterface = () => {
           "model-download-progress",
           (event) => {
             const progress = event.payload;
-            setDownloadProgress((prev) =>
-              new Map(prev).set(progress.model_id, progress),
-            );
+            const key = getDownloadKey(progress.model_id, progress.filename);
+
+            setDownloadProgress((prev) => new Map(prev).set(key, progress));
 
             // If status is complete or error, remove from downloading set after a delay
             if (progress.status === "complete" || progress.status === "error") {
               setTimeout(() => {
                 setDownloadingModels((prev) => {
                   const newSet = new Set(prev);
-                  newSet.delete(progress.model_id);
+                  newSet.delete(key);
                   return newSet;
                 });
                 setDownloadProgress((prev) => {
                   const newMap = new Map(prev);
-                  newMap.delete(progress.model_id);
+                  newMap.delete(key);
                   return newMap;
                 });
               }, 3000);
@@ -68,35 +77,39 @@ export const ModelInterface = () => {
           },
         );
 
-        unlistenComplete = await listen<string>(
+        unlistenComplete = await listen<{ model_id: string; filename: string }>(
           "model-download-complete",
           (event) => {
-            const modelId = event.payload;
+            const { model_id, filename } = event.payload;
+            const key = getDownloadKey(model_id, filename);
+
             setDownloadingModels((prev) => {
               const newSet = new Set(prev);
-              newSet.delete(modelId);
+              newSet.delete(key);
               return newSet;
             });
             setDownloadProgress((prev) => {
               const newMap = new Map(prev);
-              newMap.delete(modelId);
+              newMap.delete(key);
               return newMap;
             });
           },
         );
 
-        unlistenError = await listen<string>(
+        unlistenError = await listen<{ model_id: string; filename: string }>(
           "model-download-error",
           (event) => {
-            const modelId = event.payload;
+            const { model_id, filename } = event.payload;
+            const key = getDownloadKey(model_id, filename);
+
             setDownloadingModels((prev) => {
               const newSet = new Set(prev);
-              newSet.delete(modelId);
+              newSet.delete(key);
               return newSet;
             });
             setDownloadProgress((prev) => {
               const newMap = new Map(prev);
-              newMap.delete(modelId);
+              newMap.delete(key);
               return newMap;
             });
           },
@@ -115,41 +128,46 @@ export const ModelInterface = () => {
     };
   }, []);
 
-  const handleDownload = async (modelId: string) => {
-    if (downloadingModels.has(modelId)) return;
+  const handleDownload = async (modelId: string, filename: string) => {
+    const key = getDownloadKey(modelId, filename);
+    if (downloadingModels.has(key)) return;
 
-    setDownloadingModels((prev) => new Set(prev).add(modelId));
+    setDownloadingModels((prev) => new Set(prev).add(key));
 
     try {
-      await invoke("download_huggingface_model", { modelId });
+      await invoke("download_huggingface_model", {
+        modelId,
+        filename,
+      });
     } catch (error) {
       console.error("Failed to start download:", error);
       setDownloadingModels((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(modelId);
+        newSet.delete(key);
         return newSet;
       });
     }
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 overflow-y-auto max-h-[calc(100vh-2rem)]">
+    <div className="w-full p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Browse Models</h2>
+        <h2 className="text-2xl font-bold text-[#d8d4cf]">Browse Models</h2>
         <button
           onClick={() => fetchModels(currentPage)}
           disabled={loading}
-          className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
+          className="px-4 py-2 bg-[#121212] hover:bg-[#d8d4cf]/10 rounded-lg text-[#d8d4cf] transition-all disabled:opacity-50 cursor-pointer"
         >
           Refresh
         </button>
       </div>
 
       {/* Download progress displays */}
-      {Array.from(downloadProgress.entries()).map(([modelId, progress]) => (
+      {Array.from(downloadProgress.entries()).map(([key, progress]) => (
         <DownloadStatusDisplay
-          key={modelId}
-          modelId={modelId}
+          key={key}
+          modelId={progress.model_id}
+          filename={progress.filename}
           progress={progress.progress}
           message={progress.message}
           status={progress.status}

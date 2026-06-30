@@ -10,7 +10,9 @@ use crate::core::huggingface_client::extract_gguf_files;
 
 pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String> {
     let client = reqwest::Client::new();
-    let info_url = format!("https://huggingface.co/api/models/{}", model_id);
+    
+    // Use the full=true parameter to get all siblings
+    let info_url = format!("https://huggingface.co/api/models/{}?full=true", model_id);
     
     println!("Fetching GGUF metadata for model: {}", model_id);
     
@@ -20,6 +22,10 @@ pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String>
         .send()
         .await
         .map_err(|e| format!("Failed to get model info: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("HTTP error: {}", response.status()));
+    }
     
     let data: serde_json::Value = response
         .json()
@@ -64,7 +70,7 @@ pub async fn download_gguf_model(
     std::fs::create_dir_all(&download_dir)
         .map_err(|e| format!("Failed to create model directory: {}", e))?;
     
-    // Use the URL from the metadata, or construct it if not available
+    // Prefer the URL from metadata, fallback to constructing it
     let file_url = if !gguf_metadata.url.is_empty() {
         gguf_metadata.url.clone()
     } else {

@@ -1,4 +1,5 @@
 // src/components/models/BrowseModels.tsx
+import { useState } from "react";
 import {
   FiDownload,
   FiLoader,
@@ -8,6 +9,10 @@ import {
   FiServer,
   FiUser,
   FiRefreshCw,
+  FiChevronDown,
+  FiDownloadCloud,
+  FiHeart,
+  FiFolder,
 } from "react-icons/fi";
 import { HFModel } from "./hooks/useHuggingFaceModels";
 
@@ -21,7 +26,7 @@ interface BrowseModelsProps {
   onGoToPage: (page: number) => void;
   onNextPage: () => void;
   onPreviousPage: () => void;
-  onDownload: (modelId: string) => Promise<void>;
+  onDownload: (modelId: string, filename: string) => Promise<void>;
   onRefresh?: () => void;
   error?: string | null;
 }
@@ -37,32 +42,79 @@ const formatDownloads = (downloads?: number): string => {
   return downloads.toString();
 };
 
-const formatSize = (size?: number): string => {
-  if (!size) return "Unknown";
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(size) / Math.log(1024));
-  return `${(size / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+const getQuantizationLabel = (filename: string): string | null => {
+  // Remove file extension for cleaner matching
+  const name = filename.replace(/\.gguf$/i, "");
+
+  // Common quantization patterns - ordered by specificity
+  const patterns = [
+    // IQ (I-quant) formats
+    /IQ[1-4]_[XSML]?/i,
+    // Q formats with K/M
+    /Q[2-8]_[0-9K_][0-9K_]*/i,
+    // Simple Q formats
+    /Q[2-8]_[0-9]/i,
+    // F formats (float)
+    /F[1-9][0-9]?/i,
+    // Other common patterns
+    /q4_k_m|q5_k_m|q6_k|q8_0|q4_0|q5_0|q2_k|q3_k/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = name.match(pattern);
+    if (match) {
+      // Normalize to uppercase for consistency
+      return match[0].toUpperCase();
+    }
+  }
+
+  // Check for specific patterns without regex
+  const lowerName = name.toLowerCase();
+  const quantMap: { [key: string]: string } = {
+    q4_k_m: "Q4_K_M",
+    q5_k_m: "Q5_K_M",
+    q6_k: "Q6_K",
+    q8_0: "Q8_0",
+    q4_0: "Q4_0",
+    q5_0: "Q5_0",
+    q2_k: "Q2_K",
+    q3_k: "Q3_K",
+    f16: "F16",
+    f32: "F32",
+  };
+
+  for (const [key, value] of Object.entries(quantMap)) {
+    if (lowerName.includes(key)) {
+      return value;
+    }
+  }
+
+  return null;
 };
 
-const getQuantizationColor = (quantization: string): string => {
-  const colors: Record<string, string> = {
-    Q8_0: "bg-green-500/20 text-green-400 border-green-500/30",
-    Q8_1: "bg-green-500/20 text-green-400 border-green-500/30",
-    Q6_K: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    Q5_K: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    Q5_0: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    Q5_1: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    Q4_K: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-    Q4_0: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-    Q4_1: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-    Q3_K: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    Q3_0: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    Q3_1: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    Q2_K: "bg-red-500/20 text-red-400 border-red-500/30",
-    FP16: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-    FP32: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-  };
-  return colors[quantization] || "bg-white/10 text-white/40 border-white/10";
+// Get unique quantization labels from files
+const getUniqueQuantizations = (
+  files: { filename: string; size: number; url: string }[],
+) => {
+  const quantMap = new Map<
+    string,
+    { filename: string; size: number; url: string }
+  >();
+
+  for (const file of files) {
+    const quant = getQuantizationLabel(file.filename);
+    if (quant) {
+      // If this quantization already exists, keep the one with the most detailed name
+      if (
+        !quantMap.has(quant) ||
+        file.filename.length > quantMap.get(quant)!.filename.length
+      ) {
+        quantMap.set(quant, file);
+      }
+    }
+  }
+
+  return Array.from(quantMap.values());
 };
 
 export const BrowseModels = ({
@@ -80,11 +132,26 @@ export const BrowseModels = ({
   error,
 }: BrowseModelsProps) => {
   const totalPages = Math.max(1, Math.ceil(totalModels / modelsPerPage));
+  const [selectedFile, setSelectedFile] = useState<Map<string, string>>(
+    new Map(),
+  );
+
+  const getDownloadKey = (modelId: string, filename: string): string => {
+    return `${modelId}::${filename}`;
+  };
+
+  const isDownloading = (modelId: string, filename: string): boolean => {
+    return downloadingModels.has(getDownloadKey(modelId, filename));
+  };
+
+  const handleFileSelect = (modelId: string, filename: string) => {
+    setSelectedFile((prev) => new Map(prev).set(modelId, filename));
+  };
 
   if (loading && models.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
-        <FiLoader className="animate-spin text-purple-500" size={40} />
+        <FiLoader className="animate-spin text-[#7d7abc]" size={40} />
       </div>
     );
   }
@@ -92,12 +159,12 @@ export const BrowseModels = ({
   if (error && models.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-red-400 text-lg mb-2">Failed to load models</p>
-        <p className="text-white/40 text-sm mb-4">{error}</p>
+        <p className="text-[#d8d4cf] text-lg mb-2">Failed to load models</p>
+        <p className="text-[#d8d4cf]/40 text-sm mb-4">{error}</p>
         {onRefresh && (
           <button
             onClick={onRefresh}
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-[#121212] hover:bg-[#d8d4cf]/10 rounded-lg text-[#d8d4cf] transition-all flex items-center gap-2 cursor-pointer"
           >
             <FiRefreshCw size={16} />
             Retry
@@ -108,11 +175,11 @@ export const BrowseModels = ({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       {/* Info banner */}
-      <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-white/5 rounded-lg border border-white/5">
+      <div className="flex items-center justify-between text-sm text-[#d8d4cf]/40 px-2 py-2 bg-[#121212]/50 rounded-lg border border-[#d8d4cf]/5">
         <div className="flex items-center gap-3">
-          <FiServer className="text-purple-500" size={16} />
+          <FiServer className="text-[#7d7abc]" size={16} />
           <span>GGUF models from Hugging Face</span>
         </div>
         {totalModels > 0 && (
@@ -125,14 +192,14 @@ export const BrowseModels = ({
       {/* Model grid */}
       {models.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-white/40 text-lg">No models available</p>
-          <p className="text-white/30 text-sm mt-2">
+          <p className="text-[#d8d4cf]/40 text-lg">No models available</p>
+          <p className="text-[#d8d4cf]/30 text-sm mt-2">
             Try refreshing or check your connection
           </p>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
+              className="mt-4 px-4 py-2 bg-[#121212] hover:bg-[#d8d4cf]/10 rounded-lg text-[#d8d4cf] transition-all flex items-center gap-2 mx-auto cursor-pointer"
             >
               <FiRefreshCw size={16} />
               Refresh
@@ -140,28 +207,36 @@ export const BrowseModels = ({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
           {models.map((model) => {
-            const isDownloading = downloadingModels.has(model.id);
-            const ggufFile =
-              model.gguf_files && model.gguf_files.length > 0
-                ? model.gguf_files[0]
-                : null;
+            // Get unique quantizations
+            const uniqueFiles = getUniqueQuantizations(model.gguf_files);
+            const defaultFile =
+              uniqueFiles.length > 0 ? uniqueFiles[0].filename : "";
+            const selectedFileName = selectedFile.get(model.id) || defaultFile;
+            const selectedFileData = uniqueFiles.find(
+              (f) => f.filename === selectedFileName,
+            );
+
+            // Skip models with no identifiable quantization
+            if (uniqueFiles.length === 0) {
+              return null;
+            }
 
             return (
               <div
                 key={model.id}
-                className="bg-white/5 border border-white/10 rounded-xl p-5 hover:bg-white/8 hover:border-white/20 transition-all duration-200 flex flex-col h-full"
+                className="bg-[#121212] border border-[#d8d4cf]/10 rounded-xl p-5 hover:bg-[#d8d4cf]/5 hover:border-[#d8d4cf]/20 transition-all duration-200 flex flex-col h-full"
               >
                 {/* Model header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-white font-semibold truncate text-base">
+                    <h4 className="text-[#d8d4cf] font-semibold truncate text-base">
                       {model.name || model.id}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
-                      <FiUser className="text-white/30" size={12} />
-                      <span className="text-white/40 text-xs">
+                      <FiUser className="text-[#d8d4cf]/30" size={12} />
+                      <span className="text-[#d8d4cf]/40 text-xs">
                         {model.author || "Unknown"}
                       </span>
                     </div>
@@ -170,7 +245,7 @@ export const BrowseModels = ({
 
                 {/* Description */}
                 {model.description && (
-                  <p className="text-white/40 text-sm line-clamp-2 mb-3 flex-1">
+                  <p className="text-[#d8d4cf]/40 text-sm line-clamp-2 mb-3 flex-1">
                     {model.description}
                   </p>
                 )}
@@ -178,74 +253,80 @@ export const BrowseModels = ({
                 {/* Model stats */}
                 <div className="flex flex-wrap gap-2 mb-3">
                   {model.downloads !== undefined && model.downloads > 0 && (
-                    <span className="text-xs bg-white/10 px-2 py-1 rounded-full text-white/60 flex items-center gap-1">
-                      ⬇️ {formatDownloads(model.downloads)}
+                    <span className="text-xs bg-[#121212] px-2 py-1 rounded-full text-[#d8d4cf]/60 flex items-center gap-1">
+                      <FiDownloadCloud size={12} />
+                      {formatDownloads(model.downloads)}
                     </span>
                   )}
                   {model.likes !== undefined && model.likes > 0 && (
-                    <span className="text-xs bg-white/10 px-2 py-1 rounded-full text-white/60 flex items-center gap-1">
-                      ❤️ {model.likes}
+                    <span className="text-xs bg-[#121212] px-2 py-1 rounded-full text-[#d8d4cf]/60 flex items-center gap-1">
+                      <FiHeart size={12} />
+                      {model.likes}
                     </span>
                   )}
-                  {ggufFile && (
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full border ${getQuantizationColor(ggufFile.quantization)}`}
+                  <span className="text-xs bg-[#121212] px-2 py-1 rounded-full text-[#d8d4cf]/60 flex items-center gap-1">
+                    <FiFolder size={12} />
+                    {uniqueFiles.length} files
+                  </span>
+                </div>
+
+                {/* GGUF file selection */}
+                <div className="mb-4 space-y-2">
+                  <div className="relative">
+                    <select
+                      value={selectedFileName}
+                      onChange={(e) =>
+                        handleFileSelect(model.id, e.target.value)
+                      }
+                      className="w-full bg-[#0a0a0a] text-[#d8d4cf] border border-[#d8d4cf]/10 rounded-lg px-3 py-2 pr-8 text-sm appearance-none hover:border-[#d8d4cf]/30 transition-all focus:outline-none focus:border-[#7d7abc]"
                     >
-                      {ggufFile.quantization}
-                    </span>
+                      {uniqueFiles.map((file) => (
+                        <option key={file.filename} value={file.filename}>
+                          {getQuantizationLabel(file.filename)}
+                        </option>
+                      ))}
+                    </select>
+                    <FiChevronDown
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#d8d4cf]/40 pointer-events-none"
+                      size={14}
+                    />
+                  </div>
+
+                  {/* Show selected file details */}
+                  {selectedFileData && (
+                    <div className="text-xs text-[#d8d4cf]/30 px-1 flex items-center gap-2">
+                      <FiFile size={12} />
+                      <span className="truncate">
+                        {selectedFileData.filename}
+                      </span>
+                    </div>
                   )}
                 </div>
 
-                {/* GGUF file info */}
-                {ggufFile && (
-                  <div className="flex items-center gap-3 text-xs text-white/30 mb-4 pt-2 border-t border-white/5">
-                    <span className="flex items-center gap-1">
-                      <FiFile size={12} />
-                      {formatSize(ggufFile.size)}
-                    </span>
-                    <span className="truncate flex-1">{ggufFile.filename}</span>
-                  </div>
-                )}
-
-                {/* Tags */}
-                {model.tags && model.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-4">
-                    {model.tags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-xs bg-white/5 px-2 py-0.5 rounded-full text-white/30"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {model.tags.length > 3 && (
-                      <span className="text-xs text-white/20">
-                        +{model.tags.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
-
                 {/* Download button */}
                 <button
-                  onClick={() => onDownload(model.id)}
-                  disabled={isDownloading || !ggufFile}
-                  className="w-full mt-auto px-4 py-2.5 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  onClick={() => onDownload(model.id, selectedFileName)}
+                  disabled={
+                    isDownloading(model.id, selectedFileName) ||
+                    !selectedFileName ||
+                    uniqueFiles.length === 0
+                  }
+                  className="w-full mt-auto px-4 py-2.5 bg-[#7d7abc] hover:bg-[#7d7abc]/80 disabled:opacity-50 text-[#d8d4cf] rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                 >
-                  {isDownloading ? (
+                  {isDownloading(model.id, selectedFileName) ? (
                     <>
                       <FiLoader className="animate-spin" size={16} />
                       Downloading...
                     </>
-                  ) : !ggufFile ? (
+                  ) : !selectedFileName || uniqueFiles.length === 0 ? (
                     <>
                       <FiFile size={16} />
-                      No GGUF File
+                      No Quantized File
                     </>
                   ) : (
                     <>
                       <FiDownload size={16} />
-                      Download Model
+                      Download {getQuantizationLabel(selectedFileName)}
                     </>
                   )}
                 </button>
@@ -261,7 +342,7 @@ export const BrowseModels = ({
           <button
             onClick={onPreviousPage}
             disabled={currentPage === 1 || loading}
-            className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+            className="p-2 bg-[#121212] hover:bg-[#d8d4cf]/10 disabled:opacity-30 rounded-lg text-[#d8d4cf]/60 transition-all cursor-pointer disabled:cursor-not-allowed"
           >
             <FiChevronLeft size={18} />
           </button>
@@ -286,8 +367,8 @@ export const BrowseModels = ({
                   disabled={loading}
                   className={`px-3 py-1.5 rounded-lg text-sm transition-all cursor-pointer ${
                     currentPage === pageNum
-                      ? "bg-purple-500 text-white"
-                      : "bg-white/5 hover:bg-white/10 text-white/60"
+                      ? "bg-[#7d7abc] text-[#d8d4cf]"
+                      : "bg-[#121212] hover:bg-[#d8d4cf]/10 text-[#d8d4cf]/60"
                   }`}
                 >
                   {pageNum}
@@ -299,7 +380,7 @@ export const BrowseModels = ({
           <button
             onClick={onNextPage}
             disabled={currentPage === totalPages || loading}
-            className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+            className="p-2 bg-[#121212] hover:bg-[#d8d4cf]/10 disabled:opacity-30 rounded-lg text-[#d8d4cf]/60 transition-all cursor-pointer disabled:cursor-not-allowed"
           >
             <FiChevronRight size={18} />
           </button>
