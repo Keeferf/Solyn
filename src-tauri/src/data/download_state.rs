@@ -33,7 +33,7 @@ pub struct TerminalLine {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModelAcquisitionProgress {
     pub model_id: String,
-    pub status: String, // "downloading", "converting", "complete", "error"
+    pub status: String, 
     pub progress: u8,
     pub message: String,
 }

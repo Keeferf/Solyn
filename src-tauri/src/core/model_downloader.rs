@@ -1,6 +1,6 @@
+// src/core/model_downloader.rs
 use reqwest;
 use serde_json;
-use std::time::Duration;
 use tauri::WebviewWindow;
 use tokio::io::AsyncWriteExt;
 use futures_util::StreamExt;
@@ -10,7 +10,11 @@ use crate::core::huggingface_client::extract_gguf_files;
 
 pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String> {
     let client = reqwest::Client::new();
-    let info_url = format!("https://huggingface.co/api/models/{}", model_id);
+    
+    // Use the full=true parameter to get all siblings
+    let info_url = format!("https://huggingface.co/api/models/{}?full=true", model_id);
+    
+    println!("Fetching GGUF metadata for model: {}", model_id);
     
     let response = client
         .get(&info_url)
@@ -18,6 +22,10 @@ pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String>
         .send()
         .await
         .map_err(|e| format!("Failed to get model info: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("HTTP error: {}", response.status()));
+    }
     
     let data: serde_json::Value = response
         .json()
@@ -41,14 +49,20 @@ pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String>
         return Err("No GGUF files found in this model repository".to_string());
     }
     
-    Ok(gguf_files.first().cloned().unwrap())
+    let selected_file = gguf_files.first().cloned().unwrap();
+    println!("Selected GGUF file: {} ({:.2} MB)", 
+        selected_file.filename, 
+        selected_file.size as f64 / 1024.0 / 1024.0
+    );
+    
+    Ok(selected_file)
 }
 
 pub async fn download_gguf_model(
     window: &WebviewWindow,
     model_id: &str,
     gguf_metadata: &GGUFFileInfo,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let client = reqwest::Client::new();
     
     let model_name = model_id.replace("/", "-");
@@ -56,7 +70,7 @@ pub async fn download_gguf_model(
     std::fs::create_dir_all(&download_dir)
         .map_err(|e| format!("Failed to create model directory: {}", e))?;
     
-    // Use the URL from the metadata, or construct it if not available
+    // Prefer the URL from metadata, fallback to constructing it
     let file_url = if !gguf_metadata.url.is_empty() {
         gguf_metadata.url.clone()
     } else {
@@ -65,6 +79,8 @@ pub async fn download_gguf_model(
             model_id, gguf_metadata.filename
         )
     };
+    
+    println!("Downloading from URL: {}", file_url);
     
     broadcast_model_acquisition_progress(
         window,
@@ -120,79 +136,10 @@ pub async fn download_gguf_model(
     
     file.flush().await.map_err(|e| format!("Failed to flush file: {}", e))?;
     
-    Ok(())
-}
-
-pub async fn generate_ollama_modelfile(
-    window: &WebviewWindow,
-    model_id: &str,
-    gguf_metadata: &GGUFFileInfo,
-) -> Result<(), String> {
-    let model_name = model_id.replace("/", "-");
-    let model_dir = std::path::Path::new("models").join(&model_name);
-    let gguf_path = model_dir.join(&gguf_metadata.filename);
+    let file_size_mb = gguf_metadata.size as f64 / 1024.0 / 1024.0;
+    let result = format!("Successfully downloaded {} ({:.1} MB) to {}", 
+        gguf_metadata.filename, file_size_mb, download_dir.display());
     
-    if !gguf_path.exists() {
-        return Err("GGUF file not found".to_string());
-    }
-    
-    let modelfile_content = format!(
-        r#"FROM {}
-TEMPLATE "{{ .Prompt }}"
-SYSTEM "You are a helpful AI assistant."
-
-# Model parameters
-PARAMETER temperature 0.7
-PARAMETER top_p 0.9
-PARAMETER top_k 40
-PARAMETER repeat_penalty 1.1
-
-# GGUF quantization: {}
-"#,
-        gguf_path.display(),
-        gguf_metadata.quantization
-    );
-    
-    let modelfile_path = model_dir.join("Modelfile");
-    std::fs::write(modelfile_path, modelfile_content)
-        .map_err(|e| format!("Failed to create Modelfile: {}", e))?;
-    
-    broadcast_model_acquisition_progress(window, model_id, "converting", 75, "Modelfile created successfully");
-    
-    Ok(())
-}
-
-pub async fn import_model_into_ollama(model_id: &str) -> Result<(), String> {
-    let model_name = model_id.replace("/", "-");
-    let model_dir = std::path::Path::new("models").join(&model_name);
-    let modelfile_path = model_dir.join("Modelfile");
-    
-    if !modelfile_path.exists() {
-        return Err("Modelfile not found".to_string());
-    }
-    
-    let modelfile_content = std::fs::read_to_string(modelfile_path)
-        .map_err(|e| format!("Failed to read Modelfile: {}", e))?;
-    
-    let client = reqwest::Client::new();
-    let payload = serde_json::json!({
-        "name": model_name,
-        "modelfile": modelfile_content,
-        "stream": false,
-    });
-    
-    let response = client
-        .post("http://localhost:11434/api/create")
-        .json(&payload)
-        .timeout(Duration::from_secs(300))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to create model in Ollama: {}", e))?;
-    
-    if !response.status().is_success() {
-        let error_text = response.text().await.unwrap_or_default();
-        return Err(format!("Ollama create failed: {}", error_text));
-    }
-    
-    Ok(())
+    println!("{}", result);
+    Ok(result)
 }

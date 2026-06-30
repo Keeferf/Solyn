@@ -9,7 +9,6 @@ pub struct HuggingFaceModelListing {
     pub downloads: Option<u64>,
     pub likes: Option<u64>,
     pub description: Option<String>,
-    pub tags: Vec<String>,
     pub gguf_files: Vec<GGUFFileInfo>,
 }
 
@@ -17,6 +16,11 @@ pub struct HuggingFaceModelListing {
 pub struct GGUFFileInfo {
     pub filename: String,
     pub size: u64,
-    pub quantization: String,
     pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadRequest {
+    pub model_id: String,
+    pub filename: String,
 }

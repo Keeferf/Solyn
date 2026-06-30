@@ -5,7 +5,6 @@ use crate::core::installation_executor::execute_ollama_installation;
 use crate::helpers::platform_detector::detect_operating_system;
 use crate::events::progress_broadcaster::broadcast_download_progress;
 use crate::data::download_state::{DownloadStatus, InstallationInformation};
-use crate::data::ollama_model_types::OllamaModelInfo;
 
 #[tauri::command]
 pub async fn check_ollama_installed() -> Result<bool, String> {
@@ -20,24 +19,6 @@ pub async fn get_ollama_version() -> Result<String, String> {
 #[tauri::command]
 pub async fn get_install_info() -> Result<InstallationInformation, String> {
     get_installation_instructions().await
-}
-
-#[tauri::command]
-pub async fn list_ollama_models() -> Result<Vec<OllamaModelInfo>, String> {
-    list_installed_ollama_models().await
-}
-
-#[tauri::command]
-pub async fn pull_ollama_model(
-    app_handle: tauri::AppHandle,
-    model_name: String,
-) -> Result<String, String> {
-    initiate_model_pull(app_handle, model_name).await
-}
-
-#[tauri::command]
-pub async fn delete_ollama_model(model_name: String) -> Result<String, String> {
-    remove_ollama_model(model_name).await
 }
 
 #[tauri::command]

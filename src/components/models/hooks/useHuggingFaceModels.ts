@@ -1,152 +1,135 @@
 // src/components/models/hooks/useHuggingFaceModels.ts
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+
+export interface GGUFFile {
+  filename: string;
+  size: number;
+  quantization: string;
+  url: string;
+}
 
 export interface HFModel {
   id: string;
-  description?: string;
-  pipeline_tag?: string;
-  likes?: number;
+  model_id: string;
+  author: string;
+  name: string;
   downloads?: number;
-  size?: number;
-  lastModified?: string;
-  license?: string;
-  tags?: string[];
-  gguf_file?: string; // The GGUF filename
-  isInstalled?: boolean;
+  likes?: number;
+  description?: string;
+  tags: string[];
+  gguf_files: GGUFFile[];
 }
 
-export interface ModelDownloadProgress {
-  modelId: string;
-  status: "downloading" | "converting" | "complete" | "error";
-  progress: number;
-  message: string;
+// Backend type matching Rust's HuggingFaceModelListing
+interface BackendModel {
+  id: string;
+  model_id: string;
+  author: string;
+  name: string;
+  downloads: number | null;
+  likes: number | null;
+  description: string | null;
+  tags: string[];
+  gguf_files: {
+    filename: string;
+    size: number;
+    quantization: string;
+    url: string;
+  }[];
 }
 
-export const useHuggingFaceModels = (onModelInstalled: () => Promise<void>) => {
+export const useHuggingFaceModels = () => {
   const [models, setModels] = useState<HFModel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [downloadingModels, setDownloadingModels] = useState<Set<string>>(
-    new Set(),
-  );
-  const [downloadProgress, setDownloadProgress] = useState<
-    Map<string, ModelDownloadProgress>
-  >(new Map());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalModels, setTotalModels] = useState(0);
+  const modelsPerPage = 20;
 
-  const searchModels = useCallback(async (query: string) => {
-    if (!query.trim() || query.trim().length < 2) {
-      setModels([]);
-      return;
-    }
+  const transformModel = (backendModel: BackendModel): HFModel => {
+    return {
+      id: backendModel.model_id || backendModel.id,
+      model_id: backendModel.model_id || backendModel.id,
+      author: backendModel.author || "Unknown",
+      name: backendModel.name || backendModel.model_id?.split("/").pop() || "",
+      downloads: backendModel.downloads || 0,
+      likes: backendModel.likes || 0,
+      description: backendModel.description || "",
+      tags: backendModel.tags || [],
+      gguf_files: backendModel.gguf_files || [],
+    };
+  };
 
-    try {
+  const fetchModels = useCallback(
+    async (page: number) => {
       setLoading(true);
       setError(null);
-      const results = await invoke<HFModel[]>("search_huggingface_models", {
-        query: query.trim(),
-        limit: 20,
-      });
-      setModels(results);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to search models");
-      console.error("Error searching Hugging Face models:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      try {
+        console.log(
+          `🔄 Fetching models page ${page} with limit ${modelsPerPage}...`,
+        );
+        const response = await invoke<BackendModel[]>(
+          "fetch_huggingface_models",
+          {
+            page,
+            limit: modelsPerPage,
+          },
+        );
 
-  const downloadModel = useCallback(async (modelId: string) => {
-    setDownloadingModels((prev) => new Set(prev).add(modelId));
+        console.log(
+          `📦 Received ${response.length} models from backend for page ${page}`,
+        );
 
-    try {
-      await invoke("download_huggingface_model", { modelId });
-    } catch (err) {
-      setDownloadingModels((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(modelId);
-        return newSet;
-      });
-      throw err;
-    }
-  }, []);
-
-  // Set up progress event listeners
-  useEffect(() => {
-    let unlistenProgress: (() => void) | null = null;
-    let unlistenError: (() => void) | null = null;
-
-    const setupListeners = async () => {
-      unlistenProgress = await listen<ModelDownloadProgress>(
-        "model-download-progress",
-        (event) => {
-          const progress = event.payload;
-
-          setDownloadProgress((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(progress.modelId, progress);
-            return newMap;
-          });
-
-          if (progress.status === "complete") {
-            setDownloadingModels((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(progress.modelId);
-              return newSet;
-            });
-            // Refresh installed models
-            onModelInstalled();
-          }
-
-          if (progress.status === "error") {
-            setDownloadingModels((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(progress.modelId);
-              return newSet;
-            });
-          }
-        },
-      );
-
-      unlistenError = await listen<string>("model-download-error", (event) => {
-        setError(event.payload);
-        // Try to extract model ID from error message
-        const match = event.payload.match(/Error downloading (.+?):/);
-        if (match) {
-          const modelId = match[1];
-          setDownloadingModels((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(modelId);
-            return newSet;
-          });
+        // Log first few model IDs to verify pagination
+        if (response.length > 0) {
+          const firstIds = response.slice(0, 3).map((m) => m.model_id || m.id);
+          console.log(`🔍 First 3 model IDs on page ${page}:`, firstIds);
         }
-      });
-    };
 
-    setupListeners();
+        const transformedModels = response.map(transformModel);
+        console.log(
+          `✅ Transformed ${transformedModels.length} models for page ${page}`,
+        );
+        setModels(transformedModels);
 
-    // Cleanup function
-    return () => {
-      if (unlistenProgress) {
-        unlistenProgress();
+        // Fetch total count
+        try {
+          const total = await invoke<number>("get_huggingface_model_count");
+          setTotalModels(total);
+          console.log(`📊 Total models available: ${total}`);
+        } catch (countErr) {
+          console.error("Failed to fetch total count:", countErr);
+          // If we can't get total, use a default
+          setTotalModels(response.length * 10);
+        }
+
+        setCurrentPage(page);
+      } catch (err) {
+        console.error(`❌ Failed to fetch models for page ${page}:`, err);
+        setError(String(err));
+      } finally {
+        setLoading(false);
       }
-      if (unlistenError) {
-        unlistenError();
-      }
-    };
-  }, [onModelInstalled]);
+    },
+    [modelsPerPage],
+  );
+
+  // Initial load
+  useEffect(() => {
+    fetchModels(1);
+  }, [fetchModels]);
 
   return {
     models,
     loading,
     error,
-    searchQuery,
-    setSearchQuery,
-    searchModels,
-    downloadModel,
-    downloadingModels,
-    downloadProgress,
+    currentPage,
+    totalModels,
+    modelsPerPage,
+    fetchModels,
+    setCurrentPage: (page: number) => fetchModels(page),
+    nextPage: () => fetchModels(currentPage + 1),
+    previousPage: () => fetchModels(currentPage - 1),
   };
 };
