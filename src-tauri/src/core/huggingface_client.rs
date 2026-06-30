@@ -1,8 +1,8 @@
+// src/core/huggingface_client.rs
 use reqwest;
 use serde_json;
 use std::time::Duration;
 use crate::data::huggingface_model_types::{HuggingFaceModelListing, GGUFFileInfo};
-use crate::core::ollama_client::get_installed_model_names;
 
 pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUFFileInfo> {
     let mut gguf_files = Vec::new();
@@ -56,25 +56,29 @@ fn detect_quantization_level(filename: &str) -> String {
     "Unknown".to_string()
 }
 
-pub async fn search_hugging_face_repository(
-    query: String,
+pub async fn fetch_hugging_face_models(
+    page: Option<usize>,
     limit: Option<usize>,
 ) -> Result<Vec<HuggingFaceModelListing>, String> {
+    let page = page.unwrap_or(1);
     let limit = limit.unwrap_or(20);
     let client = reqwest::Client::new();
     
+    // Fetch models with GGUF files, sorted by downloads
     let url = format!(
-        "https://huggingface.co/api/models?search={}+GGUF&limit={}&sort=downloads",
-        query, limit
+        "https://huggingface.co/api/models?search=GGUF&sort=downloads&direction=-1&limit={}&offset={}",
+        limit, (page - 1) * limit
     );
+    
+    println!("Fetching models from URL: {}", url);
     
     let response = client
         .get(&url)
         .header("User-Agent", "SolynApp/1.0")
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
         .send()
         .await
-        .map_err(|e| format!("Failed to search Hugging Face: {}", e))?;
+        .map_err(|e| format!("Failed to fetch Hugging Face models: {}", e))?;
     
     if !response.status().is_success() {
         return Err(format!("Hugging Face API error: {}", response.status()));
@@ -85,11 +89,12 @@ pub async fn search_hugging_face_repository(
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
     
-    let installed_models = get_installed_model_names().await;
-    
     let mut models = Vec::new();
     
-    for item in data.as_array().ok_or("Invalid response format")? {
+    let items = data.as_array().ok_or("Invalid response format - expected array")?;
+    println!("Found {} items in response", items.len());
+    
+    for item in items {
         let id = item["id"].as_str().unwrap_or("").to_string();
         if id.is_empty() {
             continue;
@@ -130,18 +135,50 @@ pub async fn search_hugging_face_repository(
             })
             .unwrap_or_else(Vec::new);
         
-        models.push(HuggingFaceModelListing {
+        let model = HuggingFaceModelListing {
             id: id.clone(),
             model_id: id.clone(),
             author,
-            name,
+            name: name.clone(),
             downloads: item["downloads"].as_u64(),
             likes: item["likes"].as_u64(),
             description: item["description"].as_str().map(|s| s.to_string()),
             tags,
             gguf_files,
-        });
+        };
+        
+        models.push(model);
     }
     
+    println!("Returning {} models with GGUF files", models.len());
     Ok(models)
+}
+
+pub async fn get_total_model_count() -> Result<usize, String> {
+    let client = reqwest::Client::new();
+    
+    let url = "https://huggingface.co/api/models?search=GGUF&limit=1000";
+    
+    println!("Fetching total model count from: {}", url);
+    
+    let response = client
+        .get(url)
+        .header("User-Agent", "SolynApp/1.0")
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch model count: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Hugging Face API error: {}", response.status()));
+    }
+    
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    
+    let count = data.as_array().map(|arr| arr.len()).unwrap_or(0);
+    println!("Total model count: {}", count);
+    Ok(count)
 }
