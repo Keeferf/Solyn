@@ -59,7 +59,7 @@ export const DownloadDetails = ({
           : `Download Ollama for ${platformDisplay}`}
       </button>
 
-      <div className="text-xs text-white/30">
+      <div className="text-xs text-white/30 text-center">
         <span className="block">Or manually download from </span>
         <a
           href="https://ollama.com/download"
