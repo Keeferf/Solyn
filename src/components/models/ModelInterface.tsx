@@ -4,7 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { BrowseModels } from "./BrowseModels";
 import { DownloadStatusDisplay } from "./DownloadStatusDisplay";
-import { useHuggingFaceModels } from "./hooks/useHuggingFaceModels";
+import { ModelDetailModal } from "./ModelDetailModal";
+import { useHuggingFaceModels, HFModel } from "./hooks/useHuggingFaceModels";
 
 interface DownloadProgress {
   model_id: string;
@@ -31,6 +32,8 @@ export const ModelInterface = () => {
     fetchModels,
   } = useHuggingFaceModels();
 
+  const [selectedModel, setSelectedModel] = useState<HFModel | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingModels, setDownloadingModels] = useState<Set<DownloadKey>>(
     new Set(),
   );
@@ -41,6 +44,11 @@ export const ModelInterface = () => {
   // Helper to create unique key
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
+  };
+
+  // Check if a specific file is downloading
+  const isDownloading = (modelId: string, filename: string): boolean => {
+    return downloadingModels.has(getDownloadKey(modelId, filename));
   };
 
   // Listen for download progress events
@@ -128,6 +136,11 @@ export const ModelInterface = () => {
     };
   }, []);
 
+  const handleModelClick = (model: HFModel) => {
+    setSelectedModel(model);
+    setIsModalOpen(true);
+  };
+
   const handleDownload = async (modelId: string, filename: string) => {
     const key = getDownloadKey(modelId, filename);
     if (downloadingModels.has(key)) return;
@@ -147,6 +160,11 @@ export const ModelInterface = () => {
         return newSet;
       });
     }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedModel(null);
   };
 
   return (
@@ -185,9 +203,19 @@ export const ModelInterface = () => {
         onGoToPage={setCurrentPage}
         onNextPage={nextPage}
         onPreviousPage={previousPage}
-        onDownload={handleDownload}
+        onModelClick={handleModelClick}
         onRefresh={() => fetchModels(currentPage)}
         error={error}
+      />
+
+      {/* Model detail modal */}
+      <ModelDetailModal
+        model={selectedModel}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onDownload={handleDownload}
+        downloadingModels={downloadingModels}
+        isDownloading={isDownloading}
       />
     </div>
   );
