@@ -1,11 +1,14 @@
 // src/components/models/ModelInterface.tsx
+import { useState } from "react";
 import { FiServer, FiRefreshCw } from "react-icons/fi";
 import { useOllama } from "@/contexts/OllamaContext";
 import { useOllamaInstallation } from "./hooks/useOllamaInstallation";
 import { useOllamaModels } from "./hooks/useOllamaModels";
+import { useHuggingFaceModels } from "./hooks/useHuggingFaceModels";
 import { DownloadDetails } from "./DownloadDetails";
 import { DownloadStatusDisplay } from "./DownloadStatusDisplay";
 import { ModelList } from "./ModelList";
+import { BrowseModels } from "./BrowseModels";
 
 export const ModelInterface = () => {
   const { isOllamaInstalled, ollamaVersion, refreshOllamaStatus } = useOllama();
@@ -32,6 +35,16 @@ export const ModelInterface = () => {
     setIsTerminalExpanded,
     getPlatformDisplay,
   } = useOllamaInstallation(refreshOllamaStatus);
+
+  const {
+    models: huggingFaceModels,
+    loading: hfLoading,
+    downloadModel: downloadFromHF,
+    downloadingModels,
+    searchModels,
+    searchQuery,
+    setSearchQuery,
+  } = useHuggingFaceModels(fetchModels);
 
   const isIdle = downloadProgress.status === "Idle";
   const isActive = !isIdle;
@@ -63,6 +76,16 @@ export const ModelInterface = () => {
     }
   };
 
+  const handleDownloadFromHF = async (modelId: string) => {
+    try {
+      await downloadFromHF(modelId);
+      // Refresh the model list after download completes
+      setTimeout(() => fetchModels(), 3000);
+    } catch (error) {
+      console.error("Failed to download model from Hugging Face:", error);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto w-full p-6">
       <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
@@ -74,12 +97,12 @@ export const ModelInterface = () => {
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-3">
-            {isOllamaInstalled ? "Model Library" : "Ollama Not Installed"}
+            {isOllamaInstalled ? "Model Management" : "Ollama Not Installed"}
           </h2>
 
           <p className="text-white/60 max-w-md mx-auto mb-4">
             {isOllamaInstalled
-              ? `Ollama ${ollamaVersion ? `v${ollamaVersion} ` : ""}is running. Manage your AI models below.`
+              ? `Ollama ${ollamaVersion ? `v${ollamaVersion} ` : ""}is running. Browse and manage your AI models below.`
               : "Ollama is required to run AI models locally. Download it now to get started with Solyn."}
           </p>
 
@@ -129,18 +152,42 @@ export const ModelInterface = () => {
 
         {/* Models Management UI */}
         {isOllamaInstalled && (
-          <ModelList
-            models={models}
-            loading={modelsLoading}
-            pullingModels={pullingModels}
-            onPullModel={handlePullModel}
-            onDeleteModel={handleDeleteModel}
-          />
+          <div className="space-y-8">
+            {/* Installed Models Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <span>Installed Models</span>
+                <span className="text-sm text-white/40 font-normal">
+                  ({models.length})
+                </span>
+              </h3>
+              <ModelList
+                models={models}
+                loading={modelsLoading}
+                pullingModels={pullingModels}
+                onPullModel={handlePullModel}
+                onDeleteModel={handleDeleteModel}
+              />
+            </div>
+
+            {/* Browse Models Section */}
+            <div className="pt-8 border-t border-white/10">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Browse Models
+              </h3>
+              <BrowseModels
+                models={huggingFaceModels}
+                loading={hfLoading}
+                downloadingModels={downloadingModels}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onSearch={searchModels}
+                onDownload={handleDownloadFromHF}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
   );
 };
-
-// Add this import at the top
-import { useState } from "react";

@@ -54,7 +54,6 @@ export const useOllamaModels = (refreshTrigger: number) => {
 
     try {
       await invoke("pull_ollama_model", { modelName });
-      // The actual completion will be handled by the pull-progress events
     } catch (err) {
       setPullingModels((prev) => {
         const newSet = new Set(prev);
@@ -69,7 +68,7 @@ export const useOllamaModels = (refreshTrigger: number) => {
     async (modelName: string) => {
       try {
         await invoke("delete_ollama_model", { modelName });
-        await fetchModels(); // Refresh the list
+        await fetchModels();
       } catch (err) {
         throw new Error(
           err instanceof Error ? err.message : "Failed to delete model",
@@ -79,12 +78,10 @@ export const useOllamaModels = (refreshTrigger: number) => {
     [fetchModels],
   );
 
-  // Fetch models on mount and when refreshTrigger changes
   useEffect(() => {
     fetchModels();
   }, [fetchModels, refreshTrigger]);
 
-  // Set up progress event listeners
   useEffect(() => {
     const unlistenPullProgress = listen<ModelPullProgress>(
       "model-pull-progress",
@@ -92,10 +89,7 @@ export const useOllamaModels = (refreshTrigger: number) => {
         const progress = event.payload;
         console.log("Pull progress:", progress);
 
-        // If status is "success" or "completed", refresh the model list
         if (progress.status === "success" || progress.status === "completed") {
-          // Remove from pulling set - we need to track which model completed
-          // For simplicity, we'll clear the pulling set and refresh
           setPullingModels(new Set());
           fetchModels();
         }

@@ -28,11 +28,11 @@ pub struct InstallInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TerminalOutput {
     pub line: String,
-    pub stream: String, // "stdout", "stderr", "info", "success"
-    pub is_progress: bool, // indicates this is a progress line that should replace the last one
+    pub stream: String,
+    pub is_progress: bool,
 }
 
-// New structs for model management
+// Model management structs
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OllamaModel {
     pub name: String,
@@ -58,6 +58,37 @@ pub struct ModelPullProgress {
     pub digest: Option<String>,
     pub total: Option<u64>,
     pub completed: Option<u64>,
+}
+
+// Hugging Face structs - only for GGUF models
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HuggingFaceModel {
+    pub id: String,
+    pub description: Option<String>,
+    pub pipeline_tag: Option<String>,
+    pub likes: Option<u64>,
+    pub downloads: Option<u64>,
+    pub size: Option<u64>,
+    pub last_modified: Option<String>,
+    pub license: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub gguf_file: Option<String>, // The GGUF filename
+    pub is_installed: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModelDownloadProgress {
+    pub model_id: String,
+    pub status: String, // "downloading", "converting", "complete", "error"
+    pub progress: u8,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GGUFModelInfo {
+    pub filename: String,
+    pub size: u64,
+    pub quantization: String,
 }
 
 #[tauri::command]
@@ -192,7 +223,6 @@ async fn list_ollama_models() -> Result<Vec<OllamaModel>, String> {
             let size = model["size"].as_u64()?;
             let digest = model["digest"].as_str()?.to_string();
             
-            // Build details separately to avoid using ? in the closure
             let details = model["details"].as_object().map(|d| {
                 ModelDetails {
                     parent_model: d.get("parent_model")
@@ -247,7 +277,6 @@ async fn pull_ollama_model(
         .get_webview_window("main")
         .ok_or("Main window not found")?;
 
-    // Start the pull in a background task
     let window_clone = window.clone();
     let model_name_clone = model_name.clone();
     
@@ -278,7 +307,6 @@ async fn pull_ollama_model(
             return;
         }
 
-        // Process streaming response
         let stream = response.bytes_stream();
         use futures_util::StreamExt;
         use std::pin::pin;
@@ -323,6 +351,146 @@ async fn delete_ollama_model(model_name: String) -> Result<String, String> {
     }
 }
 
+// Updated: Search Hugging Face models - only show GGUF models
+#[tauri::command]
+async fn search_huggingface_models(
+    app_handle: tauri::AppHandle,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<HuggingFaceModel>, String> {
+    let limit = limit.unwrap_or(20);
+    let client = reqwest::Client::new();
+    
+    // Search for models with GGUF files
+    let url = format!(
+        "https://huggingface.co/api/models?search={}+GGUF&limit={}&sort=downloads",
+        query, limit
+    );
+    
+    let response = client
+        .get(&url)
+        .header("User-Agent", "SolynApp/1.0")
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to search Hugging Face: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Hugging Face API error: {}", response.status()));
+    }
+    
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    
+    let installed_models = get_installed_model_names().await;
+    
+    let mut models = Vec::new();
+    
+    for item in data.as_array().ok_or("Invalid response format")? {
+        let id = item["id"].as_str().unwrap_or("").to_string();
+        if id.is_empty() {
+            continue;
+        }
+        
+        // Check if this model has GGUF files
+        let siblings = item["siblings"].as_array();
+        let gguf_files = find_gguf_files(siblings);
+        
+        if gguf_files.is_empty() {
+            continue; // Skip models without GGUF files
+        }
+        
+        // Get the first GGUF file (usually the main one)
+        let gguf_file = gguf_files.first().cloned();
+        
+        let model_name = id.replace("/", ":");
+        let is_installed = installed_models.contains(&model_name);
+        
+        models.push(HuggingFaceModel {
+            id: id.clone(),
+            description: item["description"].as_str().map(|s| s.to_string()),
+            pipeline_tag: item["pipeline_tag"].as_str().map(|s| s.to_string()),
+            likes: item["likes"].as_u64(),
+            downloads: item["downloads"].as_u64(),
+            size: gguf_file.as_ref().map(|f| f.size),
+            last_modified: item["lastModified"].as_str().map(|s| s.to_string()),
+            license: item["license"].as_str().map(|s| s.to_string()),
+            tags: item["tags"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+                        .collect()
+                }),
+            gguf_file: gguf_file.map(|f| f.filename),
+            is_installed,
+        });
+    }
+    
+    Ok(models)
+}
+
+// New command: Download GGUF model from Hugging Face
+#[tauri::command]
+async fn download_huggingface_model(
+    app_handle: tauri::AppHandle,
+    model_id: String,
+) -> Result<String, String> {
+    let window = app_handle
+        .get_webview_window("main")
+        .ok_or("Main window not found")?;
+    
+    let window_clone = window.clone();
+    let model_id_clone = model_id.clone();
+    
+    tokio::spawn(async move {
+        emit_download_progress(&window_clone, &model_id_clone, "downloading", 0, "Starting download...");
+        
+        // Get GGUF file info
+        let gguf_info = match get_gguf_file_info(&model_id_clone).await {
+            Ok(info) => info,
+            Err(e) => {
+                emit_download_progress(&window_clone, &model_id_clone, "error", 0, &format!("Failed to find GGUF file: {}", e));
+                let _ = window_clone.emit("model-download-error", format!("Error finding GGUF for {}: {}", model_id_clone, e));
+                return;
+            }
+        };
+        
+        emit_download_progress(&window_clone, &model_id_clone, "downloading", 20, 
+            &format!("Downloading GGUF file: {}", gguf_info.filename));
+        
+        // Download the GGUF file
+        if let Err(e) = download_gguf_file(&window_clone, &model_id_clone, &gguf_info).await {
+            emit_download_progress(&window_clone, &model_id_clone, "error", 0, &format!("Download failed: {}", e));
+            let _ = window_clone.emit("model-download-error", format!("Error downloading {}: {}", model_id_clone, e));
+            return;
+        }
+        
+        emit_download_progress(&window_clone, &model_id_clone, "converting", 70, "Creating Modelfile for Ollama...");
+        
+        // Create Modelfile for Ollama
+        if let Err(e) = create_modelfile_for_gguf(&window_clone, &model_id_clone, &gguf_info).await {
+            emit_download_progress(&window_clone, &model_id_clone, "error", 0, &format!("Failed to create Modelfile: {}", e));
+            let _ = window_clone.emit("model-download-error", format!("Error creating Modelfile for {}: {}", model_id_clone, e));
+            return;
+        }
+        
+        emit_download_progress(&window_clone, &model_id_clone, "converting", 85, "Importing model into Ollama...");
+        
+        if let Err(e) = import_model_to_ollama(&model_id_clone).await {
+            emit_download_progress(&window_clone, &model_id_clone, "error", 0, &format!("Failed to import model: {}", e));
+            let _ = window_clone.emit("model-download-error", format!("Error importing {} to Ollama: {}", model_id_clone, e));
+            return;
+        }
+        
+        emit_download_progress(&window_clone, &model_id_clone, "complete", 100, "Model installed successfully!");
+    });
+    
+    Ok(format!("Started downloading model: {}", model_id))
+}
+
 fn get_platform() -> String {
     if cfg!(target_os = "windows") {
         "windows".to_string()
@@ -339,7 +507,6 @@ fn get_platform() -> String {
 fn clean_output_line(line: &str) -> String {
     let trimmed = line.trim();
     
-    // Remove common prefixes that might be added by the script or shell
     let cleaned = trimmed
         .trim_start_matches("> ")
         .trim_start_matches(">>> ")
@@ -348,7 +515,6 @@ fn clean_output_line(line: &str) -> String {
         .trim_start_matches("# ")
         .trim_start_matches("VERBOSE: ");
 
-    // Filter out specific messages we don't want to show
     if cleaned.is_empty() 
         || cleaned == ">" 
         || cleaned == ">>>" 
@@ -360,7 +526,6 @@ fn clean_output_line(line: &str) -> String {
         return String::new();
     }
     
-    // Remove specific verbose messages
     if cleaned.contains("GET with") && cleaned.contains("payload") {
         return String::new();
     }
@@ -392,7 +557,6 @@ fn strip_ansi_escapes(text: &str) -> String {
             }
             
             if in_bracket {
-                // Check if we're at the end of an ANSI sequence
                 if c.is_ascii_alphabetic() || c == '@' {
                     in_escape = false;
                     in_bracket = false;
@@ -400,7 +564,6 @@ fn strip_ansi_escapes(text: &str) -> String {
                 }
                 continue;
             } else {
-                // Single character escape
                 if c.is_ascii_alphabetic() {
                     in_escape = false;
                     continue;
@@ -414,14 +577,13 @@ fn strip_ansi_escapes(text: &str) -> String {
     result
 }
 
-// Helper function to process output stream, handling both \n and \r correctly
+// Helper function to process output stream
 fn process_output_stream(window: &tauri::WebviewWindow, text: &str, stream_type: &str) {
     let mut current_line = String::new();
     
     for ch in text.chars() {
         match ch {
             '\r' => {
-                // Carriage return: emit current line as a progress line and reset
                 if !current_line.is_empty() {
                     let stripped = strip_ansi_escapes(&current_line);
                     let cleaned = clean_output_line(&stripped);
@@ -432,7 +594,6 @@ fn process_output_stream(window: &tauri::WebviewWindow, text: &str, stream_type:
                 current_line.clear();
             }
             '\n' => {
-                // Newline: emit current line as a regular line and reset
                 if !current_line.is_empty() {
                     let stripped = strip_ansi_escapes(&current_line);
                     let cleaned = clean_output_line(&stripped);
@@ -448,7 +609,6 @@ fn process_output_stream(window: &tauri::WebviewWindow, text: &str, stream_type:
         }
     }
     
-    // Emit any remaining buffered content
     if !current_line.is_empty() {
         let stripped = strip_ansi_escapes(&current_line);
         let cleaned = clean_output_line(&stripped);
@@ -481,7 +641,6 @@ async fn download_with_pty(
         .spawn()
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
-    // Stream output in real-time
     while let Some(event) = rx.recv().await {
         match event {
             tauri_plugin_shell::process::CommandEvent::Stdout(data) => {
@@ -506,10 +665,9 @@ async fn download_with_pty(
         }
     }
 
-    // Verify installation with retries
     emit_terminal_output(window, "Verifying Ollama installation...", "info", false);
     
-    let max_attempts = 15; // Try 15 times (30 seconds total with 2 second delays)
+    let max_attempts = 15;
     let mut attempts = 0;
     
     while attempts < max_attempts {
@@ -522,13 +680,11 @@ async fn download_with_pty(
                 return Ok(());
             }
             Ok(false) => {
-                // Still not running, continue waiting
                 if attempts < max_attempts && attempts % 3 == 0 {
                     emit_terminal_output(window, &format!("Waiting for Ollama to start... (attempt {}/{})", attempts, max_attempts), "info", false);
                 }
             }
             Err(_e) => {
-                // Error checking, continue waiting
                 if attempts < max_attempts && attempts % 3 == 0 {
                     emit_terminal_output(window, &format!("Checking Ollama status... (attempt {}/{})", attempts, max_attempts), "info", false);
                 }
@@ -536,7 +692,6 @@ async fn download_with_pty(
         }
     }
     
-    // If we've exhausted all attempts, do one final check
     emit_terminal_output(window, "Performing final verification check...", "info", false);
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     
@@ -549,10 +704,253 @@ async fn download_with_pty(
             emit_terminal_output(window, "⚠️ Ollama installation completed but verification timed out.", "info", false);
             emit_terminal_output(window, "The installation should be complete. You can try refreshing the page.", "info", false);
             emit_terminal_output(window, "💡 If you see this message repeatedly, Ollama may need to be started manually.", "info", false);
-            // Still return success since installation likely completed
             Ok(())
         }
     }
+}
+
+// ============ GGUF Helper Functions ============
+
+#[derive(Debug, Clone)]
+struct GGUFFileInfo {
+    filename: String,
+    size: u64,
+    quantization: String,
+}
+
+fn find_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUFFileInfo> {
+    let mut gguf_files = Vec::new();
+    
+    if let Some(siblings) = siblings {
+        for file in siblings {
+            let filename = file["rfilename"].as_str().unwrap_or("");
+            
+            // Check if it's a GGUF file
+            if filename.ends_with(".gguf") {
+                let size = file["size"].as_u64().unwrap_or(0);
+                
+                // Try to extract quantization from filename
+                let quantization = extract_quantization(filename);
+                
+                gguf_files.push(GGUFFileInfo {
+                    filename: filename.to_string(),
+                    size,
+                    quantization,
+                });
+            }
+        }
+    }
+    
+    // Sort by size (largest first, usually the main model)
+    gguf_files.sort_by(|a, b| b.size.cmp(&a.size));
+    gguf_files
+}
+
+fn extract_quantization(filename: &str) -> String {
+    // Common GGUF quantization patterns
+    let quant_patterns = [
+        "Q8_0", "Q8_1", "Q6_K", "Q5_K", "Q5_0", "Q5_1",
+        "Q4_K", "Q4_0", "Q4_1", "Q3_K", "Q3_0", "Q3_1",
+        "Q2_K", "IQ4_NL", "IQ3_XS", "IQ2_XS", "FP16", "FP32",
+    ];
+    
+    for pattern in quant_patterns {
+        if filename.contains(pattern) {
+            return pattern.to_string();
+        }
+    }
+    
+    "Unknown".to_string()
+}
+
+async fn get_installed_model_names() -> Vec<String> {
+    if let Ok(models) = list_ollama_models().await {
+        models.into_iter().map(|m| m.name).collect()
+    } else {
+        Vec::new()
+    }
+}
+
+async fn get_gguf_file_info(model_id: &str) -> Result<GGUFFileInfo, String> {
+    let client = reqwest::Client::new();
+    let info_url = format!("https://huggingface.co/api/models/{}", model_id);
+    
+    let response = client
+        .get(&info_url)
+        .header("User-Agent", "SolynApp/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to get model info: {}", e))?;
+    
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse model info: {}", e))?;
+    
+    let siblings = data["siblings"]
+        .as_array()
+        .ok_or("No files found for model")?;
+    
+    let gguf_files = find_gguf_files(Some(siblings));
+    
+    if gguf_files.is_empty() {
+        return Err("No GGUF files found in this model repository".to_string());
+    }
+    
+    // Return the largest GGUF file (usually the main model)
+    Ok(gguf_files.first().cloned().unwrap())
+}
+
+async fn download_gguf_file(
+    window: &tauri::WebviewWindow,
+    model_id: &str,
+    gguf_info: &GGUFFileInfo,
+) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    
+    let model_name = model_id.replace("/", "-");
+    let download_dir = std::path::Path::new("models").join(&model_name);
+    std::fs::create_dir_all(&download_dir)
+        .map_err(|e| format!("Failed to create model directory: {}", e))?;
+    
+    let file_url = format!(
+        "https://huggingface.co/{}/resolve/main/{}",
+        model_id, gguf_info.filename
+    );
+    
+    emit_download_progress(
+        window,
+        model_id,
+        "downloading",
+        30,
+        &format!("Downloading {} ({:.1} MB)...", 
+            gguf_info.filename,
+            gguf_info.size as f64 / 1024.0 / 1024.0
+        )
+    );
+    
+    let response = client
+        .get(&file_url)
+        .header("User-Agent", "SolynApp/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to download GGUF file: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("HTTP error: {}", response.status()));
+    }
+    
+    let total_size = response.content_length().unwrap_or(gguf_info.size);
+    let mut downloaded = 0u64;
+    let mut stream = response.bytes_stream();
+    
+    use futures_util::StreamExt;
+    let file_path = download_dir.join(&gguf_info.filename);
+    let mut file = tokio::fs::File::create(&file_path)
+        .await
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    
+    use tokio::io::AsyncWriteExt;
+    
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Download error: {}", e))?;
+        downloaded += chunk.len() as u64;
+        
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("Failed to write file: {}", e))?;
+        
+        if total_size > 0 {
+            let progress = 30 + ((downloaded as f64 / total_size as f64) * 40.0) as u8;
+            let percent = (downloaded as f64 / total_size as f64) * 100.0;
+            emit_download_progress(
+                window,
+                model_id,
+                "downloading",
+                progress.min(70),
+                &format!("Downloading... {:.1}%", percent)
+            );
+        }
+    }
+    
+    file.flush().await.map_err(|e| format!("Failed to flush file: {}", e))?;
+    
+    Ok(())
+}
+
+async fn create_modelfile_for_gguf(
+    window: &tauri::WebviewWindow,
+    model_id: &str,
+    gguf_info: &GGUFFileInfo,
+) -> Result<(), String> {
+    let model_name = model_id.replace("/", "-");
+    let model_dir = std::path::Path::new("models").join(&model_name);
+    let gguf_path = model_dir.join(&gguf_info.filename);
+    
+    if !gguf_path.exists() {
+        return Err("GGUF file not found".to_string());
+    }
+    
+    // Create a Modelfile that points to the GGUF file
+    let modelfile_content = format!(
+        r#"FROM {}
+TEMPLATE "{{ .Prompt }}"
+SYSTEM "You are a helpful AI assistant."
+
+# Model parameters
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.1
+
+# GGUF quantization: {}
+"#,
+        gguf_path.display(),
+        gguf_info.quantization
+    );
+    
+    let modelfile_path = model_dir.join("Modelfile");
+    std::fs::write(modelfile_path, modelfile_content)
+        .map_err(|e| format!("Failed to create Modelfile: {}", e))?;
+    
+    emit_download_progress(window, model_id, "converting", 75, "Modelfile created successfully");
+    
+    Ok(())
+}
+
+async fn import_model_to_ollama(model_id: &str) -> Result<(), String> {
+    let model_name = model_id.replace("/", "-");
+    let model_dir = std::path::Path::new("models").join(&model_name);
+    let modelfile_path = model_dir.join("Modelfile");
+    
+    if !modelfile_path.exists() {
+        return Err("Modelfile not found".to_string());
+    }
+    
+    let modelfile_content = std::fs::read_to_string(modelfile_path)
+        .map_err(|e| format!("Failed to read Modelfile: {}", e))?;
+    
+    let client = reqwest::Client::new();
+    let payload = serde_json::json!({
+        "name": model_name,
+        "modelfile": modelfile_content,
+        "stream": false,
+    });
+    
+    let response = client
+        .post("http://localhost:11434/api/create")
+        .json(&payload)
+        .timeout(std::time::Duration::from_secs(300)) // 5 minute timeout for large models
+        .send()
+        .await
+        .map_err(|e| format!("Failed to create model in Ollama: {}", e))?;
+    
+    if !response.status().is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        return Err(format!("Ollama create failed: {}", error_text));
+    }
+    
+    Ok(())
 }
 
 fn emit_terminal_output(window: &tauri::WebviewWindow, line: &str, stream_type: &str, is_progress: bool) {
@@ -585,6 +983,23 @@ fn emit_progress(
     let _ = window.emit("download-progress", progress_data);
 }
 
+fn emit_download_progress(
+    window: &tauri::WebviewWindow,
+    model_id: &str,
+    status: &str,
+    progress: u8,
+    message: &str,
+) {
+    let progress_data = ModelDownloadProgress {
+        model_id: model_id.to_string(),
+        status: status.to_string(),
+        progress,
+        message: message.to_string(),
+    };
+    
+    let _ = window.emit("model-download-progress", progress_data);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -599,6 +1014,8 @@ pub fn run() {
             list_ollama_models,
             pull_ollama_model,
             delete_ollama_model,
+            search_huggingface_models,
+            download_huggingface_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
