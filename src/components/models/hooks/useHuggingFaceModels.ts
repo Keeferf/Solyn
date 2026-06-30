@@ -7,6 +7,7 @@ export interface GGUFFile {
   size: number;
   quantization: string;
   url: string;
+  parameter_count?: string | null; // Add this field
 }
 
 export interface HFModel {
@@ -36,6 +37,7 @@ interface BackendModel {
     size: number;
     quantization: string;
     url: string;
+    parameter_count?: string | null; // Add this field
   }[];
 }
 
@@ -57,7 +59,10 @@ export const useHuggingFaceModels = () => {
       likes: backendModel.likes || 0,
       description: backendModel.description || "",
       tags: backendModel.tags || [],
-      gguf_files: backendModel.gguf_files || [],
+      gguf_files: (backendModel.gguf_files || []).map((file) => ({
+        ...file,
+        parameter_count: file.parameter_count || null,
+      })),
     };
   };
 

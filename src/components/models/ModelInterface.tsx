@@ -168,8 +168,9 @@ export const ModelInterface = () => {
   };
 
   return (
-    <div className="w-full p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full h-full">
+      {/* Header - always at top */}
+      <div className="flex items-center justify-between p-6 pb-0">
         <h2 className="text-2xl font-bold text-[#d8d4cf]">Browse Models</h2>
         <button
           onClick={() => fetchModels(currentPage)}
@@ -180,33 +181,36 @@ export const ModelInterface = () => {
         </button>
       </div>
 
-      {/* Download progress displays */}
-      {Array.from(downloadProgress.entries()).map(([key, progress]) => (
-        <DownloadStatusDisplay
-          key={key}
-          modelId={progress.model_id}
-          filename={progress.filename}
-          progress={progress.progress}
-          message={progress.message}
-          status={progress.status}
-        />
-      ))}
+      {/* Content area */}
+      <div className="p-6 pt-4 space-y-6">
+        {/* Download progress displays */}
+        {Array.from(downloadProgress.entries()).map(([key, progress]) => (
+          <DownloadStatusDisplay
+            key={key}
+            modelId={progress.model_id}
+            filename={progress.filename}
+            progress={progress.progress}
+            message={progress.message}
+            status={progress.status}
+          />
+        ))}
 
-      {/* Browse models */}
-      <BrowseModels
-        models={models}
-        loading={loading}
-        downloadingModels={downloadingModels}
-        currentPage={currentPage}
-        totalModels={totalModels}
-        modelsPerPage={modelsPerPage}
-        onGoToPage={setCurrentPage}
-        onNextPage={nextPage}
-        onPreviousPage={previousPage}
-        onModelClick={handleModelClick}
-        onRefresh={() => fetchModels(currentPage)}
-        error={error}
-      />
+        {/* Browse models */}
+        <BrowseModels
+          models={models}
+          loading={loading}
+          downloadingModels={downloadingModels}
+          currentPage={currentPage}
+          totalModels={totalModels}
+          modelsPerPage={modelsPerPage}
+          onGoToPage={setCurrentPage}
+          onNextPage={nextPage}
+          onPreviousPage={previousPage}
+          onModelClick={handleModelClick}
+          onRefresh={() => fetchModels(currentPage)}
+          error={error}
+        />
+      </div>
 
       {/* Model detail modal */}
       <ModelDetailModal

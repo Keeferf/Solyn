@@ -17,6 +17,8 @@ pub struct GGUFFileInfo {
     pub filename: String,
     pub size: u64,
     pub url: String,
+    #[serde(default)]
+    pub parameter_count: Option<String>, 
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

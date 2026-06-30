@@ -12,6 +12,7 @@ import {
   FiFolder,
   FiInfo,
   FiHardDrive,
+  FiCpu,
 } from "react-icons/fi";
 import { HFModel, GGUFFile } from "./hooks/useHuggingFaceModels";
 
@@ -106,6 +107,14 @@ const getQuantizationDescription = (quant: string | null): string => {
   };
 
   return descriptions[quant] || `${quant} quantization`;
+};
+
+// Helper to format parameter count
+const formatParameterCount = (
+  paramCount: string | null | undefined,
+): string => {
+  if (!paramCount) return "Unknown";
+  return paramCount;
 };
 
 export const ModelDetailModal = ({
@@ -242,6 +251,8 @@ export const ModelDetailModal = ({
                 const largestFile = files.reduce((a, b) =>
                   a.size > b.size ? a : b,
                 );
+                // Get parameter count for this file
+                const paramCount = largestFile.parameter_count;
 
                 return (
                   <div
@@ -268,6 +279,12 @@ export const ModelDetailModal = ({
                         <p className="text-[#d8d4cf]/40 text-xs mt-1 line-clamp-1">
                           {getQuantizationDescription(quant)}
                         </p>
+                        {paramCount && (
+                          <div className="flex items-center gap-1 mt-1 text-emerald-400 text-xs">
+                            <FiCpu size={12} />
+                            <span>{formatParameterCount(paramCount)}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <div className="text-[#d8d4cf]/60 text-sm font-mono">
@@ -308,7 +325,7 @@ export const ModelDetailModal = ({
                       {selectedFile.filename}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-[#d8d4cf]/40">
+                  <div className="flex items-center gap-4 mt-2 text-xs text-[#d8d4cf]/40 flex-wrap">
                     <span className="flex items-center gap-1">
                       <FiHardDrive size={12} />
                       {formatFileSize(selectedFile.size)}
@@ -317,6 +334,12 @@ export const ModelDetailModal = ({
                       <FiInfo size={12} />
                       {getQuantizationDescription(selectedQuant)}
                     </span>
+                    {selectedFile.parameter_count && (
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <FiCpu size={12} />
+                        {formatParameterCount(selectedFile.parameter_count)}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button

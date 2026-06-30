@@ -13,6 +13,7 @@ import {
   FiDownloadCloud,
   FiFolder,
   FiChevronDown,
+  FiCpu,
 } from "react-icons/fi";
 import { HFModel } from "./hooks/useHuggingFaceModels";
 
@@ -40,6 +41,25 @@ const formatDownloads = (downloads?: number): string => {
     return `${(downloads / 1_000).toFixed(1)}K`;
   }
   return downloads.toString();
+};
+
+const formatLikes = (likes?: number): string => {
+  if (!likes) return "0";
+  if (likes >= 1_000_000) {
+    return `${(likes / 1_000_000).toFixed(1)}M`;
+  }
+  if (likes >= 1_000) {
+    // Round down to nearest hundred
+    const roundedDown = Math.floor(likes / 100) * 100;
+    const thousands = roundedDown / 1000;
+
+    // Check if it's a whole number (e.g., 10.0 → 10)
+    if (Number.isInteger(thousands)) {
+      return `${thousands}k`;
+    }
+    return `${thousands.toFixed(1)}k`;
+  }
+  return likes.toString();
 };
 
 const getQuantizationLabel = (filename: string): string | null => {
@@ -85,7 +105,12 @@ const getQuantizationLabel = (filename: string): string | null => {
 
 // Get first 3 unique quantizations for display
 const getQuantizationPreview = (
-  files: { filename: string; size: number; url: string }[],
+  files: {
+    filename: string;
+    size: number;
+    url: string;
+    parameter_count?: string | null;
+  }[],
 ): string[] => {
   const quants = new Set<string>();
   for (const file of files) {
@@ -96,6 +121,25 @@ const getQuantizationPreview = (
     }
   }
   return Array.from(quants);
+};
+
+// Get unique parameter counts for display
+const getParameterCountPreview = (
+  files: {
+    filename: string;
+    size: number;
+    url: string;
+    parameter_count?: string | null;
+  }[],
+): string[] => {
+  const params = new Set<string>();
+  for (const file of files) {
+    if (file.parameter_count) {
+      params.add(file.parameter_count);
+      if (params.size >= 2) break;
+    }
+  }
+  return Array.from(params);
 };
 
 export const BrowseModels = ({
@@ -114,33 +158,57 @@ export const BrowseModels = ({
 }: BrowseModelsProps) => {
   const totalPages = Math.max(1, Math.ceil(totalModels / modelsPerPage));
 
+  // Loading state - keeps the info banner visible
   if (loading && models.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <FiLoader
-          className="animate-spin text-[var(--color-purple-accent)]"
-          size={40}
-        />
+      <div className="w-full space-y-6">
+        {/* Info banner - stays visible during loading */}
+        <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+          <div className="flex items-center gap-3">
+            <FiServer className="text-[var(--color-purple-accent)]" size={16} />
+            <span>Loading models from Hugging Face...</span>
+          </div>
+        </div>
+
+        {/* Loading spinner */}
+        <div className="flex items-center justify-center py-16">
+          <FiLoader
+            className="animate-spin text-[var(--color-purple-accent)]"
+            size={40}
+          />
+        </div>
       </div>
     );
   }
 
+  // Error state - keeps the info banner visible
   if (error && models.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-[var(--color-white)] text-lg mb-2">
-          Failed to load models
-        </p>
-        <p className="text-[var(--color-white)]/40 text-sm mb-4">{error}</p>
-        {onRefresh && (
-          <button
-            onClick={onRefresh}
-            className="px-4 py-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 rounded-lg text-[var(--color-white)] transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <FiRefreshCw size={16} />
-            Retry
-          </button>
-        )}
+      <div className="w-full space-y-6">
+        {/* Info banner */}
+        <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+          <div className="flex items-center gap-3">
+            <FiServer className="text-[var(--color-purple-accent)]" size={16} />
+            <span>Error loading models</span>
+          </div>
+        </div>
+
+        {/* Error message */}
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-[var(--color-white)] text-lg mb-2">
+            Failed to load models
+          </p>
+          <p className="text-[var(--color-white)]/40 text-sm mb-4">{error}</p>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="px-4 py-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 rounded-lg text-[var(--color-white)] transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <FiRefreshCw size={16} />
+              Retry
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -184,6 +252,7 @@ export const BrowseModels = ({
           {models.map((model) => {
             // Get unique quantizations for preview
             const quantPreviews = getQuantizationPreview(model.gguf_files);
+            const paramPreviews = getParameterCountPreview(model.gguf_files);
             const hasGGUF = model.gguf_files.length > 0;
 
             return (
@@ -237,13 +306,16 @@ export const BrowseModels = ({
                   {model.likes !== undefined && model.likes > 0 && (
                     <span className="text-xs bg-rose-500/15 text-rose-400 px-2 py-1 rounded-full border border-rose-500/20 flex items-center gap-1">
                       <FiHeart size={12} />
-                      {model.likes}
+                      {formatLikes(model.likes)}
                     </span>
                   )}
-                  <span className="text-xs bg-[var(--color-purple-accent)]/10 text-[var(--color-white)]/60 px-2 py-1 rounded-full border border-[var(--color-white)]/10 flex items-center gap-1">
-                    <FiFolder size={12} />
-                    {model.gguf_files.length} files
-                  </span>
+                  {/* Parameter count preview */}
+                  {paramPreviews.length > 0 && (
+                    <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                      <FiCpu size={12} />
+                      {paramPreviews.join(", ")}
+                    </span>
+                  )}
                 </div>
 
                 {/* Quantization preview chips */}

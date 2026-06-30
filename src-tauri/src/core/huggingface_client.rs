@@ -4,6 +4,48 @@ use serde_json;
 use std::time::Duration;
 use crate::data::huggingface_model_types::{HuggingFaceModelListing, GGUFFileInfo};
 
+// Helper function to extract parameter count from filename
+fn extract_parameter_count(filename: &str) -> Option<String> {
+    let lower = filename.to_lowercase();
+    
+    // Check for common patterns
+    if lower.contains("70b") { return Some("70B".to_string()); }
+    if lower.contains("13b") { return Some("13B".to_string()); }
+    if lower.contains("8x7b") { return Some("8x7B".to_string()); }
+    if lower.contains("7b") { return Some("7B".to_string()); }
+    if lower.contains("3b") { return Some("3B".to_string()); }
+    if lower.contains("1b") { return Some("1B".to_string()); }
+    if lower.contains("405b") { return Some("405B".to_string()); }
+    if lower.contains("125m") { return Some("125M".to_string()); }
+    if lower.contains("350m") { return Some("350M".to_string()); }
+    if lower.contains("1.5b") { return Some("1.5B".to_string()); }
+    if lower.contains("2.7b") { return Some("2.7B".to_string()); }
+    if lower.contains("6.7b") { return Some("6.7B".to_string()); }
+    if lower.contains("14b") { return Some("14B".to_string()); }
+    if lower.contains("22b") { return Some("22B".to_string()); }
+    if lower.contains("34b") { return Some("34B".to_string()); }
+    
+    // Try regex patterns for more complex cases
+    let patterns = [
+        r"(\d+)x(\d+)b",     // 8x7B, etc.
+        r"(\d+\.?\d*)b",     // 7B, 13B, 1.5B
+        r"(\d+)m",           // 125M, 350M
+    ];
+    
+    for pattern in patterns {
+        if let Ok(re) = regex::Regex::new(pattern) {
+            if let Some(caps) = re.captures(&lower) {
+                if let Some(matched) = caps.get(0) {
+                    let param = matched.as_str().to_uppercase();
+                    return Some(param);
+                }
+            }
+        }
+    }
+    
+    None
+}
+
 pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUFFileInfo> {
     let mut gguf_files = Vec::new();
     
@@ -34,10 +76,14 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
                     format!("https://huggingface.co/resolve/main/{}", filename)
                 };
                 
+                // Extract parameter count from filename
+                let parameter_count = extract_parameter_count(filename);
+                
                 gguf_files.push(GGUFFileInfo {
                     filename: filename.to_string(),
                     size,
                     url,
+                    parameter_count,
                 });
             }
         }
