@@ -1,7 +1,17 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HuggingFaceModelListing {
+pub struct HFModelSummary {
+    pub id: String,
+    pub model_id: String,
+    pub author: String,
+    pub name: String,
+    pub downloads: Option<u64>,
+    pub likes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HFModelDetails {
     pub id: String,
     pub model_id: String,
     pub author: String,
@@ -20,7 +30,7 @@ pub struct GGUFFileInfo {
     #[serde(default)]
     pub parameter_count: Option<String>,
     #[serde(default)]
-    pub quantization: Option<String>, // Add this field
+    pub quantization: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

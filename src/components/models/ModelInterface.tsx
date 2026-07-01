@@ -5,7 +5,11 @@ import { listen } from "@tauri-apps/api/event";
 import { BrowseModels } from "./BrowseModels";
 import { DownloadStatusDisplay } from "./DownloadStatusDisplay";
 import { ModelDetailModal } from "./ModelDetailModal";
-import { useHuggingFaceModels, HFModel } from "./hooks/useHuggingFaceModels";
+import {
+  useHuggingFaceModels,
+  HFModelSummary,
+  HFModelDetails,
+} from "./hooks/useHuggingFaceModels";
 
 interface DownloadProgress {
   model_id: string;
@@ -32,7 +36,9 @@ export const ModelInterface = () => {
     fetchModels,
   } = useHuggingFaceModels();
 
-  const [selectedModel, setSelectedModel] = useState<HFModel | null>(null);
+  const [selectedModel, setSelectedModel] = useState<HFModelSummary | null>(
+    null,
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingModels, setDownloadingModels] = useState<Set<DownloadKey>>(
     new Set(),
@@ -136,7 +142,7 @@ export const ModelInterface = () => {
     };
   }, []);
 
-  const handleModelClick = (model: HFModel) => {
+  const handleModelClick = (model: HFModelSummary) => {
     setSelectedModel(model);
     setIsModalOpen(true);
   };

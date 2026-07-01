@@ -14,7 +14,12 @@ import {
   FiHardDrive,
   FiCpu,
 } from "react-icons/fi";
-import { HFModel, GGUFFile } from "./hooks/useHuggingFaceModels";
+import {
+  HFModel,
+  HFModelDetails,
+  GGUFFile,
+  hasDetails,
+} from "./hooks/useHuggingFaceModels";
 
 interface ModelDetailModalProps {
   model: HFModel | null;
@@ -127,18 +132,15 @@ export const ModelDetailModal = ({
   },
 }: ModelDetailModalProps) => {
   const [selectedFile, setSelectedFile] = useState<GGUFFile | null>(null);
-  const [fullModel, setFullModel] = useState<HFModel | null>(null);
+  const [fullModel, setFullModel] = useState<HFModelDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Fetch full model details when modal opens (with caching on backend)
   useEffect(() => {
     if (isOpen && model) {
-      setIsLoadingDetails(true);
-      setLoadError(null);
-
-      // Check if model already has GGUF files (from pre-fetching)
-      if (model.gguf_files && model.gguf_files.length > 0) {
+      // Check if model already has GGUF files (from pre-fetching or if it was already loaded)
+      if (hasDetails(model) && model.gguf_files.length > 0) {
         console.log("📦 Using pre-fetched model details");
         setFullModel(model);
         setIsLoadingDetails(false);
@@ -146,42 +148,21 @@ export const ModelDetailModal = ({
       }
 
       // Fetch full model details with GGUF files
-      invoke("fetch_model_details", { modelId: model.model_id })
-        .then((result: any) => {
-          console.log("📦 Fetched model details:", result);
-          const transformedModel: HFModel = {
-            id: result.model_id || result.id,
-            model_id: result.model_id || result.id,
-            author: result.author || "Unknown",
-            name: result.name || result.model_id?.split("/").pop() || "",
-            downloads: result.downloads || 0,
-            likes: result.likes || 0,
-            description: result.description || "",
-            tags: [],
-            gguf_files: (result.gguf_files || []).map((file: any) => ({
-              filename: file.filename,
-              size: file.size,
-              // Use backend's quantization, fallback to extraction only if needed
-              quantization:
-                file.quantization || getQuantizationLabel(file.filename) || "",
-              url: file.url,
-              parameter_count: file.parameter_count || null,
-            })),
-          };
+      setIsLoadingDetails(true);
+      setLoadError(null);
 
-          console.log("✅ Transformed model:", transformedModel);
-          setFullModel(transformedModel);
+      invoke("fetch_model_details", { modelId: model.model_id })
+        .then((result: unknown) => {
+          // Type assertion to tell TypeScript what shape to expect
+          const details = result as HFModelDetails;
+          console.log("📦 Fetched model details:", details);
+          setFullModel(details);
           setIsLoadingDetails(false);
         })
         .catch((error) => {
           console.error("❌ Failed to fetch model details:", error);
           setLoadError("Failed to load model details. Please try again.");
           setIsLoadingDetails(false);
-
-          // Fallback: use the model from props if available
-          if (model.gguf_files && model.gguf_files.length > 0) {
-            setFullModel(model);
-          }
         });
     } else {
       // Reset when modal closes
@@ -220,9 +201,9 @@ export const ModelDetailModal = ({
     }
   };
 
-  // Use fullModel if available, otherwise fallback to model prop
+  // Use fullModel if available, otherwise use model (but model might not have details)
   const displayModel = fullModel || model;
-  const files = displayModel.gguf_files || [];
+  const files = fullModel?.gguf_files || [];
 
   // Filter out files with unknown quantization - use backend's quantization data
   const validFiles = files.filter(
@@ -332,10 +313,10 @@ export const ModelDetailModal = ({
           )}
 
           {/* Description */}
-          {displayModel.description && (
+          {fullModel?.description && (
             <div className="mb-6 p-4 bg-[#121212] rounded-lg border border-[#d8d4cf]/5">
               <p className="text-[#d8d4cf]/70 text-sm leading-relaxed">
-                {displayModel.description}
+                {fullModel.description}
               </p>
             </div>
           )}

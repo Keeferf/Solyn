@@ -10,67 +10,40 @@ export interface GGUFFile {
   parameter_count?: string | null;
 }
 
-export interface HFModel {
+// Summary type - what we get from browse API (no GGUF files)
+export interface HFModelSummary {
   id: string;
   model_id: string;
   author: string;
   name: string;
   downloads?: number;
   likes?: number;
+}
+
+// Details type - what we get from fetch_model_details
+export interface HFModelDetails extends HFModelSummary {
   description?: string;
-  tags?: string[];
   gguf_files: GGUFFile[];
 }
 
-// Backend type matching Rust's HuggingFaceModelListing
-interface BackendModel {
-  id: string;
-  model_id: string;
-  author: string;
-  name: string;
-  downloads: number | null;
-  likes: number | null;
-  description: string | null;
-  gguf_files: {
-    filename: string;
-    size: number;
-    quantization: string;
-    url: string;
-    parameter_count?: string | null;
-  }[];
+// Union type for convenience
+export type HFModel = HFModelSummary | HFModelDetails;
+
+// Type guard to check if model has details
+export function hasDetails(model: HFModel): model is HFModelDetails {
+  return (
+    "gguf_files" in model && Array.isArray((model as HFModelDetails).gguf_files)
+  );
 }
 
 export const useHuggingFaceModels = () => {
-  const [models, setModels] = useState<HFModel[]>([]);
+  const [models, setModels] = useState<HFModelSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalModels, setTotalModels] = useState(0);
   const [totalModelsFetched, setTotalModelsFetched] = useState(false);
-  const [prefetchedModels, setPrefetchedModels] = useState<Set<string>>(
-    new Set(),
-  );
   const modelsPerPage = 20;
-
-  const transformModel = (backendModel: BackendModel): HFModel => {
-    return {
-      id: backendModel.model_id || backendModel.id,
-      model_id: backendModel.model_id || backendModel.id,
-      author: backendModel.author || "Unknown",
-      name: backendModel.name || backendModel.model_id?.split("/").pop() || "",
-      downloads: backendModel.downloads || 0,
-      likes: backendModel.likes || 0,
-      description: backendModel.description || "",
-      tags: [],
-      gguf_files: (backendModel.gguf_files || []).map((file) => ({
-        filename: file.filename,
-        size: file.size,
-        quantization: file.quantization || "", // Use backend's quantization
-        url: file.url,
-        parameter_count: file.parameter_count || null,
-      })),
-    };
-  };
 
   const fetchModels = useCallback(
     async (page: number) => {
@@ -80,7 +53,7 @@ export const useHuggingFaceModels = () => {
         console.log(
           `🔄 Fetching models page ${page} with limit ${modelsPerPage}...`,
         );
-        const response = await invoke<BackendModel[]>(
+        const response = await invoke<HFModelSummary[]>(
           "fetch_huggingface_models",
           {
             page,
@@ -98,11 +71,8 @@ export const useHuggingFaceModels = () => {
           console.log(`🔍 First 3 model IDs on page ${page}:`, firstIds);
         }
 
-        const transformedModels = response.map(transformModel);
-        console.log(
-          `✅ Transformed ${transformedModels.length} models for page ${page}`,
-        );
-        setModels(transformedModels);
+        setModels(response);
+        setCurrentPage(page);
 
         // Only fetch total count once
         if (!totalModelsFetched) {
@@ -117,38 +87,6 @@ export const useHuggingFaceModels = () => {
             setTotalModels(response.length * 10);
           }
         }
-
-        setCurrentPage(page);
-
-        // Pre-fetch details for visible models (first 3)
-        if (transformedModels.length > 0) {
-          const modelsToPrefecth = transformedModels.slice(0, 3);
-          for (const model of modelsToPrefecth) {
-            if (!prefetchedModels.has(model.model_id)) {
-              setPrefetchedModels((prev) => new Set(prev).add(model.model_id));
-              // Don't await - fire and forget
-              invoke("fetch_model_details", { modelId: model.model_id })
-                .then((details: any) => {
-                  console.log(`📦 Pre-fetched details for ${model.model_id}`);
-                  // Update the model in the list with details
-                  setModels((prevModels) =>
-                    prevModels.map((m) => {
-                      if (m.model_id === model.model_id) {
-                        return {
-                          ...m,
-                          gguf_files: details.gguf_files || [],
-                        };
-                      }
-                      return m;
-                    }),
-                  );
-                })
-                .catch((err) => {
-                  console.error(`Failed to pre-fetch ${model.model_id}:`, err);
-                });
-            }
-          }
-        }
       } catch (err) {
         console.error(`❌ Failed to fetch models for page ${page}:`, err);
         setError(String(err));
@@ -156,7 +94,7 @@ export const useHuggingFaceModels = () => {
         setLoading(false);
       }
     },
-    [modelsPerPage, totalModelsFetched, prefetchedModels],
+    [modelsPerPage, totalModelsFetched],
   );
 
   // Initial load

@@ -15,10 +15,10 @@ import {
   FiChevronDown,
   FiCpu,
 } from "react-icons/fi";
-import { HFModel } from "./hooks/useHuggingFaceModels";
+import { HFModelSummary } from "./hooks/useHuggingFaceModels";
 
 interface BrowseModelsProps {
-  models: HFModel[];
+  models: HFModelSummary[];
   loading: boolean;
   downloadingModels: Set<string>;
   currentPage: number;
@@ -27,7 +27,7 @@ interface BrowseModelsProps {
   onGoToPage: (page: number) => void;
   onNextPage: () => void;
   onPreviousPage: () => void;
-  onModelClick: (model: HFModel) => void;
+  onModelClick: (model: HFModelSummary) => void;
   onRefresh?: () => void;
   error?: string | null;
 }
@@ -61,89 +61,6 @@ const formatLikes = (likes?: number): string => {
   }
   return likes.toString();
 };
-
-const getQuantizationLabel = (filename: string): string | null => {
-  const name = filename.replace(/\.gguf$/i, "");
-
-  const patterns = [
-    /IQ[1-4]_[XSML]?/i,
-    /Q[2-8]_[0-9K_][0-9K_]*/i,
-    /Q[2-8]_[0-9]/i,
-    /F[1-9][0-9]?/i,
-    /q4_k_m|q5_k_m|q6_k|q8_0|q4_0|q5_0|q2_k|q3_k/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = name.match(pattern);
-    if (match) {
-      return match[0].toUpperCase();
-    }
-  }
-
-  const lowerName = name.toLowerCase();
-  const quantMap: { [key: string]: string } = {
-    q4_k_m: "Q4_K_M",
-    q5_k_m: "Q5_K_M",
-    q6_k: "Q6_K",
-    q8_0: "Q8_0",
-    q4_0: "Q4_0",
-    q5_0: "Q5_0",
-    q2_k: "Q2_K",
-    q3_k: "Q3_K",
-    f16: "F16",
-    f32: "F32",
-  };
-
-  for (const [key, value] of Object.entries(quantMap)) {
-    if (lowerName.includes(key)) {
-      return value;
-    }
-  }
-
-  return null;
-};
-
-// Get first 3 unique quantizations for display
-const getQuantizationPreview = (
-  files: {
-    filename: string;
-    size: number;
-    url: string;
-    parameter_count?: string | null;
-  }[],
-): string[] => {
-  const quants = new Set<string>();
-  for (const file of files) {
-    const quant = getQuantizationLabel(file.filename);
-    if (quant) {
-      quants.add(quant);
-      if (quants.size >= 3) break;
-    }
-  }
-  return Array.from(quants);
-};
-
-// Get unique parameter counts for display
-const getParameterCountPreview = (
-  files: {
-    filename: string;
-    size: number;
-    url: string;
-    parameter_count?: string | null;
-  }[],
-): string[] => {
-  const params = new Set<string>();
-  for (const file of files) {
-    if (file.parameter_count) {
-      params.add(file.parameter_count);
-      if (params.size >= 2) break;
-    }
-  }
-  return Array.from(params);
-};
-
-// src/components/models/BrowseModels.tsx
-// ... (keep all imports and helper functions the same)
 
 export const BrowseModels = ({
   models,
@@ -252,75 +169,57 @@ export const BrowseModels = ({
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-          {models.map((model) => {
-            // Check if model has GGUF files (fetched when modal opens)
-            const hasGGUF = true; // We assume all models from search have GGUF files
-
-            // We don't have GGUF files in browse list anymore
-            // Show placeholder until modal loads
-            const quantPreviews: string[] = [];
-            const paramPreviews: string[] = [];
-
-            return (
-              <div
-                key={model.id}
-                onClick={() => onModelClick(model)}
-                className={`bg-[var(--color-black)] border border-[var(--color-white)]/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-[var(--color-white)]/5 hover:border-[var(--color-white)]/20 cursor-pointer hover:scale-[1.02]`}
-              >
-                {/* Model header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-[var(--color-white)] font-semibold truncate text-base">
-                      {model.name || model.model_id}
-                    </h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <FiUser
-                        className="text-[var(--color-white)]/30"
-                        size={12}
-                      />
-                      <span className="text-[var(--color-white)]/40 text-xs">
-                        {model.author || "Unknown"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-[var(--color-white)]/30 text-xs bg-[var(--color-purple-accent)]/10 px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20">
-                    <FiChevronDown size={14} />
+          {models.map((model) => (
+            <div
+              key={model.id}
+              onClick={() => onModelClick(model)}
+              className={`bg-[var(--color-black)] border border-[var(--color-white)]/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-[var(--color-white)]/5 hover:border-[var(--color-white)]/20 cursor-pointer hover:scale-[1.02]`}
+            >
+              {/* Model header */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-[var(--color-white)] font-semibold truncate text-base">
+                    {model.name || model.model_id}
+                  </h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    <FiUser
+                      className="text-[var(--color-white)]/30"
+                      size={12}
+                    />
+                    <span className="text-[var(--color-white)]/40 text-xs">
+                      {model.author || "Unknown"}
+                    </span>
                   </div>
                 </div>
-
-                {/* Description */}
-                {model.description && (
-                  <p className="text-[var(--color-white)]/40 text-sm line-clamp-2 mb-3 flex-1">
-                    {model.description}
-                  </p>
-                )}
-
-                {/* Model stats */}
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {model.downloads !== undefined && model.downloads > 0 && (
-                    <span className="text-xs bg-[var(--color-purple-accent)]/15 text-[var(--color-purple-accent)] px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20 flex items-center gap-1">
-                      <FiDownloadCloud size={12} />
-                      {formatDownloads(model.downloads)}
-                    </span>
-                  )}
-                  {model.likes !== undefined && model.likes > 0 && (
-                    <span className="text-xs bg-rose-500/15 text-rose-400 px-2 py-1 rounded-full border border-rose-500/20 flex items-center gap-1">
-                      <FiHeart size={12} />
-                      {formatLikes(model.likes)}
-                    </span>
-                  )}
-                  {/* Parameter count preview - we don't have this in browse list */}
-                </div>
-
-                {/* Quantization preview - we don't have this in browse list */}
-                <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-[var(--color-white)]/5">
-                  <span className="text-xs text-[var(--color-white)]/30">
-                    Click to view available quantizations
-                  </span>
+                <div className="text-[var(--color-white)]/30 text-xs bg-[var(--color-purple-accent)]/10 px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20">
+                  <FiChevronDown size={14} />
                 </div>
               </div>
-            );
-          })}
+
+              {/* Model stats */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {model.downloads !== undefined && model.downloads > 0 && (
+                  <span className="text-xs bg-[var(--color-purple-accent)]/15 text-[var(--color-purple-accent)] px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20 flex items-center gap-1">
+                    <FiDownloadCloud size={12} />
+                    {formatDownloads(model.downloads)}
+                  </span>
+                )}
+                {model.likes !== undefined && model.likes > 0 && (
+                  <span className="text-xs bg-rose-500/15 text-rose-400 px-2 py-1 rounded-full border border-rose-500/20 flex items-center gap-1">
+                    <FiHeart size={12} />
+                    {formatLikes(model.likes)}
+                  </span>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-[var(--color-white)]/5">
+                <span className="text-xs text-[var(--color-white)]/30">
+                  Click to view available quantizations
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
