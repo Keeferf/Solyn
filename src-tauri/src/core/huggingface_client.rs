@@ -121,7 +121,6 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
                 };
 
                 let parameter_count = extract_parameter_count(filename);
-
                 let quantization = extract_quantization(filename);
                 
                 gguf_files.push(GGUFFileInfo {
@@ -137,6 +136,54 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
     
     gguf_files.sort_by(|a, b| b.size.cmp(&a.size));
     gguf_files
+}
+
+// NEW: Function to fetch file sizes using HEAD requests
+async fn fetch_file_sizes(model_id: &str, filenames: &[String]) -> HashMap<String, u64> {
+    let mut size_map = HashMap::new();
+    let client = reqwest::Client::new();
+    
+    // Process files in parallel with a semaphore to avoid rate limiting
+    let mut tasks = Vec::new();
+    
+    for filename in filenames {
+        let client = client.clone();
+        let model_id = model_id.to_string();
+        let filename = filename.clone();
+        
+        let task = tokio::spawn(async move {
+            let url = format!("https://huggingface.co/{}/resolve/main/{}", model_id, filename);
+            let response = client
+                .head(&url)
+                .header("User-Agent", "SolynApp/1.0")
+                .timeout(Duration::from_secs(10))
+                .send()
+                .await;
+            
+            if let Ok(response) = response {
+                if let Some(size) = response
+                    .headers()
+                    .get("content-length")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok())
+                {
+                    return Some((filename, size));
+                }
+            }
+            None
+        });
+        
+        tasks.push(task);
+    }
+    
+    // Collect results
+    for task in tasks {
+        if let Ok(Some((filename, size))) = task.await {
+            size_map.insert(filename, size);
+        }
+    }
+    
+    size_map
 }
 
 pub async fn fetch_hugging_face_models(
@@ -206,7 +253,7 @@ pub async fn fetch_hugging_face_models(
     Ok(models)
 }
 
-// Fetch full model details with GGUF files - WITH CACHING
+// UPDATED: Fetch full model details with GGUF files - WITH CACHING and HEAD requests for sizes
 pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, String> {
     // Check cache first
     {
@@ -243,21 +290,46 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, Strin
         return Err("Invalid model ID".to_string());
     }
     
-    // Get siblings with full data
+    // Get siblings
     let siblings = data["siblings"].as_array();
     
-    // Add model_id to each sibling for URL construction
-    let siblings_with_model_id = siblings.map(|siblings_vec| {
-        let mut enhanced_siblings = Vec::new();
-        for sibling in siblings_vec {
-            let mut enhanced = sibling.clone();
-            enhanced["model_id"] = serde_json::Value::String(id.clone());
-            enhanced_siblings.push(enhanced);
-        }
-        enhanced_siblings
-    });
+    // Collect GGUF filenames and build enhanced siblings
+    let mut gguf_filenames = Vec::new();
+    let mut siblings_with_model_id = Vec::new();
     
-    let gguf_files = extract_gguf_files(siblings_with_model_id.as_ref());
+    if let Some(siblings_vec) = siblings {
+        for sibling in siblings_vec {
+            let filename = sibling["rfilename"].as_str()
+                .or_else(|| sibling["filename"].as_str())
+                .unwrap_or("");
+            
+            if filename.ends_with(".gguf") {
+                gguf_filenames.push(filename.to_string());
+                
+                let mut enhanced = sibling.clone();
+                enhanced["model_id"] = serde_json::Value::String(id.clone());
+                siblings_with_model_id.push(enhanced);
+            }
+        }
+    }
+    
+    // If we have GGUF files, fetch their actual sizes using HEAD requests
+    if !gguf_filenames.is_empty() {
+        let size_map = fetch_file_sizes(&id, &gguf_filenames).await;
+        
+        // Update siblings with sizes
+        for sibling in &mut siblings_with_model_id {
+            if let Some(filename) = sibling["rfilename"].as_str()
+                .or_else(|| sibling["filename"].as_str())
+            {
+                if let Some(&size) = size_map.get(filename) {
+                    sibling["size"] = serde_json::Value::Number(size.into());
+                }
+            }
+        }
+    }
+    
+    let gguf_files = extract_gguf_files(Some(&siblings_with_model_id));
     
     if gguf_files.is_empty() {
         return Err("No GGUF files found in this model repository".to_string());
