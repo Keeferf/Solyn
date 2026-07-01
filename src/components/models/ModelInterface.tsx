@@ -8,7 +8,6 @@ import { ModelDetailModal } from "./ModelDetailModal";
 import {
   useHuggingFaceModels,
   HFModelSummary,
-  HFModelDetails,
 } from "./hooks/useHuggingFaceModels";
 
 interface DownloadProgress {
@@ -19,8 +18,7 @@ interface DownloadProgress {
   message: string;
 }
 
-// Key for tracking downloads includes filename
-type DownloadKey = string; // format: "model_id::filename"
+type DownloadKey = string;
 
 export const ModelInterface = () => {
   const {
@@ -36,9 +34,7 @@ export const ModelInterface = () => {
     fetchModels,
   } = useHuggingFaceModels();
 
-  const [selectedModel, setSelectedModel] = useState<HFModelSummary | null>(
-    null,
-  );
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingModels, setDownloadingModels] = useState<Set<DownloadKey>>(
     new Set(),
@@ -47,12 +43,10 @@ export const ModelInterface = () => {
     Map<DownloadKey, DownloadProgress>
   >(new Map());
 
-  // Helper to create unique key
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
   };
 
-  // Check if a specific file is downloading
   const isDownloading = (modelId: string, filename: string): boolean => {
     return downloadingModels.has(getDownloadKey(modelId, filename));
   };
@@ -73,7 +67,6 @@ export const ModelInterface = () => {
 
             setDownloadProgress((prev) => new Map(prev).set(key, progress));
 
-            // If status is complete or error, remove from downloading set after a delay
             if (progress.status === "complete" || progress.status === "error") {
               setTimeout(() => {
                 setDownloadingModels((prev) => {
@@ -143,7 +136,7 @@ export const ModelInterface = () => {
   }, []);
 
   const handleModelClick = (model: HFModelSummary) => {
-    setSelectedModel(model);
+    setSelectedModelId(model.model_id);
     setIsModalOpen(true);
   };
 
@@ -170,12 +163,11 @@ export const ModelInterface = () => {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSelectedModel(null);
+    setSelectedModelId(null);
   };
 
   return (
     <div className="w-full h-full">
-      {/* Header - always at top */}
       <div className="flex items-center justify-between p-6 pb-0">
         <h2 className="text-2xl font-bold text-[#d8d4cf]">Browse Models</h2>
         <button
@@ -187,9 +179,7 @@ export const ModelInterface = () => {
         </button>
       </div>
 
-      {/* Content area */}
       <div className="p-6 pt-4 space-y-6">
-        {/* Download progress displays */}
         {Array.from(downloadProgress.entries()).map(([key, progress]) => (
           <DownloadStatusDisplay
             key={key}
@@ -201,7 +191,6 @@ export const ModelInterface = () => {
           />
         ))}
 
-        {/* Browse models */}
         <BrowseModels
           models={models}
           loading={loading}
@@ -218,9 +207,8 @@ export const ModelInterface = () => {
         />
       </div>
 
-      {/* Model detail modal */}
       <ModelDetailModal
-        model={selectedModel}
+        modelId={selectedModelId}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onDownload={handleDownload}

@@ -14,15 +14,10 @@ import {
   FiHardDrive,
   FiCpu,
 } from "react-icons/fi";
-import {
-  HFModel,
-  HFModelDetails,
-  GGUFFile,
-  hasDetails,
-} from "./hooks/useHuggingFaceModels";
+import { HFModelDetails, GGUFFile } from "./hooks/useHuggingFaceModels";
 
 interface ModelDetailModalProps {
-  model: HFModel | null;
+  modelId: string | null;
   isOpen: boolean;
   onClose: () => void;
   onDownload: (modelId: string, filename: string) => Promise<void>;
@@ -122,7 +117,7 @@ const formatParameterCount = (
 };
 
 export const ModelDetailModal = ({
-  model,
+  modelId,
   isOpen,
   onClose,
   onDownload,
@@ -131,49 +126,39 @@ export const ModelDetailModal = ({
     return downloadingModels.has(`${modelId}::${filename}`);
   },
 }: ModelDetailModalProps) => {
-  const [selectedFile, setSelectedFile] = useState<GGUFFile | null>(null);
   const [details, setDetails] = useState<HFModelDetails | null>(null);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<GGUFFile | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch full model details when modal opens (with caching on backend)
+  // Fetch details when modal opens
   useEffect(() => {
-    if (isOpen && model) {
-      // Check if model already has GGUF files (from pre-fetching)
-      if (hasDetails(model) && model.gguf_files.length > 0) {
-        console.log("📦 Using pre-fetched model details");
-        setDetails(model);
-        setIsLoadingDetails(false);
-        return;
-      }
+    if (isOpen && modelId) {
+      setIsLoading(true);
+      setError(null);
 
-      // Fetch full model details with GGUF files
-      setIsLoadingDetails(true);
-      setLoadError(null);
-
-      invoke<HFModelDetails>("fetch_model_details", { modelId: model.model_id })
+      invoke<HFModelDetails>("fetch_model_details", { modelId })
         .then((result) => {
-          console.log("📦 Fetched model details:", result);
           setDetails(result);
-          setIsLoadingDetails(false);
+          setIsLoading(false);
         })
-        .catch((error) => {
-          console.error("❌ Failed to fetch model details:", error);
-          setLoadError("Failed to load model details. Please try again.");
-          setIsLoadingDetails(false);
+        .catch((err) => {
+          console.error("Failed to fetch model details:", err);
+          setError("Failed to load model details. Please try again.");
+          setIsLoading(false);
         });
     } else {
       // Reset when modal closes
       setDetails(null);
       setSelectedFile(null);
-      setLoadError(null);
+      setError(null);
     }
-  }, [isOpen, model]);
+  }, [isOpen, modelId]);
 
-  // Reset selection when model data changes
+  // Reset selection when details change
   useEffect(() => {
     if (details && details.gguf_files.length > 0) {
-      // Filter out files with unknown quantization first
+      // Filter out files with unknown quantization
       const validFiles = details.gguf_files.filter(
         (file) =>
           file.quantization || getQuantizationLabel(file.filename) !== null,
@@ -187,51 +172,8 @@ export const ModelDetailModal = ({
     }
   }, [details]);
 
-  if (!isOpen || !model) return null;
-
-  const getDownloadKey = (modelId: string, filename: string): string => {
-    return `${modelId}::${filename}`;
-  };
-
-  const handleDownloadClick = () => {
-    if (selectedFile) {
-      onDownload(model.model_id, selectedFile.filename);
-    }
-  };
-
-  // Use details if available, otherwise fallback to model
-  const displayModel = details || model;
-  const files = details?.gguf_files || [];
-
-  // Filter out files with unknown quantization - use backend's quantization data
-  const validFiles = files.filter(
-    (file) => file.quantization || getQuantizationLabel(file.filename) !== null,
-  );
-
-  // Sort files by size for display
-  const sortedFiles = [...validFiles].sort((a, b) => b.size - a.size);
-
-  // Group files by quantization type for better display
-  const groupedFiles = sortedFiles.reduce(
-    (acc, file) => {
-      // Use backend's quantization if available, otherwise extract
-      const quant =
-        file.quantization || getQuantizationLabel(file.filename) || "Unknown";
-      if (!acc[quant]) {
-        acc[quant] = [];
-      }
-      acc[quant].push(file);
-      return acc;
-    },
-    {} as Record<string, GGUFFile[]>,
-  );
-
-  const selectedQuant = selectedFile
-    ? selectedFile.quantization || getQuantizationLabel(selectedFile.filename)
-    : null;
-
   // Loading state
-  if (isLoadingDetails) {
+  if (isLoading) {
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
@@ -259,6 +201,80 @@ export const ModelDetailModal = ({
     );
   }
 
+  // Error state
+  if (error) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div className="bg-[#1a1a1a] border border-[#d8d4cf]/10 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-slideUp">
+          <div className="flex items-center justify-between p-6 border-b border-[#d8d4cf]/10">
+            <h3 className="text-xl font-bold text-[#d8d4cf]">Error</h3>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-[#d8d4cf]/10 rounded-lg transition-all text-[#d8d4cf]/60 hover:text-[#d8d4cf] cursor-pointer"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
+          <div className="p-6">
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          </div>
+          <div className="p-4 border-t border-[#d8d4cf]/10 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-[#121212] hover:bg-[#d8d4cf]/10 rounded-lg text-[#d8d4cf]/60 hover:text-[#d8d4cf] transition-all text-sm cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No details yet (shouldn't happen if isLoading is false)
+  if (!details || !modelId) return null;
+
+  const files = details.gguf_files;
+
+  // Filter out files with unknown quantization
+  const validFiles = files.filter(
+    (file) => file.quantization || getQuantizationLabel(file.filename) !== null,
+  );
+
+  // Sort files by size for display
+  const sortedFiles = [...validFiles].sort((a, b) => b.size - a.size);
+
+  // Group files by quantization type for better display
+  const groupedFiles = sortedFiles.reduce(
+    (acc, file) => {
+      const quant =
+        file.quantization || getQuantizationLabel(file.filename) || "Unknown";
+      if (!acc[quant]) {
+        acc[quant] = [];
+      }
+      acc[quant].push(file);
+      return acc;
+    },
+    {} as Record<string, GGUFFile[]>,
+  );
+
+  const selectedQuant = selectedFile
+    ? selectedFile.quantization || getQuantizationLabel(selectedFile.filename)
+    : null;
+
+  const handleDownloadClick = () => {
+    if (selectedFile) {
+      onDownload(modelId, selectedFile.filename);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
@@ -271,24 +287,23 @@ export const ModelDetailModal = ({
         <div className="flex items-start justify-between p-6 border-b border-[#d8d4cf]/10">
           <div className="flex-1 min-w-0">
             <h3 className="text-xl font-bold text-[#d8d4cf] truncate">
-              {displayModel.name || displayModel.model_id}
+              {details.name || details.model_id}
             </h3>
             <div className="flex items-center gap-3 mt-1">
               <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
                 <FiUser size={14} />
-                <span>{displayModel.author || "Unknown"}</span>
+                <span>{details.author || "Unknown"}</span>
               </div>
-              {displayModel.downloads !== undefined &&
-                displayModel.downloads > 0 && (
-                  <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
-                    <FiDownloadCloud size={14} />
-                    <span>{formatDownloads(displayModel.downloads)}</span>
-                  </div>
-                )}
-              {displayModel.likes !== undefined && displayModel.likes > 0 && (
+              {details.downloads !== undefined && details.downloads > 0 && (
+                <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
+                  <FiDownloadCloud size={14} />
+                  <span>{formatDownloads(details.downloads)}</span>
+                </div>
+              )}
+              {details.likes !== undefined && details.likes > 0 && (
                 <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
                   <FiHeart size={14} />
-                  <span>{displayModel.likes}</span>
+                  <span>{details.likes}</span>
                 </div>
               )}
             </div>
@@ -303,15 +318,8 @@ export const ModelDetailModal = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-          {/* Error message */}
-          {loadError && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="text-red-400 text-sm">{loadError}</p>
-            </div>
-          )}
-
           {/* Description */}
-          {details?.description && (
+          {details.description && (
             <div className="mb-6 p-4 bg-[#121212] rounded-lg border border-[#d8d4cf]/5">
               <p className="text-[#d8d4cf]/70 text-sm leading-relaxed">
                 {details.description}
@@ -331,11 +339,9 @@ export const ModelDetailModal = ({
                 const isSelected =
                   selectedFile &&
                   files.some((f) => f.filename === selectedFile.filename);
-                // Show the largest file for this quantization
                 const largestFile = files.reduce((a, b) =>
                   a.size > b.size ? a : b,
                 );
-                // Get parameter count for this file
                 const paramCount = largestFile.parameter_count;
 
                 return (
@@ -428,13 +434,10 @@ export const ModelDetailModal = ({
                 </div>
                 <button
                   onClick={handleDownloadClick}
-                  disabled={isDownloading(
-                    model.model_id,
-                    selectedFile.filename,
-                  )}
+                  disabled={isDownloading(modelId, selectedFile.filename)}
                   className="ml-4 px-6 py-2.5 bg-[#7d7abc] hover:bg-[#7d7abc]/80 disabled:opacity-50 text-[#d8d4cf] rounded-lg text-sm font-medium transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed flex-shrink-0"
                 >
-                  {isDownloading(model.model_id, selectedFile.filename) ? (
+                  {isDownloading(modelId, selectedFile.filename) ? (
                     <>
                       <FiLoader className="animate-spin" size={16} />
                       Downloading...
