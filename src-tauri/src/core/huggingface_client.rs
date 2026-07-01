@@ -46,6 +46,57 @@ fn extract_parameter_count(filename: &str) -> Option<String> {
     None
 }
 
+// Helper function to extract quantization from filename
+fn extract_quantization(filename: &str) -> Option<String> {
+    let name = filename.replace(".gguf", "");
+    
+    // Define quantization patterns
+    let patterns = [
+        r"IQ[1-4]_[XSML]?",
+        r"Q[2-8]_[0-9K_][0-9K_]*",
+        r"Q[2-8]_[0-9]",
+        r"F[1-9][0-9]?",
+        r"q4_k_m",
+        r"q5_k_m",
+        r"q6_k",
+        r"q8_0",
+        r"q4_0",
+        r"q5_0",
+        r"q2_k",
+        r"q3_k",
+        r"f16",
+        r"f32",
+    ];
+    
+    // Try to match quantization patterns
+    for pattern in patterns {
+        if let Ok(re) = regex::Regex::new(&format!(r"(?i){}", pattern)) {
+            if let Some(caps) = re.captures(&name) {
+                if let Some(matched) = caps.get(0) {
+                    let quant = matched.as_str().to_uppercase();
+                    // Normalize common quantizations
+                    let normalized = match quant.as_str() {
+                        "Q4_K_M" => "Q4_K_M",
+                        "Q5_K_M" => "Q5_K_M",
+                        "Q6_K" => "Q6_K",
+                        "Q8_0" => "Q8_0",
+                        "Q4_0" => "Q4_0",
+                        "Q5_0" => "Q5_0",
+                        "Q2_K" => "Q2_K",
+                        "Q3_K" => "Q3_K",
+                        "F16" => "F16",
+                        "F32" => "F32",
+                        _ => &quant,
+                    };
+                    return Some(normalized.to_string());
+                }
+            }
+        }
+    }
+    
+    None
+}
+
 pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUFFileInfo> {
     let mut gguf_files = Vec::new();
     
@@ -79,11 +130,15 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
                 // Extract parameter count from filename
                 let parameter_count = extract_parameter_count(filename);
                 
+                // Extract quantization from filename
+                let quantization = extract_quantization(filename);
+                
                 gguf_files.push(GGUFFileInfo {
                     filename: filename.to_string(),
                     size,
                     url,
                     parameter_count,
+                    quantization,
                 });
             }
         }
@@ -102,13 +157,12 @@ pub async fn fetch_hugging_face_models(
     let client = reqwest::Client::new();
     
     // Fix: Use 0-based offset for pagination
-    // Page 1 = offset 0, Page 2 = offset 20, Page 3 = offset 40, etc.
     let offset = (page - 1) * limit;
     
-    // Use "filter" parameter to specifically request models with GGUF files.
-    // The "full" parameter ensures we get the complete sibling list.
+    // IMPORTANT: REMOVED full=true for pagination to work
+    // We only get basic model info here, not full sibling data
     let url = format!(
-        "https://huggingface.co/api/models?filter=gguf&full=true&sort=downloads&direction=-1&limit={}&offset={}",
+        "https://huggingface.co/api/models?filter=gguf&sort=downloads&direction=-1&limit={}&offset={}",
         limit, offset
     );
     
@@ -146,31 +200,13 @@ pub async fn fetch_hugging_face_models(
             continue;
         }
         
-        // Get siblings - with "full=true" we should have all siblings
-        let siblings = item["siblings"].as_array();
-        
-        // Add model_id to each sibling for URL construction
-        let siblings_with_model_id = siblings.map(|siblings_vec| {
-            let mut enhanced_siblings = Vec::new();
-            for sibling in siblings_vec {
-                let mut enhanced = sibling.clone();
-                enhanced["model_id"] = serde_json::Value::String(id.clone());
-                enhanced_siblings.push(enhanced);
-            }
-            enhanced_siblings
-        });
-        
-        let gguf_files = extract_gguf_files(siblings_with_model_id.as_ref());
-        
-        if gguf_files.is_empty() {
-            continue;
-        }
-        
         // Split the ID into author and name components
         let parts: Vec<&str> = id.split('/').collect();
         let author = parts.get(0).unwrap_or(&"").to_string();
         let name = parts.get(1).unwrap_or(&"").to_string();
         
+        // We don't have GGUF files in the browse list anymore
+        // They will be fetched when the modal opens
         let model = HuggingFaceModelListing {
             id: id.clone(),
             model_id: id.clone(),
@@ -179,7 +215,7 @@ pub async fn fetch_hugging_face_models(
             downloads: item["downloads"].as_u64(),
             likes: item["likes"].as_u64(),
             description: item["description"].as_str().map(|s| s.to_string()),
-            gguf_files,
+            gguf_files: Vec::new(), // Empty for browse list
         };
         
         models.push(model);
@@ -188,11 +224,79 @@ pub async fn fetch_hugging_face_models(
     Ok(models)
 }
 
+// NEW: Fetch full model details with GGUF files
+pub async fn fetch_model_details(model_id: &str) -> Result<HuggingFaceModelListing, String> {
+    let client = reqwest::Client::new();
+    
+    // Use full=true to get all siblings with GGUF files
+    let url = format!("https://huggingface.co/api/models/{}?full=true", model_id);
+    
+    let response = client
+        .get(&url)
+        .header("User-Agent", "SolynApp/1.0")
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch model details: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Hugging Face API error: {}", response.status()));
+    }
+    
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    
+    let id = data["id"].as_str().unwrap_or("").to_string();
+    if id.is_empty() {
+        return Err("Invalid model ID".to_string());
+    }
+    
+    // Get siblings with full data
+    let siblings = data["siblings"].as_array();
+    
+    // Add model_id to each sibling for URL construction
+    let siblings_with_model_id = siblings.map(|siblings_vec| {
+        let mut enhanced_siblings = Vec::new();
+        for sibling in siblings_vec {
+            let mut enhanced = sibling.clone();
+            enhanced["model_id"] = serde_json::Value::String(id.clone());
+            enhanced_siblings.push(enhanced);
+        }
+        enhanced_siblings
+    });
+    
+    let gguf_files = extract_gguf_files(siblings_with_model_id.as_ref());
+    
+    if gguf_files.is_empty() {
+        return Err("No GGUF files found in this model repository".to_string());
+    }
+    
+    // Split the ID into author and name components
+    let parts: Vec<&str> = id.split('/').collect();
+    let author = parts.get(0).unwrap_or(&"").to_string();
+    let name = parts.get(1).unwrap_or(&"").to_string();
+    
+    let model = HuggingFaceModelListing {
+        id: id.clone(),
+        model_id: id.clone(),
+        author,
+        name: name.clone(),
+        downloads: data["downloads"].as_u64(),
+        likes: data["likes"].as_u64(),
+        description: data["description"].as_str().map(|s| s.to_string()),
+        gguf_files,
+    };
+    
+    Ok(model)
+}
+
 pub async fn get_total_model_count() -> Result<usize, String> {
     let client = reqwest::Client::new();
     
-    // Use the same filter for consistency
-    let url = "https://huggingface.co/api/models?filter=gguf&limit=1000";
+    // Use the same filter for consistency (without full=true)
+    let url = "https://huggingface.co/api/models?filter=gguf&limit=1";
     
     let response = client
         .get(url)
@@ -206,12 +310,33 @@ pub async fn get_total_model_count() -> Result<usize, String> {
         return Err(format!("Hugging Face API error: {}", response.status()));
     }
     
+    // Get the total count from the Link header
+    let link_header = response.headers()
+        .get("link")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    
+    // Parse the last page number from the Link header
+    // Example: <https://huggingface.co/api/models?filter=gguf&limit=1&offset=100>; rel="last"
+    if let Some(last_url) = link_header.split(',')
+        .find(|part| part.contains("rel=\"last\""))
+        .and_then(|part| part.split('>').next())
+    {
+        // The type is now &str, not Option
+        let last_url = last_url.trim_start_matches('<');
+        if let Some(offset_param) = last_url.split('&').find(|p| p.starts_with("offset=")) {
+            if let Ok(offset) = offset_param.split('=').nth(1).unwrap_or("0").parse::<usize>() {
+                return Ok(offset + 1); // offset + 1 gives total count
+            }
+        }
+    }
+    
+    // Fallback: get the data and count manually
     let data: serde_json::Value = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
     
-    // Handle both array and object responses
     let count = if let Some(items_array) = data.as_array() {
         items_array.len()
     } else if let Some(models_array) = data.get("models").and_then(|v| v.as_array()) {

@@ -51,6 +51,7 @@ pub async fn fetch_gguf_metadata(model_id: &str) -> Result<GGUFFileInfo, String>
     Ok(selected_file)
 }
 
+// Updated to accept specific GGUF file info
 pub async fn download_gguf_model(
     window: &WebviewWindow,
     model_id: &str,

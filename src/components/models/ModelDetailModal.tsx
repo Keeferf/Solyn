@@ -85,7 +85,6 @@ const getQuantizationLabel = (filename: string): string | null => {
   return null;
 };
 
-// Get quantization quality description
 const getQuantizationDescription = (quant: string | null): string => {
   if (!quant) return "Unknown quantization";
 
@@ -109,7 +108,6 @@ const getQuantizationDescription = (quant: string | null): string => {
   return descriptions[quant] || `${quant} quantization`;
 };
 
-// Helper to format parameter count
 const formatParameterCount = (
   paramCount: string | null | undefined,
 ): string => {
@@ -128,13 +126,66 @@ export const ModelDetailModal = ({
   },
 }: ModelDetailModalProps) => {
   const [selectedFile, setSelectedFile] = useState<GGUFFile | null>(null);
+  const [fullModel, setFullModel] = useState<HFModel | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Reset selection when model changes
+  // Fetch full model details when modal opens
   useEffect(() => {
-    if (model && model.gguf_files.length > 0) {
+    if (isOpen && model) {
+      setIsLoadingDetails(true);
+      setLoadError(null);
+
+      // Fetch full model details with GGUF files
+      invoke("fetch_model_details", { modelId: model.model_id })
+        .then((result: any) => {
+          console.log("📦 Fetched model details:", result);
+          const transformedModel: HFModel = {
+            id: result.model_id || result.id,
+            model_id: result.model_id || result.id,
+            author: result.author || "Unknown",
+            name: result.name || result.model_id?.split("/").pop() || "",
+            downloads: result.downloads || 0,
+            likes: result.likes || 0,
+            description: result.description || "",
+            tags: [],
+            gguf_files: (result.gguf_files || []).map((file: any) => ({
+              filename: file.filename,
+              size: file.size,
+              quantization:
+                file.quantization || getQuantizationLabel(file.filename) || "", // Fallback to extraction
+              url: file.url,
+              parameter_count: file.parameter_count || null,
+            })),
+          };
+
+          console.log("✅ Transformed model:", transformedModel);
+          setFullModel(transformedModel);
+          setIsLoadingDetails(false);
+        })
+        .catch((error) => {
+          console.error("❌ Failed to fetch model details:", error);
+          setLoadError("Failed to load model details. Please try again.");
+          setIsLoadingDetails(false);
+
+          // Fallback: use the model from props if available
+          if (model.gguf_files && model.gguf_files.length > 0) {
+            setFullModel(model);
+          }
+        });
+    } else {
+      // Reset when modal closes
+      setFullModel(null);
+      setSelectedFile(null);
+      setLoadError(null);
+    }
+  }, [isOpen, model]);
+
+  // Reset selection when model data changes
+  useEffect(() => {
+    if (fullModel && fullModel.gguf_files.length > 0) {
       // Filter out files with unknown quantization first
-      const validFiles = model.gguf_files.filter(
+      const validFiles = fullModel.gguf_files.filter(
         (file) => getQuantizationLabel(file.filename) !== null,
       );
 
@@ -144,7 +195,7 @@ export const ModelDetailModal = ({
     } else {
       setSelectedFile(null);
     }
-  }, [model]);
+  }, [fullModel]);
 
   if (!isOpen || !model) return null;
 
@@ -158,8 +209,12 @@ export const ModelDetailModal = ({
     }
   };
 
+  // Use fullModel if available, otherwise fallback to model prop
+  const displayModel = fullModel || model;
+  const files = displayModel.gguf_files || [];
+
   // Filter out files with unknown quantization
-  const validFiles = model.gguf_files.filter(
+  const validFiles = files.filter(
     (file) => getQuantizationLabel(file.filename) !== null,
   );
 
@@ -183,6 +238,35 @@ export const ModelDetailModal = ({
     ? getQuantizationLabel(selectedFile.filename)
     : null;
 
+  // Loading state
+  if (isLoadingDetails) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div className="bg-[#1a1a1a] border border-[#d8d4cf]/10 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-slideUp">
+          <div className="flex items-center justify-between p-6 border-b border-[#d8d4cf]/10">
+            <h3 className="text-xl font-bold text-[#d8d4cf]">
+              Loading model details...
+            </h3>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-[#d8d4cf]/10 rounded-lg transition-all text-[#d8d4cf]/60 hover:text-[#d8d4cf] cursor-pointer"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
+          <div className="flex items-center justify-center py-16">
+            <FiLoader className="animate-spin text-[#7d7abc]" size={40} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
@@ -195,23 +279,24 @@ export const ModelDetailModal = ({
         <div className="flex items-start justify-between p-6 border-b border-[#d8d4cf]/10">
           <div className="flex-1 min-w-0">
             <h3 className="text-xl font-bold text-[#d8d4cf] truncate">
-              {model.name || model.model_id}
+              {displayModel.name || displayModel.model_id}
             </h3>
             <div className="flex items-center gap-3 mt-1">
               <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
                 <FiUser size={14} />
-                <span>{model.author || "Unknown"}</span>
+                <span>{displayModel.author || "Unknown"}</span>
               </div>
-              {model.downloads !== undefined && model.downloads > 0 && (
-                <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
-                  <FiDownloadCloud size={14} />
-                  <span>{formatDownloads(model.downloads)}</span>
-                </div>
-              )}
-              {model.likes !== undefined && model.likes > 0 && (
+              {displayModel.downloads !== undefined &&
+                displayModel.downloads > 0 && (
+                  <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
+                    <FiDownloadCloud size={14} />
+                    <span>{formatDownloads(displayModel.downloads)}</span>
+                  </div>
+                )}
+              {displayModel.likes !== undefined && displayModel.likes > 0 && (
                 <div className="flex items-center gap-1 text-[#d8d4cf]/40 text-sm">
                   <FiHeart size={14} />
-                  <span>{model.likes}</span>
+                  <span>{displayModel.likes}</span>
                 </div>
               )}
             </div>
@@ -226,11 +311,18 @@ export const ModelDetailModal = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          {/* Error message */}
+          {loadError && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-red-400 text-sm">{loadError}</p>
+            </div>
+          )}
+
           {/* Description */}
-          {model.description && (
+          {displayModel.description && (
             <div className="mb-6 p-4 bg-[#121212] rounded-lg border border-[#d8d4cf]/5">
               <p className="text-[#d8d4cf]/70 text-sm leading-relaxed">
-                {model.description}
+                {displayModel.description}
               </p>
             </div>
           )}

@@ -142,6 +142,9 @@ const getParameterCountPreview = (
   return Array.from(params);
 };
 
+// src/components/models/BrowseModels.tsx
+// ... (keep all imports and helper functions the same)
+
 export const BrowseModels = ({
   models,
   loading,
@@ -250,20 +253,19 @@ export const BrowseModels = ({
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
           {models.map((model) => {
-            // Get unique quantizations for preview
-            const quantPreviews = getQuantizationPreview(model.gguf_files);
-            const paramPreviews = getParameterCountPreview(model.gguf_files);
-            const hasGGUF = model.gguf_files.length > 0;
+            // Check if model has GGUF files (fetched when modal opens)
+            const hasGGUF = true; // We assume all models from search have GGUF files
+
+            // We don't have GGUF files in browse list anymore
+            // Show placeholder until modal loads
+            const quantPreviews: string[] = [];
+            const paramPreviews: string[] = [];
 
             return (
               <div
                 key={model.id}
-                onClick={() => hasGGUF && onModelClick(model)}
-                className={`bg-[var(--color-black)] border border-[var(--color-white)]/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full ${
-                  hasGGUF
-                    ? "hover:bg-[var(--color-white)]/5 hover:border-[var(--color-white)]/20 cursor-pointer hover:scale-[1.02]"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
+                onClick={() => onModelClick(model)}
+                className={`bg-[var(--color-black)] border border-[var(--color-white)]/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-[var(--color-white)]/5 hover:border-[var(--color-white)]/20 cursor-pointer hover:scale-[1.02]`}
               >
                 {/* Model header */}
                 <div className="flex items-start justify-between mb-3">
@@ -281,11 +283,9 @@ export const BrowseModels = ({
                       </span>
                     </div>
                   </div>
-                  {hasGGUF && (
-                    <div className="text-[var(--color-white)]/30 text-xs bg-[var(--color-purple-accent)]/10 px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20">
-                      <FiChevronDown size={14} />
-                    </div>
-                  )}
+                  <div className="text-[var(--color-white)]/30 text-xs bg-[var(--color-purple-accent)]/10 px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20">
+                    <FiChevronDown size={14} />
+                  </div>
                 </div>
 
                 {/* Description */}
@@ -309,33 +309,15 @@ export const BrowseModels = ({
                       {formatLikes(model.likes)}
                     </span>
                   )}
-                  {/* Parameter count preview */}
-                  {paramPreviews.length > 0 && (
-                    <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                      <FiCpu size={12} />
-                      {paramPreviews.join(", ")}
-                    </span>
-                  )}
+                  {/* Parameter count preview - we don't have this in browse list */}
                 </div>
 
-                {/* Quantization preview chips */}
-                {quantPreviews.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-[var(--color-white)]/5">
-                    {quantPreviews.map((quant) => (
-                      <span
-                        key={quant}
-                        className="text-xs bg-[var(--color-purple-accent)]/10 text-[var(--color-white)]/60 px-2.5 py-1 rounded-full border border-[var(--color-white)]/10 font-mono"
-                      >
-                        {quant}
-                      </span>
-                    ))}
-                    {model.gguf_files.length > quantPreviews.length && (
-                      <span className="text-xs text-[var(--color-white)]/30 px-1 flex items-center">
-                        +{model.gguf_files.length - quantPreviews.length} more
-                      </span>
-                    )}
-                  </div>
-                )}
+                {/* Quantization preview - we don't have this in browse list */}
+                <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-[var(--color-white)]/5">
+                  <span className="text-xs text-[var(--color-white)]/30">
+                    Click to view available quantizations
+                  </span>
+                </div>
               </div>
             );
           })}

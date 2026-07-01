@@ -3,8 +3,6 @@ pub mod api;
 pub mod core;
 pub mod helpers;
 pub mod events;
-
-// Re-export commonly used types for convenience
 pub use data::download_state::*;
 pub use data::huggingface_model_types::*;
 
@@ -29,6 +27,7 @@ pub fn run() {
             api::huggingface_commands::fetch_huggingface_models,
             api::huggingface_commands::get_huggingface_model_count,
             api::huggingface_commands::download_huggingface_model,
+            api::huggingface_commands::fetch_model_details, // Added this
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
