@@ -3524,6 +3524,7 @@ name = "solyn"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "once_cell",
  "regex",
  "reqwest",
  "serde",

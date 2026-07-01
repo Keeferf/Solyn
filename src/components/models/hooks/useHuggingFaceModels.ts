@@ -46,6 +46,10 @@ export const useHuggingFaceModels = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalModels, setTotalModels] = useState(0);
+  const [totalModelsFetched, setTotalModelsFetched] = useState(false);
+  const [prefetchedModels, setPrefetchedModels] = useState<Set<string>>(
+    new Set(),
+  );
   const modelsPerPage = 20;
 
   const transformModel = (backendModel: BackendModel): HFModel => {
@@ -61,7 +65,7 @@ export const useHuggingFaceModels = () => {
       gguf_files: (backendModel.gguf_files || []).map((file) => ({
         filename: file.filename,
         size: file.size,
-        quantization: file.quantization || "",
+        quantization: file.quantization || "", // Use backend's quantization
         url: file.url,
         parameter_count: file.parameter_count || null,
       })),
@@ -100,18 +104,51 @@ export const useHuggingFaceModels = () => {
         );
         setModels(transformedModels);
 
-        // Fetch total count
-        try {
-          const total = await invoke<number>("get_huggingface_model_count");
-          setTotalModels(total);
-          console.log(`📊 Total models available: ${total}`);
-        } catch (countErr) {
-          console.error("Failed to fetch total count:", countErr);
-          // If we can't get total, use a default
-          setTotalModels(response.length * 10);
+        // Only fetch total count once
+        if (!totalModelsFetched) {
+          try {
+            const total = await invoke<number>("get_huggingface_model_count");
+            setTotalModels(total);
+            setTotalModelsFetched(true);
+            console.log(`📊 Total models available: ${total}`);
+          } catch (countErr) {
+            console.error("Failed to fetch total count:", countErr);
+            // If we can't get total, use a default
+            setTotalModels(response.length * 10);
+          }
         }
 
         setCurrentPage(page);
+
+        // Pre-fetch details for visible models (first 3)
+        if (transformedModels.length > 0) {
+          const modelsToPrefecth = transformedModels.slice(0, 3);
+          for (const model of modelsToPrefecth) {
+            if (!prefetchedModels.has(model.model_id)) {
+              setPrefetchedModels((prev) => new Set(prev).add(model.model_id));
+              // Don't await - fire and forget
+              invoke("fetch_model_details", { modelId: model.model_id })
+                .then((details: any) => {
+                  console.log(`📦 Pre-fetched details for ${model.model_id}`);
+                  // Update the model in the list with details
+                  setModels((prevModels) =>
+                    prevModels.map((m) => {
+                      if (m.model_id === model.model_id) {
+                        return {
+                          ...m,
+                          gguf_files: details.gguf_files || [],
+                        };
+                      }
+                      return m;
+                    }),
+                  );
+                })
+                .catch((err) => {
+                  console.error(`Failed to pre-fetch ${model.model_id}:`, err);
+                });
+            }
+          }
+        }
       } catch (err) {
         console.error(`❌ Failed to fetch models for page ${page}:`, err);
         setError(String(err));
@@ -119,7 +156,7 @@ export const useHuggingFaceModels = () => {
         setLoading(false);
       }
     },
-    [modelsPerPage],
+    [modelsPerPage, totalModelsFetched, prefetchedModels],
   );
 
   // Initial load

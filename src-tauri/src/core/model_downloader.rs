@@ -74,11 +74,12 @@ pub async fn download_gguf_model(
         )
     };
     
+    // Single progress broadcast at start (removed the duplicate at 30%)
     broadcast_model_acquisition_progress(
         window,
         model_id,
         "downloading",
-        30,
+        10,
         &format!("Downloading {} ({:.1} MB)...", 
             gguf_metadata.filename,
             gguf_metadata.size as f64 / 1024.0 / 1024.0
@@ -114,19 +115,29 @@ pub async fn download_gguf_model(
             .map_err(|e| format!("Failed to write file: {}", e))?;
         
         if total_size > 0 {
-            let progress = 30 + ((downloaded as f64 / total_size as f64) * 40.0) as u8;
+            // Start from 10% and go to 90% (leaving 10% for finalization)
+            let progress = 10 + ((downloaded as f64 / total_size as f64) * 80.0) as u8;
             let percent = (downloaded as f64 / total_size as f64) * 100.0;
             broadcast_model_acquisition_progress(
                 window,
                 model_id,
                 "downloading",
-                progress.min(70),
+                progress.min(90),
                 &format!("Downloading... {:.1}%", percent)
             );
         }
     }
     
     file.flush().await.map_err(|e| format!("Failed to flush file: {}", e))?;
+    
+    // Final progress update
+    broadcast_model_acquisition_progress(
+        window,
+        model_id,
+        "downloading",
+        95,
+        "Finalizing download..."
+    );
     
     let file_size_mb = gguf_metadata.size as f64 / 1024.0 / 1024.0;
     let result = format!("Successfully downloaded {} ({:.1} MB) to {}", 

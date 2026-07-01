@@ -2,7 +2,14 @@
 use reqwest;
 use serde_json;
 use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 use crate::data::huggingface_model_types::{HuggingFaceModelListing, GGUFFileInfo};
+
+// Cache for model details to avoid redundant API calls
+static MODEL_DETAILS_CACHE: Lazy<Mutex<HashMap<String, HuggingFaceModelListing>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 // Helper function to extract parameter count from filename
 fn extract_parameter_count(filename: &str) -> Option<String> {
@@ -224,8 +231,16 @@ pub async fn fetch_hugging_face_models(
     Ok(models)
 }
 
-// NEW: Fetch full model details with GGUF files
+// NEW: Fetch full model details with GGUF files - WITH CACHING
 pub async fn fetch_model_details(model_id: &str) -> Result<HuggingFaceModelListing, String> {
+    // Check cache first
+    {
+        let cache = MODEL_DETAILS_CACHE.lock().unwrap();
+        if let Some(cached) = cache.get(model_id) {
+            return Ok(cached.clone());
+        }
+    }
+    
     let client = reqwest::Client::new();
     
     // Use full=true to get all siblings with GGUF files
@@ -288,6 +303,12 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HuggingFaceModelListi
         description: data["description"].as_str().map(|s| s.to_string()),
         gguf_files,
     };
+    
+    // Store in cache
+    {
+        let mut cache = MODEL_DETAILS_CACHE.lock().unwrap();
+        cache.insert(model_id.to_string(), model.clone());
+    }
     
     Ok(model)
 }

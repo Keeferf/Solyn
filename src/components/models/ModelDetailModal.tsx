@@ -44,6 +44,7 @@ const formatDownloads = (downloads?: number): string => {
   return downloads.toString();
 };
 
+// Helper function as fallback only - main quantization should come from backend
 const getQuantizationLabel = (filename: string): string | null => {
   const name = filename.replace(/\.gguf$/i, "");
 
@@ -130,11 +131,19 @@ export const ModelDetailModal = ({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Fetch full model details when modal opens
+  // Fetch full model details when modal opens (with caching on backend)
   useEffect(() => {
     if (isOpen && model) {
       setIsLoadingDetails(true);
       setLoadError(null);
+
+      // Check if model already has GGUF files (from pre-fetching)
+      if (model.gguf_files && model.gguf_files.length > 0) {
+        console.log("📦 Using pre-fetched model details");
+        setFullModel(model);
+        setIsLoadingDetails(false);
+        return;
+      }
 
       // Fetch full model details with GGUF files
       invoke("fetch_model_details", { modelId: model.model_id })
@@ -152,8 +161,9 @@ export const ModelDetailModal = ({
             gguf_files: (result.gguf_files || []).map((file: any) => ({
               filename: file.filename,
               size: file.size,
+              // Use backend's quantization, fallback to extraction only if needed
               quantization:
-                file.quantization || getQuantizationLabel(file.filename) || "", // Fallback to extraction
+                file.quantization || getQuantizationLabel(file.filename) || "",
               url: file.url,
               parameter_count: file.parameter_count || null,
             })),
@@ -186,7 +196,8 @@ export const ModelDetailModal = ({
     if (fullModel && fullModel.gguf_files.length > 0) {
       // Filter out files with unknown quantization first
       const validFiles = fullModel.gguf_files.filter(
-        (file) => getQuantizationLabel(file.filename) !== null,
+        (file) =>
+          file.quantization || getQuantizationLabel(file.filename) !== null,
       );
 
       // Sort files by size (largest first as default)
@@ -213,9 +224,9 @@ export const ModelDetailModal = ({
   const displayModel = fullModel || model;
   const files = displayModel.gguf_files || [];
 
-  // Filter out files with unknown quantization
+  // Filter out files with unknown quantization - use backend's quantization data
   const validFiles = files.filter(
-    (file) => getQuantizationLabel(file.filename) !== null,
+    (file) => file.quantization || getQuantizationLabel(file.filename) !== null,
   );
 
   // Sort files by size for display
@@ -224,7 +235,9 @@ export const ModelDetailModal = ({
   // Group files by quantization type for better display
   const groupedFiles = sortedFiles.reduce(
     (acc, file) => {
-      const quant = getQuantizationLabel(file.filename) || "Unknown";
+      // Use backend's quantization if available, otherwise extract
+      const quant =
+        file.quantization || getQuantizationLabel(file.filename) || "Unknown";
       if (!acc[quant]) {
         acc[quant] = [];
       }
@@ -235,7 +248,7 @@ export const ModelDetailModal = ({
   );
 
   const selectedQuant = selectedFile
-    ? getQuantizationLabel(selectedFile.filename)
+    ? selectedFile.quantization || getQuantizationLabel(selectedFile.filename)
     : null;
 
   // Loading state
