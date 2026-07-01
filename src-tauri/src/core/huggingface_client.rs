@@ -1,14 +1,17 @@
-// src/core/huggingface_client.rs
 use reqwest;
 use serde_json;
 use std::time::Duration;
-use crate::data::huggingface_model_types::{HuggingFaceModelListing, GGUFFileInfo};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo};
 
-// Helper function to extract parameter count from filename
+static MODEL_DETAILS_CACHE: Lazy<Mutex<HashMap<String, HFModelDetails>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
 fn extract_parameter_count(filename: &str) -> Option<String> {
     let lower = filename.to_lowercase();
     
-    // Check for common patterns
     if lower.contains("70b") { return Some("70B".to_string()); }
     if lower.contains("13b") { return Some("13B".to_string()); }
     if lower.contains("8x7b") { return Some("8x7B".to_string()); }
@@ -25,11 +28,10 @@ fn extract_parameter_count(filename: &str) -> Option<String> {
     if lower.contains("22b") { return Some("22B".to_string()); }
     if lower.contains("34b") { return Some("34B".to_string()); }
     
-    // Try regex patterns for more complex cases
     let patterns = [
-        r"(\d+)x(\d+)b",     // 8x7B, etc.
-        r"(\d+\.?\d*)b",     // 7B, 13B, 1.5B
-        r"(\d+)m",           // 125M, 350M
+        r"(\d+)x(\d+)b", 
+        r"(\d+\.?\d*)b",
+        r"(\d+)m",
     ];
     
     for pattern in patterns {
@@ -46,11 +48,8 @@ fn extract_parameter_count(filename: &str) -> Option<String> {
     None
 }
 
-// Helper function to extract quantization from filename
 fn extract_quantization(filename: &str) -> Option<String> {
     let name = filename.replace(".gguf", "");
-    
-    // Define quantization patterns
     let patterns = [
         r"IQ[1-4]_[XSML]?",
         r"Q[2-8]_[0-9K_][0-9K_]*",
@@ -68,13 +67,11 @@ fn extract_quantization(filename: &str) -> Option<String> {
         r"f32",
     ];
     
-    // Try to match quantization patterns
     for pattern in patterns {
         if let Ok(re) = regex::Regex::new(&format!(r"(?i){}", pattern)) {
             if let Some(caps) = re.captures(&name) {
                 if let Some(matched) = caps.get(0) {
                     let quant = matched.as_str().to_uppercase();
-                    // Normalize common quantizations
                     let normalized = match quant.as_str() {
                         "Q4_K_M" => "Q4_K_M",
                         "Q5_K_M" => "Q5_K_M",
@@ -105,18 +102,14 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
             let filename = file["rfilename"].as_str()
                 .or_else(|| file["filename"].as_str())
                 .unwrap_or("");
-            
             if filename.ends_with(".gguf") {
-                // Try multiple possible field names for size
                 let size = file["size"].as_u64()
                     .or_else(|| file["file_size"].as_u64())
                     .or_else(|| {
-                        // Some APIs use a nested object for file info
                         file["file"]["size"].as_u64()
                     })
                     .unwrap_or(0);
-                
-                // Construct the download URL
+
                 let model_id = file.get("model_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
@@ -126,11 +119,9 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
                 } else {
                     format!("https://huggingface.co/resolve/main/{}", filename)
                 };
-                
-                // Extract parameter count from filename
+
                 let parameter_count = extract_parameter_count(filename);
-                
-                // Extract quantization from filename
+
                 let quantization = extract_quantization(filename);
                 
                 gguf_files.push(GGUFFileInfo {
@@ -151,16 +142,11 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
 pub async fn fetch_hugging_face_models(
     page: Option<usize>,
     limit: Option<usize>,
-) -> Result<Vec<HuggingFaceModelListing>, String> {
+) -> Result<Vec<HFModelSummary>, String> {
     let page = page.unwrap_or(1);
     let limit = limit.unwrap_or(20);
     let client = reqwest::Client::new();
-    
-    // Fix: Use 0-based offset for pagination
     let offset = (page - 1) * limit;
-    
-    // IMPORTANT: REMOVED full=true for pagination to work
-    // We only get basic model info here, not full sibling data
     let url = format!(
         "https://huggingface.co/api/models?filter=gguf&sort=downloads&direction=-1&limit={}&offset={}",
         limit, offset
@@ -205,17 +191,13 @@ pub async fn fetch_hugging_face_models(
         let author = parts.get(0).unwrap_or(&"").to_string();
         let name = parts.get(1).unwrap_or(&"").to_string();
         
-        // We don't have GGUF files in the browse list anymore
-        // They will be fetched when the modal opens
-        let model = HuggingFaceModelListing {
+        let model = HFModelSummary {
             id: id.clone(),
             model_id: id.clone(),
             author,
             name: name.clone(),
             downloads: item["downloads"].as_u64(),
             likes: item["likes"].as_u64(),
-            description: item["description"].as_str().map(|s| s.to_string()),
-            gguf_files: Vec::new(), // Empty for browse list
         };
         
         models.push(model);
@@ -224,8 +206,16 @@ pub async fn fetch_hugging_face_models(
     Ok(models)
 }
 
-// NEW: Fetch full model details with GGUF files
-pub async fn fetch_model_details(model_id: &str) -> Result<HuggingFaceModelListing, String> {
+// Fetch full model details with GGUF files - WITH CACHING
+pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, String> {
+    // Check cache first
+    {
+        let cache = MODEL_DETAILS_CACHE.lock().unwrap();
+        if let Some(cached) = cache.get(model_id) {
+            return Ok(cached.clone());
+        }
+    }
+    
     let client = reqwest::Client::new();
     
     // Use full=true to get all siblings with GGUF files
@@ -278,7 +268,7 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HuggingFaceModelListi
     let author = parts.get(0).unwrap_or(&"").to_string();
     let name = parts.get(1).unwrap_or(&"").to_string();
     
-    let model = HuggingFaceModelListing {
+    let model = HFModelDetails {
         id: id.clone(),
         model_id: id.clone(),
         author,
@@ -289,13 +279,17 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HuggingFaceModelListi
         gguf_files,
     };
     
+    // Store in cache
+    {
+        let mut cache = MODEL_DETAILS_CACHE.lock().unwrap();
+        cache.insert(model_id.to_string(), model.clone());
+    }
+    
     Ok(model)
 }
 
 pub async fn get_total_model_count() -> Result<usize, String> {
     let client = reqwest::Client::new();
-    
-    // Use the same filter for consistency (without full=true)
     let url = "https://huggingface.co/api/models?filter=gguf&limit=1";
     
     let response = client
