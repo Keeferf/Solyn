@@ -132,17 +132,17 @@ export const ModelDetailModal = ({
   },
 }: ModelDetailModalProps) => {
   const [selectedFile, setSelectedFile] = useState<GGUFFile | null>(null);
-  const [fullModel, setFullModel] = useState<HFModelDetails | null>(null);
+  const [details, setDetails] = useState<HFModelDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Fetch full model details when modal opens (with caching on backend)
   useEffect(() => {
     if (isOpen && model) {
-      // Check if model already has GGUF files (from pre-fetching or if it was already loaded)
+      // Check if model already has GGUF files (from pre-fetching)
       if (hasDetails(model) && model.gguf_files.length > 0) {
         console.log("📦 Using pre-fetched model details");
-        setFullModel(model);
+        setDetails(model);
         setIsLoadingDetails(false);
         return;
       }
@@ -151,12 +151,10 @@ export const ModelDetailModal = ({
       setIsLoadingDetails(true);
       setLoadError(null);
 
-      invoke("fetch_model_details", { modelId: model.model_id })
-        .then((result: unknown) => {
-          // Type assertion to tell TypeScript what shape to expect
-          const details = result as HFModelDetails;
-          console.log("📦 Fetched model details:", details);
-          setFullModel(details);
+      invoke<HFModelDetails>("fetch_model_details", { modelId: model.model_id })
+        .then((result) => {
+          console.log("📦 Fetched model details:", result);
+          setDetails(result);
           setIsLoadingDetails(false);
         })
         .catch((error) => {
@@ -166,7 +164,7 @@ export const ModelDetailModal = ({
         });
     } else {
       // Reset when modal closes
-      setFullModel(null);
+      setDetails(null);
       setSelectedFile(null);
       setLoadError(null);
     }
@@ -174,9 +172,9 @@ export const ModelDetailModal = ({
 
   // Reset selection when model data changes
   useEffect(() => {
-    if (fullModel && fullModel.gguf_files.length > 0) {
+    if (details && details.gguf_files.length > 0) {
       // Filter out files with unknown quantization first
-      const validFiles = fullModel.gguf_files.filter(
+      const validFiles = details.gguf_files.filter(
         (file) =>
           file.quantization || getQuantizationLabel(file.filename) !== null,
       );
@@ -187,7 +185,7 @@ export const ModelDetailModal = ({
     } else {
       setSelectedFile(null);
     }
-  }, [fullModel]);
+  }, [details]);
 
   if (!isOpen || !model) return null;
 
@@ -201,9 +199,9 @@ export const ModelDetailModal = ({
     }
   };
 
-  // Use fullModel if available, otherwise use model (but model might not have details)
-  const displayModel = fullModel || model;
-  const files = fullModel?.gguf_files || [];
+  // Use details if available, otherwise fallback to model
+  const displayModel = details || model;
+  const files = details?.gguf_files || [];
 
   // Filter out files with unknown quantization - use backend's quantization data
   const validFiles = files.filter(
@@ -313,10 +311,10 @@ export const ModelDetailModal = ({
           )}
 
           {/* Description */}
-          {fullModel?.description && (
+          {details?.description && (
             <div className="mb-6 p-4 bg-[#121212] rounded-lg border border-[#d8d4cf]/5">
               <p className="text-[#d8d4cf]/70 text-sm leading-relaxed">
-                {fullModel.description}
+                {details.description}
               </p>
             </div>
           )}
