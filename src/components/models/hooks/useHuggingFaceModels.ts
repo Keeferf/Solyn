@@ -41,6 +41,7 @@ export const useHuggingFaceModels = () => {
   const [totalModels, setTotalModels] = useState(0);
   const currentPageRef = useRef(1);
   const modelsPerPage = 20;
+  const maxModels = 500; // GGUF models cap from backend
   const initialLoadDone = useRef(false);
   const hasLoadedAllRef = useRef(false);
   const loadedIdsRef = useRef<Set<string>>(new Set());
@@ -51,30 +52,21 @@ export const useHuggingFaceModels = () => {
     setLoading(true);
     setError(null);
     try {
-      console.log(`🔄 [FRONTEND] Loading initial models page 1...`);
+      console.log(`🔄 [FRONTEND] Loading initial GGUF models page 1...`);
 
       let total = 0;
       try {
         total = await invoke<number>("get_huggingface_model_count");
-        console.log(
-          `📊 [FRONTEND] Total models available (from API): ${total}`,
-        );
+        console.log(`📊 [FRONTEND] Total GGUF models available: ${total}`);
       } catch (countErr) {
-        console.warn(
-          "[FRONTEND] Failed to get total count, will use fallback",
-          countErr,
-        );
-        total = 0;
+        console.warn("[FRONTEND] Failed to get total count", countErr);
+        total = maxModels; // Use the cap as fallback
       }
 
-      if (total < modelsPerPage) {
-        console.log(
-          `⚠️ [FRONTEND] Total count (${total}) is less than models per page (${modelsPerPage}), using fallback`,
-        );
-        total = 1000;
-      }
-
-      setTotalModels(total);
+      // Cap at 500 since backend filters GGUF only
+      const capped = Math.min(total, maxModels);
+      setTotalModels(capped);
+      console.log(`📊 [FRONTEND] Capped total to ${capped} models`);
 
       console.log(
         `📤 [FRONTEND] Calling fetch_huggingface_models_page with page: 1, limit: ${modelsPerPage}`,
@@ -111,7 +103,7 @@ export const useHuggingFaceModels = () => {
 
       const hasMoreModels = response.length === modelsPerPage;
       console.log(
-        `🔍 [FRONTEND] Has more models? ${hasMoreModels} (got ${response.length}, total from API: ${total})`,
+        `🔍 [FRONTEND] Has more models? ${hasMoreModels} (got ${response.length}/${modelsPerPage})`,
       );
       setHasMore(hasMoreModels);
 
@@ -174,7 +166,7 @@ export const useHuggingFaceModels = () => {
         return;
       }
 
-      // Filter out duplicates
+      // Filter out duplicates (shouldn't happen with pagination, but safe)
       const existingIds = loadedIdsRef.current;
       const newModels = response.filter((m) => !existingIds.has(m.model_id));
 
@@ -205,22 +197,16 @@ export const useHuggingFaceModels = () => {
 
       currentPageRef.current = nextPage;
 
-      // Check if we've loaded all models
+      // Check if we've loaded all models (page returned less than requested)
       if (response.length < modelsPerPage) {
         console.log(
-          `📭 [FRONTEND] Got less than limit (${response.length} < ${modelsPerPage}), no more models`,
-        );
-        setHasMore(false);
-        hasLoadedAllRef.current = true;
-      } else if (newModels.length < modelsPerPage) {
-        console.log(
-          `📭 [FRONTEND] Got ${newModels.length} new models (less than limit), no more models`,
+          `📭 [FRONTEND] Got less than limit (${response.length} < ${modelsPerPage}), reached end`,
         );
         setHasMore(false);
         hasLoadedAllRef.current = true;
       } else {
         console.log(
-          `✅ [FRONTEND] Got full page of new models, assuming there are more`,
+          `✅ [FRONTEND] Got full page of models, possibly more available`,
         );
         setHasMore(true);
       }
@@ -233,12 +219,13 @@ export const useHuggingFaceModels = () => {
   }, [loadingMore, hasMore, loading, modelsPerPage]);
 
   const refreshModels = useCallback(async () => {
-    console.log(`🔄 [FRONTEND] Refreshing models...`);
+    console.log(`🔄 [FRONTEND] Refreshing GGUF models...`);
     initialLoadDone.current = false;
     hasLoadedAllRef.current = false;
     loadedIdsRef.current = new Set();
     setModels([]);
     setHasMore(true);
+    setTotalModels(0);
     currentPageRef.current = 0;
     await loadInitialModels();
   }, [loadInitialModels]);
@@ -254,6 +241,7 @@ export const useHuggingFaceModels = () => {
     error,
     hasMore,
     totalModels,
+    maxModels,
     loadMoreModels,
     refreshModels,
   };

@@ -16,6 +16,8 @@ interface BrowseModelsProps {
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
+  totalModels: number;
+  maxModels: number;
   downloadingModels: Set<string>;
   onModelClick: (model: HFModelSummary) => void;
   onLoadMore: () => void;
@@ -55,6 +57,8 @@ export const BrowseModels = ({
   loading,
   loadingMore,
   hasMore,
+  totalModels,
+  maxModels,
   downloadingModels,
   onModelClick,
   onLoadMore,
@@ -68,10 +72,12 @@ export const BrowseModels = ({
 
   useEffect(() => {
     console.log(
-      `🔍 [UI] Intersection observer: isIntersecting=${isIntersecting}, hasMore=${hasMore}, loadingMore=${loadingMore}`,
+      `🔍 [UI] Intersection: isIntersecting=${isIntersecting}, hasMore=${hasMore}, loadingMore=${loadingMore}`,
     );
-    console.log(`🔍 [UI] Models loaded: ${models.length}, hasMore: ${hasMore}`);
-  }, [isIntersecting, hasMore, loadingMore, models.length]);
+    console.log(
+      `🔍 [UI] Models: ${models.length}/${totalModels}, hasMore: ${hasMore}`,
+    );
+  }, [isIntersecting, hasMore, loadingMore, models.length, totalModels]);
 
   useEffect(() => {
     if (isIntersecting && hasMore && !loadingMore && !loading) {
@@ -86,7 +92,7 @@ export const BrowseModels = ({
         <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
           <div className="flex items-center gap-3">
             <FiServer className="text-purple-accent" size={16} />
-            <span>Loading models from Hugging Face...</span>
+            <span>Loading GGUF models from Hugging Face...</span>
           </div>
         </div>
         <div className="flex items-center justify-center py-16">
@@ -102,7 +108,7 @@ export const BrowseModels = ({
         <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
           <div className="flex items-center gap-3">
             <FiServer className="text-purple-accent" size={16} />
-            <span>Error loading models</span>
+            <span>Error loading GGUF models</span>
           </div>
         </div>
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -130,12 +136,16 @@ export const BrowseModels = ({
           <span>GGUF models from Hugging Face</span>
         </div>
         <div className="flex items-center gap-3">
-          <span>{models.length} models loaded</span>
+          <span className="font-mono">
+            {models.length}/{totalModels > 0 ? totalModels : maxModels}
+          </span>
           {hasMore && (
-            <span className="text-purple-accent">· Scroll for more</span>
+            <span className="text-purple-accent text-xs">
+              · Scroll for more
+            </span>
           )}
           {!hasMore && models.length > 0 && (
-            <span className="text-green-500">· All loaded</span>
+            <span className="text-green-500 text-xs">· All loaded</span>
           )}
         </div>
       </div>
@@ -230,6 +240,11 @@ export const BrowseModels = ({
           {!hasMore && models.length > 0 && (
             <div className="py-8 text-center text-white/30 text-sm border-t border-white/5">
               All {models.length} models loaded
+              {totalModels > 0 && totalModels < maxModels && (
+                <span className="block text-xs text-white/20 mt-2">
+                  ({totalModels} available from Hugging Face)
+                </span>
+              )}
             </div>
           )}
         </>
