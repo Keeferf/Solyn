@@ -24,8 +24,8 @@ pub fn run() {
             // Platform commands
             api::platform_commands::get_platform_info,
             
-            // Hugging Face commands
-            api::huggingface_commands::fetch_huggingface_models,
+            // Hugging Face commands - UPDATED for infinite scroll
+            api::huggingface_commands::fetch_huggingface_models_page,  // Changed from fetch_huggingface_models
             api::huggingface_commands::get_huggingface_model_count,
             api::huggingface_commands::download_huggingface_model,
             api::huggingface_commands::fetch_model_details,

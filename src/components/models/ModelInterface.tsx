@@ -24,14 +24,11 @@ export const ModelInterface = () => {
   const {
     models,
     loading,
+    loadingMore,
     error,
-    currentPage,
-    totalModels,
-    modelsPerPage,
-    setCurrentPage,
-    nextPage,
-    previousPage,
-    fetchModels,
+    hasMore,
+    loadMoreModels,
+    refreshModels,
   } = useHuggingFaceModels();
 
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -51,7 +48,6 @@ export const ModelInterface = () => {
     return downloadingModels.has(getDownloadKey(modelId, filename));
   };
 
-  // Listen for download progress events
   useEffect(() => {
     let unlistenProgress: (() => void) | undefined;
     let unlistenComplete: (() => void) | undefined;
@@ -171,7 +167,7 @@ export const ModelInterface = () => {
       <div className="flex items-center justify-between p-6 pb-0">
         <h2 className="text-2xl font-bold text-white">Browse Models</h2>
         <button
-          onClick={() => fetchModels(currentPage)}
+          onClick={refreshModels}
           disabled={loading}
           className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
         >
@@ -194,15 +190,12 @@ export const ModelInterface = () => {
         <BrowseModels
           models={models}
           loading={loading}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
           downloadingModels={downloadingModels}
-          currentPage={currentPage}
-          totalModels={totalModels}
-          modelsPerPage={modelsPerPage}
-          onGoToPage={setCurrentPage}
-          onNextPage={nextPage}
-          onPreviousPage={previousPage}
           onModelClick={handleModelClick}
-          onRefresh={() => fetchModels(currentPage)}
+          onLoadMore={loadMoreModels}
+          onRefresh={refreshModels}
           error={error}
         />
       </div>
