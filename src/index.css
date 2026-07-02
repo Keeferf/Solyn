@@ -1,8 +1,6 @@
-/* src/index.css */
 @import "tailwindcss";
 
-/* CSS Custom Properties for colors */
-:root {
+@theme {
   --color-white: #d8d4cf;
   --color-black: #121212;
   --color-purple-accent: #7d7abc;

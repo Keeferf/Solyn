@@ -169,11 +169,11 @@ export const ModelInterface = () => {
   return (
     <div className="w-full h-full">
       <div className="flex items-center justify-between p-6 pb-0">
-        <h2 className="text-2xl font-bold text-[#d8d4cf]">Browse Models</h2>
+        <h2 className="text-2xl font-bold text-white">Browse Models</h2>
         <button
           onClick={() => fetchModels(currentPage)}
           disabled={loading}
-          className="px-4 py-2 bg-[#121212] hover:bg-[#d8d4cf]/10 rounded-lg text-[#d8d4cf] transition-all disabled:opacity-50 cursor-pointer"
+          className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
         >
           Refresh
         </button>

@@ -9,7 +9,7 @@ import {
 
 interface DownloadStatusDisplayProps {
   modelId: string;
-  filename: string; // Added filename
+  filename: string;
   progress: number;
   message: string;
   status: string;
@@ -29,7 +29,9 @@ export const DownloadStatusDisplay = ({
       case "error":
         return <FiXCircle className="text-red-400" size={20} />;
       case "downloading":
-        return <FiLoader className="animate-spin text-purple-500" size={20} />;
+        return (
+          <FiLoader className="animate-spin text-purple-accent" size={20} />
+        );
       default:
         return <FiDownload className="text-white/40" size={20} />;
     }
@@ -42,7 +44,7 @@ export const DownloadStatusDisplay = ({
       case "error":
         return "border-red-500/30 bg-red-500/10";
       case "downloading":
-        return "border-purple-500/30 bg-purple-500/10";
+        return "border-purple-accent/30 bg-purple-accent/10";
       default:
         return "border-white/10 bg-white/5";
     }
@@ -90,7 +92,7 @@ export const DownloadStatusDisplay = ({
               ? "bg-red-500"
               : status === "complete"
                 ? "bg-green-500"
-                : "bg-purple-500"
+                : "bg-purple-accent"
           }`}
           style={{ width: `${Math.min(100, progress)}%` }}
         />

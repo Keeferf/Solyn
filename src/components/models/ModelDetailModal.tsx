@@ -1,7 +1,7 @@
 // src/components/models/ModelDetailModal.tsx
 import { useState, useEffect } from "react";
 import { FiFolder, FiX } from "react-icons/fi";
-import { HFModelDetails, GGUFFile } from "./hooks/useHuggingFaceModels";
+import { GGUFFile } from "./hooks/useHuggingFaceModels";
 import { useModelDetails } from "./hooks/useModelDetails";
 import {
   getValidFiles,
@@ -11,7 +11,6 @@ import {
 import {
   LoadingState,
   ErrorState,
-  ModalHeader,
   ModelInfo,
   QuantizationCard,
   SelectedFileDetails,
@@ -72,13 +71,13 @@ export const ModelDetailModal = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[#1a1a1a] border border-[#d8d4cf]/10 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-slideUp">
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-slideUp">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-[#d8d4cf]/10">
+        <div className="flex items-start justify-between p-6 border-b border-white/10">
           <ModelInfo details={details} />
           <button
             onClick={onClose}
-            className="p-2 hover:bg-[#d8d4cf]/10 rounded-lg transition-all text-[#d8d4cf]/60 hover:text-[#d8d4cf] cursor-pointer"
+            className="p-2 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-white cursor-pointer"
           >
             <FiX size={20} />
           </button>
@@ -88,8 +87,8 @@ export const ModelDetailModal = ({
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
           {/* Description */}
           {details.description && (
-            <div className="mb-6 p-4 bg-[#121212] rounded-lg border border-[#d8d4cf]/5">
-              <p className="text-[#d8d4cf]/70 text-sm leading-relaxed">
+            <div className="mb-6 p-4 bg-black rounded-lg border border-white/5">
+              <p className="text-white/70 text-sm leading-relaxed">
                 {details.description}
               </p>
             </div>
@@ -97,7 +96,7 @@ export const ModelDetailModal = ({
 
           {/* Quantizations */}
           <div className="mb-6">
-            <h4 className="text-sm font-semibold text-[#d8d4cf]/60 mb-3 flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-white/60 mb-3 flex items-center gap-2">
               <FiFolder size={16} />
               Available Quantizations ({validFiles.length} files)
             </h4>
@@ -120,7 +119,7 @@ export const ModelDetailModal = ({
             </div>
 
             {validFiles.length === 0 && (
-              <div className="text-center py-8 text-[#d8d4cf]/40">
+              <div className="text-center py-8 text-white/40">
                 <p>No recognized quantization formats found</p>
                 <p className="text-xs mt-1">
                   This model may have no GGUF files or uses an unsupported
@@ -142,14 +141,14 @@ export const ModelDetailModal = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#d8d4cf]/10 flex justify-between items-center">
-          <span className="text-xs text-[#d8d4cf]/30">
+        <div className="p-4 border-t border-white/10 flex justify-between items-center">
+          <span className="text-xs text-white/30">
             {validFiles.length} GGUF file
             {validFiles.length > 1 ? "s" : ""} available
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-[#121212] hover:bg-[#d8d4cf]/10 rounded-lg text-[#d8d4cf]/60 hover:text-[#d8d4cf] transition-all text-sm cursor-pointer"
+            className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all text-sm cursor-pointer"
           >
             Close
           </button>

@@ -1,4 +1,3 @@
-// src/components/models/ModalDetails/ModalHeader.tsx
 import { FiX } from "react-icons/fi";
 
 export const ModalHeader = ({
@@ -8,11 +7,11 @@ export const ModalHeader = ({
   title: string;
   onClose: () => void;
 }) => (
-  <div className="flex items-center justify-between p-6 border-b border-[#d8d4cf]/10">
-    <h3 className="text-xl font-bold text-[#d8d4cf]">{title}</h3>
+  <div className="flex items-center justify-between p-6 border-b border-white/10">
+    <h3 className="text-xl font-bold text-white">{title}</h3>
     <button
       onClick={onClose}
-      className="p-2 hover:bg-[#d8d4cf]/10 rounded-lg transition-all text-[#d8d4cf]/60 hover:text-[#d8d4cf] cursor-pointer"
+      className="p-2 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-white cursor-pointer"
     >
       <FiX size={20} />
     </button>

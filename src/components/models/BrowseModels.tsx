@@ -1,9 +1,5 @@
-// src/components/models/BrowseModels.tsx
-import { useState } from "react";
 import {
-  FiDownload,
   FiLoader,
-  FiFile,
   FiChevronLeft,
   FiChevronRight,
   FiServer,
@@ -11,9 +7,7 @@ import {
   FiRefreshCw,
   FiHeart,
   FiDownloadCloud,
-  FiFolder,
   FiChevronDown,
-  FiCpu,
 } from "react-icons/fi";
 import { HFModelSummary } from "./hooks/useHuggingFaceModels";
 
@@ -83,19 +77,16 @@ export const BrowseModels = ({
     return (
       <div className="w-full space-y-6">
         {/* Info banner - stays visible during loading */}
-        <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+        <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
           <div className="flex items-center gap-3">
-            <FiServer className="text-[var(--color-purple-accent)]" size={16} />
+            <FiServer className="text-purple-accent" size={16} />
             <span>Loading models from Hugging Face...</span>
           </div>
         </div>
 
         {/* Loading spinner */}
         <div className="flex items-center justify-center py-16">
-          <FiLoader
-            className="animate-spin text-[var(--color-purple-accent)]"
-            size={40}
-          />
+          <FiLoader className="animate-spin text-purple-accent" size={40} />
         </div>
       </div>
     );
@@ -106,23 +97,21 @@ export const BrowseModels = ({
     return (
       <div className="w-full space-y-6">
         {/* Info banner */}
-        <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+        <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
           <div className="flex items-center gap-3">
-            <FiServer className="text-[var(--color-purple-accent)]" size={16} />
+            <FiServer className="text-purple-accent" size={16} />
             <span>Error loading models</span>
           </div>
         </div>
 
         {/* Error message */}
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-[var(--color-white)] text-lg mb-2">
-            Failed to load models
-          </p>
-          <p className="text-[var(--color-white)]/40 text-sm mb-4">{error}</p>
+          <p className="text-white text-lg mb-2">Failed to load models</p>
+          <p className="text-white/40 text-sm mb-4">{error}</p>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="px-4 py-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 rounded-lg text-[var(--color-white)] transition-all flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 cursor-pointer"
             >
               <FiRefreshCw size={16} />
               Retry
@@ -136,9 +125,9 @@ export const BrowseModels = ({
   return (
     <div className="w-full space-y-6">
       {/* Info banner */}
-      <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+      <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
         <div className="flex items-center gap-3">
-          <FiServer className="text-[var(--color-purple-accent)]" size={16} />
+          <FiServer className="text-purple-accent" size={16} />
           <span>GGUF models from Hugging Face</span>
         </div>
         {totalModels > 0 && (
@@ -151,16 +140,14 @@ export const BrowseModels = ({
       {/* Model grid */}
       {models.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-[var(--color-white)]/40 text-lg">
-            No models available
-          </p>
-          <p className="text-[var(--color-white)]/30 text-sm mt-2">
+          <p className="text-white/40 text-lg">No models available</p>
+          <p className="text-white/30 text-sm mt-2">
             Try refreshing or check your connection
           </p>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="mt-4 px-4 py-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 rounded-lg text-[var(--color-white)] transition-all flex items-center gap-2 mx-auto cursor-pointer"
+              className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
             >
               <FiRefreshCw size={16} />
               Refresh
@@ -173,25 +160,22 @@ export const BrowseModels = ({
             <div
               key={model.id}
               onClick={() => onModelClick(model)}
-              className={`bg-[var(--color-black)] border border-[var(--color-white)]/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-[var(--color-white)]/5 hover:border-[var(--color-white)]/20 cursor-pointer hover:scale-[1.02]`}
+              className="bg-black border border-white/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-white/5 hover:border-white/20 cursor-pointer hover:scale-[1.02]"
             >
               {/* Model header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-[var(--color-white)] font-semibold truncate text-base">
+                  <h4 className="text-white font-semibold truncate text-base">
                     {model.name || model.model_id}
                   </h4>
                   <div className="flex items-center gap-2 mt-1">
-                    <FiUser
-                      className="text-[var(--color-white)]/30"
-                      size={12}
-                    />
-                    <span className="text-[var(--color-white)]/40 text-xs">
+                    <FiUser className="text-white/30" size={12} />
+                    <span className="text-white/40 text-xs">
                       {model.author || "Unknown"}
                     </span>
                   </div>
                 </div>
-                <div className="text-[var(--color-white)]/30 text-xs bg-[var(--color-purple-accent)]/10 px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20">
+                <div className="text-white/30 text-xs bg-purple-accent/10 px-2 py-1 rounded-full border border-purple-accent/20">
                   <FiChevronDown size={14} />
                 </div>
               </div>
@@ -199,7 +183,7 @@ export const BrowseModels = ({
               {/* Model stats */}
               <div className="flex flex-wrap gap-2 mb-3">
                 {model.downloads !== undefined && model.downloads > 0 && (
-                  <span className="text-xs bg-[var(--color-purple-accent)]/15 text-[var(--color-purple-accent)] px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20 flex items-center gap-1">
+                  <span className="text-xs bg-purple-accent/15 text-purple-accent px-2 py-1 rounded-full border border-purple-accent/20 flex items-center gap-1">
                     <FiDownloadCloud size={12} />
                     {formatDownloads(model.downloads)}
                   </span>
@@ -213,8 +197,8 @@ export const BrowseModels = ({
               </div>
 
               {/* Footer */}
-              <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-[var(--color-white)]/5">
-                <span className="text-xs text-[var(--color-white)]/30">
+              <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-white/5">
+                <span className="text-xs text-white/30">
                   Click to view available quantizations
                 </span>
               </div>
@@ -229,7 +213,7 @@ export const BrowseModels = ({
           <button
             onClick={onPreviousPage}
             disabled={currentPage === 1 || loading}
-            className="p-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 disabled:opacity-30 rounded-lg text-[var(--color-white)]/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+            className="p-2 bg-black hover:bg-white/10 disabled:opacity-30 rounded-lg text-white/60 transition-all cursor-pointer disabled:cursor-not-allowed"
           >
             <FiChevronLeft size={18} />
           </button>
@@ -254,8 +238,8 @@ export const BrowseModels = ({
                   disabled={loading}
                   className={`px-3 py-1.5 rounded-lg text-sm transition-all cursor-pointer ${
                     currentPage === pageNum
-                      ? "bg-[var(--color-purple-accent)] text-[var(--color-white)]"
-                      : "bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 text-[var(--color-white)]/60"
+                      ? "bg-purple-accent text-white"
+                      : "bg-black hover:bg-white/10 text-white/60"
                   }`}
                 >
                   {pageNum}
@@ -267,7 +251,7 @@ export const BrowseModels = ({
           <button
             onClick={onNextPage}
             disabled={currentPage === totalPages || loading}
-            className="p-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 disabled:opacity-30 rounded-lg text-[var(--color-white)]/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+            className="p-2 bg-black hover:bg-white/10 disabled:opacity-30 rounded-lg text-white/60 transition-all cursor-pointer disabled:cursor-not-allowed"
           >
             <FiChevronRight size={18} />
           </button>
