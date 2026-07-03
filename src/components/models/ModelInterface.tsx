@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { BrowseModels } from "./BrowseModels";
+import { ModelToolbar } from "./ModelToolbar";
 import { DownloadStatusDisplay } from "./DownloadStatusDisplay";
 import { ModelDetailModal } from "./ModelDetailModal";
 import {
@@ -30,9 +31,13 @@ export const ModelInterface = () => {
     totalModels,
     maxModels,
     currentFilter,
+    searchQuery,
+    isSearching,
     changeFilter,
     loadMoreModels,
     refreshModels,
+    searchModels,
+    clearSearch,
   } = useHuggingFaceModels();
 
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -43,7 +48,6 @@ export const ModelInterface = () => {
   const [downloadProgress, setDownloadProgress] = useState<
     Map<DownloadKey, DownloadProgress>
   >(new Map());
-  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
@@ -122,7 +126,9 @@ export const ModelInterface = () => {
             });
           },
         );
-      } catch (err) {}
+      } catch (err) {
+        console.error("Failed to setup download listeners:", err);
+      }
     };
 
     setupListeners();
@@ -164,13 +170,16 @@ export const ModelInterface = () => {
     setSelectedModelId(null);
   };
 
-  const handleFilterChange = async (filter: string) => {
-    await changeFilter(filter as any);
+  const handleFilterChange = (filter: string) => {
+    changeFilter(filter as any);
   };
 
   const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
-    console.log("Search query:", query);
+    searchModels(query);
+  };
+
+  const handleClearSearch = () => {
+    clearSearch();
   };
 
   return (
@@ -186,7 +195,7 @@ export const ModelInterface = () => {
         </div>
         <button
           onClick={refreshModels}
-          disabled={loading || isSwitchingFilter}
+          disabled={loading || isSwitchingFilter || isSearching}
           className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
         >
           Refresh
@@ -194,6 +203,7 @@ export const ModelInterface = () => {
       </div>
 
       <div className="p-6 pt-4 space-y-6">
+        {/* Download Status */}
         {Array.from(downloadProgress.entries()).map(([key, progress]) => (
           <DownloadStatusDisplay
             key={key}
@@ -205,23 +215,34 @@ export const ModelInterface = () => {
           />
         ))}
 
+        {/* Toolbar - Search and Filters */}
+        <ModelToolbar
+          searchQuery={searchQuery}
+          onSearchChange={handleSearchChange}
+          onClearSearch={handleClearSearch}
+          currentFilter={currentFilter}
+          onFilterChange={handleFilterChange}
+          loading={loading || isSearching}
+          disabled={isSwitchingFilter}
+        />
+
+        {/* Models Grid */}
         <BrowseModels
           models={models}
           loading={loading}
           loadingMore={loadingMore}
           isSwitchingFilter={isSwitchingFilter}
+          isSearching={isSearching}
           hasMore={hasMore}
           totalModels={totalModels}
           maxModels={maxModels}
-          currentFilter={currentFilter}
           downloadingModels={downloadingModels}
           onModelClick={handleModelClick}
           onLoadMore={loadMoreModels}
           onRefresh={refreshModels}
-          onFilterChange={handleFilterChange}
           error={error}
           searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
+          onClearSearch={handleClearSearch}
         />
       </div>
 

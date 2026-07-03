@@ -5,12 +5,15 @@ use std::time::Duration;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo, ModelFilter};
+use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo, ModelFilter, SearchModelsRequest, SearchModelsResponse};
 
 static MODEL_DETAILS_CACHE: Lazy<Mutex<HashMap<String, HFModelDetails>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 static GGUF_MODELS_CACHE: Lazy<Mutex<HashMap<ModelFilter, Vec<HFModelSummary>>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+static SEARCH_CACHE: Lazy<Mutex<HashMap<String, Vec<HFModelSummary>>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 const MAX_MODELS: usize = 100;
@@ -319,6 +322,146 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
     Ok(all_models)
 }
 
+// NEW: Search function with filtering
+async fn search_gguf_models(
+    query: &str,
+    filter: ModelFilter,
+) -> Result<Vec<HFModelSummary>, String> {
+    // Check cache first
+    let cache_key = format!("{}:{}", query, filter.as_str());
+    {
+        let cache = SEARCH_CACHE.lock().unwrap();
+        if let Some(models) = cache.get(&cache_key) {
+            return Ok(models.clone());
+        }
+    }
+    
+    let client = reqwest::Client::new();
+    let mut all_models = Vec::new();
+    let mut page = 1;
+    let mut consecutive_empty_pages = 0;
+    
+    let sort_param = match filter {
+        ModelFilter::MostDownloads => "downloads",
+        ModelFilter::MostLiked => "likes",
+        ModelFilter::Recent => "lastModified",
+    };
+    
+    // URL encode the query
+    let encoded_query = urlencoding::encode(query);
+    
+    loop {
+        if all_models.len() >= MAX_MODELS {
+            break;
+        }
+        
+        // Search with the query and GGUF filter
+        let url = format!(
+            "https://huggingface.co/api/models?search={}+gguf&sort={}&direction=-1&limit={}&page={}",
+            encoded_query, sort_param, BATCH_SIZE, page
+        );
+        
+        let response = client
+            .get(&url)
+            .header("User-Agent", "SolynApp/1.0")
+            .header("Cache-Control", "no-cache")
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to search Hugging Face models: {}", e))?;
+        
+        if !response.status().is_success() {
+            return Err(format!("Hugging Face API error: {}", response.status()));
+        }
+        
+        let data: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        
+        let items = if let Some(items_array) = data.as_array() {
+            items_array.clone()
+        } else if let Some(models_array) = data.get("models").and_then(|v| v.as_array()) {
+            models_array.clone()
+        } else {
+            break;
+        };
+        
+        if items.is_empty() {
+            consecutive_empty_pages += 1;
+            if consecutive_empty_pages > 2 {
+                break;
+            }
+            page += 1;
+            continue;
+        }
+        
+        consecutive_empty_pages = 0;
+        let remaining = MAX_MODELS - all_models.len();
+        
+        for item in items.iter().take(remaining) {
+            let id = item["id"].as_str().unwrap_or("").to_string();
+            if id.is_empty() {
+                continue;
+            }
+            
+            // Additional client-side filtering for GGUF
+            let siblings = item.get("siblings").and_then(|s| s.as_array());
+            let has_gguf = siblings
+                .map(|s| s.iter().any(|f| {
+                    f["rfilename"].as_str()
+                        .or_else(|| f["filename"].as_str())
+                        .map(|name| name.ends_with(".gguf"))
+                        .unwrap_or(false)
+                }))
+                .unwrap_or(false);
+            
+            if siblings.is_none() || has_gguf {
+                let parts: Vec<&str> = id.split('/').collect();
+                let author = parts.get(0).unwrap_or(&"").to_string();
+                let name = parts.get(1).unwrap_or(&"").to_string();
+                
+                let created_at = item["created_at"].as_str()
+                    .or_else(|| item["createdAt"].as_str())
+                    .map(|s| s.to_string());
+                
+                let last_modified = item["last_modified"].as_str()
+                    .or_else(|| item["lastModified"].as_str())
+                    .map(|s| s.to_string());
+                
+                all_models.push(HFModelSummary {
+                    id: id.clone(),
+                    model_id: id,
+                    author,
+                    name,
+                    downloads: item["downloads"].as_u64(),
+                    likes: item["likes"].as_u64(),
+                    created_at: created_at.clone(),
+                    last_modified: last_modified.or(created_at),
+                });
+            }
+        }
+        
+        page += 1;
+        
+        if items.len() < BATCH_SIZE {
+            break;
+        }
+        
+        if all_models.is_empty() && page > 5 {
+            break;
+        }
+    }
+    
+    // Cache the results
+    {
+        let mut cache = SEARCH_CACHE.lock().unwrap();
+        cache.insert(cache_key, all_models.clone());
+    }
+    
+    Ok(all_models)
+}
+
 pub async fn fetch_hugging_face_models_page(
     page: usize,
     limit: usize,
@@ -337,8 +480,60 @@ pub async fn fetch_hugging_face_models_page(
     Ok(page_models)
 }
 
+// NEW: Search with pagination
+pub async fn search_hugging_face_models(
+    query: &str,
+    page: usize,
+    limit: usize,
+    filter: &ModelFilter,
+) -> Result<SearchModelsResponse, String> {
+    if query.trim().is_empty() {
+        // If query is empty, return regular filtered results
+        let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
+        let start = (page - 1) * limit;
+        let end = std::cmp::min(start + limit, all_models.len());
+        
+        let models = if start >= all_models.len() {
+            Vec::new()
+        } else {
+            all_models[start..end].to_vec()
+        };
+        
+        return Ok(SearchModelsResponse {
+            models,
+            total: all_models.len(),
+            has_more: end < all_models.len(),
+        });
+    }
+    
+    let all_models = search_gguf_models(query, filter.clone()).await?;
+    let start = (page - 1) * limit;
+    let end = std::cmp::min(start + limit, all_models.len());
+    
+    let models = if start >= all_models.len() {
+        Vec::new()
+    } else {
+        all_models[start..end].to_vec()
+    };
+    
+    Ok(SearchModelsResponse {
+        models,
+        total: all_models.len(),
+        has_more: end < all_models.len(),
+    })
+}
+
 pub async fn get_total_model_count_for_filter(filter: &ModelFilter) -> Result<usize, String> {
     let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
+    Ok(all_models.len())
+}
+
+// NEW: Get search result count
+pub async fn get_search_model_count(query: &str, filter: &ModelFilter) -> Result<usize, String> {
+    if query.trim().is_empty() {
+        return get_total_model_count_for_filter(filter).await;
+    }
+    let all_models = search_gguf_models(query, filter.clone()).await?;
     Ok(all_models.len())
 }
 
@@ -447,4 +642,8 @@ pub fn clear_model_cache(filter: Option<ModelFilter>) {
     } else {
         cache.clear();
     }
+    
+    // Also clear search cache
+    let mut search_cache = SEARCH_CACHE.lock().unwrap();
+    search_cache.clear();
 }
