@@ -17,6 +17,7 @@ interface BrowseModelsProps {
   models: HFModelSummary[];
   loading: boolean;
   loadingMore: boolean;
+  isSwitchingFilter: boolean;
   hasMore: boolean;
   totalModels: number;
   maxModels: number;
@@ -66,6 +67,7 @@ export const BrowseModels = ({
   models,
   loading,
   loadingMore,
+  isSwitchingFilter,
   hasMore,
   totalModels,
   maxModels,
@@ -83,11 +85,25 @@ export const BrowseModels = ({
   });
 
   useEffect(() => {
-    if (isIntersecting && hasMore && !loadingMore && !loading) {
+    if (
+      isIntersecting &&
+      hasMore &&
+      !loadingMore &&
+      !loading &&
+      !isSwitchingFilter
+    ) {
       onLoadMore();
     }
-  }, [isIntersecting, hasMore, loadingMore, loading, onLoadMore]);
+  }, [
+    isIntersecting,
+    hasMore,
+    loadingMore,
+    loading,
+    isSwitchingFilter,
+    onLoadMore,
+  ]);
 
+  // Show loading state for initial load
   if (loading && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -104,6 +120,7 @@ export const BrowseModels = ({
     );
   }
 
+  // Show error state
   if (error && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -142,7 +159,10 @@ export const BrowseModels = ({
             <button
               key={value}
               onClick={() => onFilterChange(value)}
+              disabled={isSwitchingFilter}
               className={`px-3 py-1 rounded-lg text-xs transition-all flex items-center gap-1 cursor-pointer ${
+                isSwitchingFilter ? "opacity-50 cursor-not-allowed" : ""
+              } ${
                 currentFilter === value
                   ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
                   : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
@@ -155,7 +175,14 @@ export const BrowseModels = ({
         </div>
       </div>
 
-      {models.length === 0 ? (
+      {/* Filter switching overlay */}
+      {isSwitchingFilter ? (
+        <div className="flex flex-col items-center justify-center py-16">
+          <FiLoader className="animate-spin text-purple-accent" size={40} />
+          <p className="text-white/60 mt-4 text-sm">Loading models...</p>
+          <p className="text-white/30 text-xs mt-1">This may take a moment</p>
+        </div>
+      ) : models.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-white/40 text-lg">No models available</p>
           <p className="text-white/30 text-sm mt-2">

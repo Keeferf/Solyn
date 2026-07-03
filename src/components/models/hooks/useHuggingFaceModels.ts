@@ -41,6 +41,7 @@ export const useHuggingFaceModels = (
   const [models, setModels] = useState<HFModelSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isSwitchingFilter, setIsSwitchingFilter] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [totalModels, setTotalModels] = useState(0);
@@ -65,6 +66,9 @@ export const useHuggingFaceModels = (
 
       if (!keepExistingModels) {
         setLoading(true);
+      } else {
+        // When switching filters, show the switching state
+        setIsSwitchingFilter(true);
       }
       setError(null);
 
@@ -111,6 +115,7 @@ export const useHuggingFaceModels = (
         setError(String(err));
       } finally {
         setLoading(false);
+        setIsSwitchingFilter(false);
         isChangingFilterRef.current = false;
       }
     },
@@ -118,7 +123,13 @@ export const useHuggingFaceModels = (
   );
 
   const loadMoreModels = useCallback(async () => {
-    if (loadingMore || !hasMore || loading || hasLoadedAllRef.current) {
+    if (
+      loadingMore ||
+      !hasMore ||
+      loading ||
+      hasLoadedAllRef.current ||
+      isSwitchingFilter
+    ) {
       return;
     }
 
@@ -177,20 +188,23 @@ export const useHuggingFaceModels = (
     maxModels,
     currentFilter,
     models.length,
+    isSwitchingFilter,
   ]);
 
   const changeFilter = useCallback(
     async (newFilter: ModelFilter) => {
       if (newFilter === currentFilter) return;
 
-      isChangingFilterRef.current = true;
-
-      initialLoadDone.current = false;
-      hasLoadedAllRef.current = false;
-      loadedIdsRef.current = new Set();
+      // Clear existing models immediately to show empty state
+      setModels([]);
       setHasMore(true);
       setTotalModels(0);
       currentPageRef.current = 0;
+      hasLoadedAllRef.current = false;
+      loadedIdsRef.current = new Set();
+
+      isChangingFilterRef.current = true;
+      initialLoadDone.current = false;
 
       await loadInitialModels(newFilter, true);
     },
@@ -216,6 +230,7 @@ export const useHuggingFaceModels = (
     models,
     loading,
     loadingMore,
+    isSwitchingFilter,
     error,
     hasMore,
     totalModels,

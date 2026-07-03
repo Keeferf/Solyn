@@ -25,6 +25,7 @@ export const ModelInterface = () => {
     models,
     loading,
     loadingMore,
+    isSwitchingFilter,
     error,
     hasMore,
     totalModels,
@@ -167,7 +168,6 @@ export const ModelInterface = () => {
   };
 
   const handleFilterChange = async (filter: string) => {
-    // Use the filter type directly from the hook
     await changeFilter(filter as any);
   };
 
@@ -177,7 +177,7 @@ export const ModelInterface = () => {
         <h2 className="text-2xl font-bold text-white">Browse Models</h2>
         <button
           onClick={refreshModels}
-          disabled={loading}
+          disabled={loading || isSwitchingFilter}
           className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
         >
           Refresh
@@ -200,6 +200,7 @@ export const ModelInterface = () => {
           models={models}
           loading={loading}
           loadingMore={loadingMore}
+          isSwitchingFilter={isSwitchingFilter}
           hasMore={hasMore}
           totalModels={totalModels}
           maxModels={maxModels}
