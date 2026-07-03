@@ -1,4 +1,3 @@
-// src/components/models/hooks/useHuggingFaceModels.ts
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -67,7 +66,6 @@ export const useHuggingFaceModels = (
       if (!keepExistingModels) {
         setLoading(true);
       } else {
-        // When switching filters, show the switching state
         setIsSwitchingFilter(true);
       }
       setError(null);
@@ -195,7 +193,6 @@ export const useHuggingFaceModels = (
     async (newFilter: ModelFilter) => {
       if (newFilter === currentFilter) return;
 
-      // Clear existing models immediately to show empty state
       setModels([]);
       setHasMore(true);
       setTotalModels(0);

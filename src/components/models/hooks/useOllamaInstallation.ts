@@ -1,4 +1,3 @@
-// src/components/models/hooks/useOllamaInstallation.ts
 import { useState, useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -37,20 +36,16 @@ export const useOllamaInstallation = (
   const [isTerminalExpanded, setIsTerminalExpanded] = useState(true);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch install info
   useEffect(() => {
     const fetchInstallInfo = async () => {
       try {
         const info = await invoke<InstallInfo>("get_install_info");
         setInstallInfo(info);
-      } catch {
-        // Silent fail
-      }
+      } catch {}
     };
     fetchInstallInfo();
   }, []);
 
-  // Setup event listeners
   useEffect(() => {
     const setupListeners = async () => {
       const unlistenProgress = await listen<DownloadProgress>(
@@ -77,7 +72,6 @@ export const useOllamaInstallation = (
     };
   }, [refreshOllamaStatus]);
 
-  // Handle download progress events
   const handleDownloadProgress = (event: { payload: DownloadProgress }) => {
     const payload = event.payload;
     setDownloadProgress(payload);
@@ -92,7 +86,6 @@ export const useOllamaInstallation = (
     }
   };
 
-  // Handle installation completion
   const handleInstallationComplete = (
     refreshOllamaStatus: () => Promise<void>,
   ) => {
@@ -110,11 +103,9 @@ export const useOllamaInstallation = (
     setTimeout(tryRefresh, 2000);
   };
 
-  // Handle terminal output
   const handleTerminalOutput = (event: { payload: TerminalOutput }) => {
     const line = event.payload.line;
 
-    // Filter out completion messages
     if (shouldFilterLine(line)) {
       return;
     }
@@ -123,7 +114,6 @@ export const useOllamaInstallation = (
 
     setTerminalLines((prev) => {
       if (isProgressLine) {
-        // Replace the last progress line if it exists
         const lastIndex = prev.length - 1;
         if (lastIndex >= 0) {
           const lastLine = prev[lastIndex].line;
@@ -137,7 +127,6 @@ export const useOllamaInstallation = (
     });
   };
 
-  // Filter helpers
   const shouldFilterLine = (line: string): boolean => {
     const filteredMessages = [
       "Install complete. Run 'ollama' from the command line.",
@@ -158,7 +147,6 @@ export const useOllamaInstallation = (
     );
   };
 
-  // Download handler
   const handleDownloadOllama = async () => {
     setIsDownloading(true);
     setTerminalLines([]);
@@ -182,7 +170,6 @@ export const useOllamaInstallation = (
     }
   };
 
-  // Reset state
   const resetState = () => {
     setDownloadProgress({
       status: "Idle",
@@ -193,7 +180,6 @@ export const useOllamaInstallation = (
     setIsTerminalExpanded(true);
   };
 
-  // Auto-scroll terminal
   useEffect(() => {
     if (terminalEndRef.current) {
       terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -206,7 +192,7 @@ export const useOllamaInstallation = (
     isDownloading,
     terminalLines,
     isTerminalExpanded,
-    terminalEndRef: terminalEndRef as React.RefObject<HTMLDivElement>, // Type assertion to fix the ref type
+    terminalEndRef: terminalEndRef as React.RefObject<HTMLDivElement>,
     handleDownloadOllama,
     resetState,
     setIsTerminalExpanded,
@@ -214,7 +200,6 @@ export const useOllamaInstallation = (
   };
 };
 
-// Helper function (pure)
 const getPlatformDisplay = (installInfo: InstallInfo | null): string => {
   if (!installInfo) return "Your Platform";
   const platformMap: Record<string, string> = {

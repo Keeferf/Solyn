@@ -1,4 +1,3 @@
-// src/components/models/hooks/useIntersectionObserver.ts
 import { useEffect, useRef, useState } from "react";
 
 export const useIntersectionObserver = (
