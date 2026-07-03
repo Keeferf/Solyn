@@ -27,6 +27,10 @@ export const ModelInterface = () => {
     loadingMore,
     error,
     hasMore,
+    totalModels,
+    maxModels,
+    currentFilter,
+    changeFilter,
     loadMoreModels,
     refreshModels,
   } = useHuggingFaceModels();
@@ -162,6 +166,11 @@ export const ModelInterface = () => {
     setSelectedModelId(null);
   };
 
+  const handleFilterChange = async (filter: string) => {
+    // Use the filter type directly from the hook
+    await changeFilter(filter as any);
+  };
+
   return (
     <div className="w-full h-full">
       <div className="flex items-center justify-between p-6 pb-0">
@@ -192,10 +201,14 @@ export const ModelInterface = () => {
           loading={loading}
           loadingMore={loadingMore}
           hasMore={hasMore}
+          totalModels={totalModels}
+          maxModels={maxModels}
+          currentFilter={currentFilter}
           downloadingModels={downloadingModels}
           onModelClick={handleModelClick}
           onLoadMore={loadMoreModels}
           onRefresh={refreshModels}
+          onFilterChange={handleFilterChange}
           error={error}
         />
       </div>

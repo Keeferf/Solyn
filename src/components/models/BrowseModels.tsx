@@ -7,6 +7,9 @@ import {
   FiRefreshCw,
   FiHeart,
   FiDownloadCloud,
+  FiTrendingUp,
+  FiClock,
+  FiThumbsUp,
 } from "react-icons/fi";
 import { HFModelSummary } from "./hooks/useHuggingFaceModels";
 import { useIntersectionObserver } from "./hooks/useIntersectionObserver";
@@ -18,10 +21,12 @@ interface BrowseModelsProps {
   hasMore: boolean;
   totalModels: number;
   maxModels: number;
+  currentFilter: string;
   downloadingModels: Set<string>;
   onModelClick: (model: HFModelSummary) => void;
   onLoadMore: () => void;
   onRefresh?: () => void;
+  onFilterChange: (filter: string) => void;
   error?: string | null;
 }
 
@@ -52,6 +57,13 @@ const formatLikes = (likes?: number): string => {
   return likes.toString();
 };
 
+const filterOptions = [
+  { value: "most_downloads", label: "Most Downloads", icon: FiDownloadCloud },
+  { value: "most_liked", label: "Most Liked", icon: FiThumbsUp },
+  { value: "trending", label: "Trending", icon: FiTrendingUp },
+  { value: "recent", label: "Recent", icon: FiClock },
+];
+
 export const BrowseModels = ({
   models,
   loading,
@@ -59,10 +71,12 @@ export const BrowseModels = ({
   hasMore,
   totalModels,
   maxModels,
+  currentFilter,
   downloadingModels,
   onModelClick,
   onLoadMore,
   onRefresh,
+  onFilterChange,
   error,
 }: BrowseModelsProps) => {
   const { targetRef, isIntersecting } = useIntersectionObserver({
@@ -75,9 +89,16 @@ export const BrowseModels = ({
       `🔍 [UI] Intersection: isIntersecting=${isIntersecting}, hasMore=${hasMore}, loadingMore=${loadingMore}`,
     );
     console.log(
-      `🔍 [UI] Models: ${models.length}/${totalModels}, hasMore: ${hasMore}`,
+      `🔍 [UI] Models: ${models.length}/${totalModels}, hasMore: ${hasMore}, filter: ${currentFilter}`,
     );
-  }, [isIntersecting, hasMore, loadingMore, models.length, totalModels]);
+  }, [
+    isIntersecting,
+    hasMore,
+    loadingMore,
+    models.length,
+    totalModels,
+    currentFilter,
+  ]);
 
   useEffect(() => {
     if (isIntersecting && hasMore && !loadingMore && !loading) {
@@ -130,23 +151,40 @@ export const BrowseModels = ({
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
+      {/* Filter Bar */}
+      <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <FiServer className="text-purple-accent" size={16} />
           <span>GGUF models from Hugging Face</span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="font-mono">
-            {models.length}/{totalModels > 0 ? totalModels : maxModels}
-          </span>
-          {hasMore && (
-            <span className="text-purple-accent text-xs">
-              · Scroll for more
+        <div className="flex items-center gap-2 flex-wrap">
+          {filterOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => onFilterChange(value)}
+              className={`px-3 py-1 rounded-lg text-xs transition-all flex items-center gap-1 cursor-pointer ${
+                currentFilter === value
+                  ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
+                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          ))}
+          <div className="flex items-center gap-3 ml-2 pl-2 border-l border-white/10">
+            <span className="font-mono text-white/60">
+              {models.length}/{totalModels > 0 ? totalModels : maxModels}
             </span>
-          )}
-          {!hasMore && models.length > 0 && (
-            <span className="text-green-500 text-xs">· All loaded</span>
-          )}
+            {hasMore && (
+              <span className="text-purple-accent text-xs">
+                · Scroll for more
+              </span>
+            )}
+            {!hasMore && models.length > 0 && (
+              <span className="text-green-500 text-xs">· All loaded</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -200,13 +238,13 @@ export const BrowseModels = ({
 
                   <div className="flex flex-wrap gap-2 mb-3">
                     {model.downloads !== undefined && model.downloads > 0 && (
-                      <span className="text-xs bg-purple-accent/15 text-purple-accent px-2 py-1 rounded-full border border-purple-accent/20 flex items-center gap-1">
+                      <span className="text-xs bg-green-500/15 text-green-400 px-2 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
                         <FiDownloadCloud size={12} />
                         {formatDownloads(model.downloads)}
                       </span>
                     )}
                     {model.likes !== undefined && model.likes > 0 && (
-                      <span className="text-xs bg-rose-500/15 text-rose-400 px-2 py-1 rounded-full border border-rose-500/20 flex items-center gap-1">
+                      <span className="text-xs bg-red-500/15 text-red-400 px-2 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
                         <FiHeart size={12} />
                         {formatLikes(model.likes)}
                       </span>
