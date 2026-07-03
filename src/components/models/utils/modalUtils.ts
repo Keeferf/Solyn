@@ -1,4 +1,3 @@
-// src/components/models/utils/modalUtils.ts
 import { GGUFFile } from "../hooks/useHuggingFaceModels";
 
 export const formatFileSize = (bytes: number): string => {
