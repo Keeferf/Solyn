@@ -199,7 +199,7 @@ export const BrowseModels = ({
               value={localSearch}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search models by name, author, or description..."
-              className="w-full bg-black/50 border border-white/10 rounded-lg px-10 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-purple-accent/50 focus:ring-1 focus:ring-purple-accent/50 transition-all"
+              className="w-full bg-black/50 border border-white/10 rounded-lg px-10 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-purple-accent focus:ring-2 focus:ring-purple-accent transition-all"
               disabled={loading || isSwitchingFilter}
             />
             {localSearch && (
@@ -212,19 +212,6 @@ export const BrowseModels = ({
               </button>
             )}
           </div>
-          {localSearch && !loading && !isSwitchingFilter && (
-            <div className="mt-2 text-xs text-white/40 flex items-center gap-2">
-              <span>
-                Found {models.length} result{models.length !== 1 ? "s" : ""}
-              </span>
-              <button
-                onClick={handleClearSearch}
-                className="text-purple-accent/70 hover:text-purple-accent transition-colors cursor-pointer"
-              >
-                Clear search
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Filter Buttons */}
@@ -238,7 +225,7 @@ export const BrowseModels = ({
                 isSwitchingFilter ? "opacity-50 cursor-not-allowed" : ""
               } ${
                 currentFilter === value
-                  ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
+                  ? "bg-purple-accent text-white border border-purple-accent"
                   : "bg-black/50 text-white/60 hover:bg-white/10 hover:text-white border border-white/10"
               }`}
             >
