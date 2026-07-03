@@ -1,4 +1,3 @@
-// src/components/models/BrowseModels.tsx
 import { useEffect } from "react";
 import {
   FiLoader,
@@ -209,7 +208,7 @@ export const BrowseModels = ({
                 <div
                   key={`${model.id}-${index}`}
                   onClick={() => onModelClick(model)}
-                  className={`bg-black border border-white/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-white/5 hover:border-white/20 cursor-pointer hover:scale-[1.02] ${
+                  className={`group bg-black border border-white/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-white/5 hover:border-white/20 cursor-pointer hover:scale-[1.02] ${
                     isDownloading ? "opacity-50 pointer-events-none" : ""
                   }`}
                 >
@@ -247,9 +246,9 @@ export const BrowseModels = ({
                     )}
                   </div>
 
-                  {/* Clean footer with just "View all" and animation */}
+                  {/* Footer with chevron that animates on card hover */}
                   <div className="flex items-center justify-end mt-auto pt-3 border-t border-white/5">
-                    <span className="text-xs text-white/30 flex items-center gap-1 hover:text-white/60 transition-colors group">
+                    <span className="text-xs text-white/30 flex items-center gap-1 group-hover:text-white/60 transition-colors">
                       View all quantizations
                       <FiChevronRight
                         size={14}
