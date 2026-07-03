@@ -1,4 +1,3 @@
-// src/components/models/DownloadStatusDisplay.tsx
 import {
   FiLoader,
   FiCheckCircle,
@@ -50,7 +49,6 @@ export const DownloadStatusDisplay = ({
     }
   };
 
-  // Helper to extract quantization from filename
   const getQuantizationLabel = (filename: string): string => {
     const match = filename.match(
       /Q[0-9]_[0-9K]|Q[0-9]_[0-9]|F[0-9]{2}|[IQ][0-9]_[0-9]/,
@@ -84,7 +82,6 @@ export const DownloadStatusDisplay = ({
         <span className="text-white/40 text-sm font-mono">{progress}%</span>
       </div>
 
-      {/* Progress bar */}
       <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
         <div
           className={`h-full transition-all duration-500 ${

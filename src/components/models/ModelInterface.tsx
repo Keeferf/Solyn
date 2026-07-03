@@ -1,4 +1,3 @@
-// src/components/models/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -123,7 +122,7 @@ export const ModelInterface = () => {
           },
         );
       } catch (err) {
-        console.error("Failed to setup event listeners:", err);
+        // Silent error handling
       }
     };
 
@@ -153,7 +152,6 @@ export const ModelInterface = () => {
         filename,
       });
     } catch (error) {
-      console.error("Failed to start download:", error);
       setDownloadingModels((prev) => {
         const newSet = new Set(prev);
         newSet.delete(key);

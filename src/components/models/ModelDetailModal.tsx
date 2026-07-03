@@ -1,4 +1,3 @@
-// src/components/models/ModelDetailModal.tsx
 import { useState, useEffect } from "react";
 import { FiFolder, FiX } from "react-icons/fi";
 import { GGUFFile } from "./hooks/useHuggingFaceModels";
@@ -38,7 +37,6 @@ export const ModelDetailModal = ({
   const { details, isLoading, error } = useModelDetails(modelId, isOpen);
   const [selectedFile, setSelectedFile] = useState<GGUFFile | null>(null);
 
-  // Reset selection when details change
   useEffect(() => {
     if (details && details.gguf_files.length > 0) {
       const defaultFile = getDefaultSelectedFile(details.gguf_files);
@@ -48,17 +46,14 @@ export const ModelDetailModal = ({
     }
   }, [details]);
 
-  // Loading state
   if (isLoading) {
     return <LoadingState onClose={onClose} />;
   }
 
-  // Error state
   if (error) {
     return <ErrorState error={error} onClose={onClose} />;
   }
 
-  // No details yet
   if (!details || !modelId) return null;
 
   const validFiles = getValidFiles(details.gguf_files);
@@ -72,7 +67,6 @@ export const ModelDetailModal = ({
       }}
     >
       <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-slideUp">
-        {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-white/10">
           <ModelInfo details={details} />
           <button
@@ -83,9 +77,7 @@ export const ModelDetailModal = ({
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-          {/* Description */}
           {details.description && (
             <div className="mb-6 p-4 bg-black rounded-lg border border-white/5">
               <p className="text-white/70 text-sm leading-relaxed">
@@ -94,7 +86,6 @@ export const ModelDetailModal = ({
             </div>
           )}
 
-          {/* Quantizations */}
           <div className="mb-6">
             <h4 className="text-sm font-semibold text-white/60 mb-3 flex items-center gap-2">
               <FiFolder size={16} />
@@ -129,7 +120,6 @@ export const ModelDetailModal = ({
             )}
           </div>
 
-          {/* Selected file details */}
           {selectedFile && (
             <SelectedFileDetails
               file={selectedFile}
@@ -140,7 +130,6 @@ export const ModelDetailModal = ({
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-4 border-t border-white/10 flex justify-between items-center">
           <span className="text-xs text-white/30">
             {validFiles.length} GGUF file

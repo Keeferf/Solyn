@@ -103,7 +103,6 @@ export const BrowseModels = ({
     onLoadMore,
   ]);
 
-  // Show loading state for initial load
   if (loading && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -120,7 +119,6 @@ export const BrowseModels = ({
     );
   }
 
-  // Show error state
   if (error && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -175,7 +173,6 @@ export const BrowseModels = ({
         </div>
       </div>
 
-      {/* Filter switching overlay */}
       {isSwitchingFilter ? (
         <div className="flex flex-col items-center justify-center py-16">
           <FiLoader className="animate-spin text-purple-accent" size={40} />
@@ -246,7 +243,6 @@ export const BrowseModels = ({
                     )}
                   </div>
 
-                  {/* Footer with chevron that animates on card hover */}
                   <div className="flex items-center justify-end mt-auto pt-3 border-t border-white/5">
                     <span className="text-xs text-white/30 flex items-center gap-1 group-hover:text-white/60 transition-colors">
                       View all quantizations

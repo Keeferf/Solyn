@@ -1,4 +1,3 @@
-// src/components/models/DownloadDetails.tsx
 import { FiDownload, FiExternalLink } from "react-icons/fi";
 
 interface InstallInfo {
@@ -10,7 +9,7 @@ interface InstallInfo {
 interface DownloadDetailsProps {
   installInfo: InstallInfo;
   platformDisplay: string;
-  isOllamaInstalled: boolean | null; // Allow null
+  isOllamaInstalled: boolean | null;
   onDownload: () => void;
   isDownloading: boolean;
 }
