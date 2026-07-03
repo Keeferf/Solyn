@@ -1,5 +1,3 @@
-// BrowseModels.tsx - Updated with search bar UI
-
 import { useEffect, useState } from "react";
 import {
   FiLoader,
@@ -32,7 +30,6 @@ interface BrowseModelsProps {
   onRefresh?: () => void;
   onFilterChange: (filter: string) => void;
   error?: string | null;
-  // New search props
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
 }
@@ -95,7 +92,6 @@ export const BrowseModels = ({
 
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
-  // Sync local search with prop
   useEffect(() => {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
@@ -177,36 +173,10 @@ export const BrowseModels = ({
 
   return (
     <div className="w-full space-y-6">
-      {/* Header with filter and search */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5 flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <FiServer className="text-purple-accent" size={16} />
-            <span>GGUF models from Hugging Face</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {filterOptions.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                onClick={() => onFilterChange(value)}
-                disabled={isSwitchingFilter}
-                className={`px-3 py-1 rounded-lg text-xs transition-all flex items-center gap-1 cursor-pointer ${
-                  isSwitchingFilter ? "opacity-50 cursor-not-allowed" : ""
-                } ${
-                  currentFilter === value
-                    ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
-                    : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Icon size={12} />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
+      {/* Search Bar and Filters - Inline */}
+      <div className="flex flex-col sm:flex-row gap-3">
         {/* Search Bar */}
-        <div className="relative">
+        <div className="relative flex-1">
           <div className="relative">
             <FiSearch
               className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
@@ -243,6 +213,27 @@ export const BrowseModels = ({
               </button>
             </div>
           )}
+        </div>
+
+        {/* Filter Buttons */}
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {filterOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => onFilterChange(value)}
+              disabled={isSwitchingFilter}
+              className={`px-3 py-2.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                isSwitchingFilter ? "opacity-50 cursor-not-allowed" : ""
+              } ${
+                currentFilter === value
+                  ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
+                  : "bg-black/50 text-white/60 hover:bg-white/10 hover:text-white border border-white/10"
+              }`}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 

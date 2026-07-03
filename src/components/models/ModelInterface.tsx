@@ -1,5 +1,3 @@
-// ModelInterface.tsx - Updated with search state
-
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -124,9 +122,7 @@ export const ModelInterface = () => {
             });
           },
         );
-      } catch (err) {
-        // Silent error handling
-      }
+      } catch (err) {}
     };
 
     setupListeners();
@@ -174,15 +170,20 @@ export const ModelInterface = () => {
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
-    // TODO: Implement search logic in useHuggingFaceModels hook
-    // For now, this is just UI
     console.log("Search query:", query);
   };
 
   return (
     <div className="w-full h-full">
       <div className="flex items-center justify-between p-6 pb-0">
-        <h2 className="text-2xl font-bold text-white">Browse Models</h2>
+        <div className="flex items-center gap-8">
+          <h2 className="font-anton text-3xl sm:text-4xl text-white tracking-wide">
+            Browse
+          </h2>
+          <h2 className="font-anton text-3xl sm:text-4xl text-white/30 tracking-wide">
+            Installed
+          </h2>
+        </div>
         <button
           onClick={refreshModels}
           disabled={loading || isSwitchingFilter}
