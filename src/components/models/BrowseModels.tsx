@@ -9,6 +9,7 @@ import {
   FiDownloadCloud,
   FiClock,
   FiThumbsUp,
+  FiChevronRight,
 } from "react-icons/fi";
 import { HFModelSummary } from "./hooks/useHuggingFaceModels";
 import { useIntersectionObserver } from "./hooks/useIntersectionObserver";
@@ -203,6 +204,7 @@ export const BrowseModels = ({
           <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
             {models.map((model, index) => {
               const isDownloading = downloadingModels.has(model.model_id);
+
               return (
                 <div
                   key={`${model.id}-${index}`}
@@ -245,9 +247,14 @@ export const BrowseModels = ({
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-white/5">
-                    <span className="text-xs text-white/30">
-                      Click to view quantizations
+                  {/* Clean footer with just "View all" and animation */}
+                  <div className="flex items-center justify-end mt-auto pt-3 border-t border-white/5">
+                    <span className="text-xs text-white/30 flex items-center gap-1 hover:text-white/60 transition-colors group">
+                      View all quantizations
+                      <FiChevronRight
+                        size={14}
+                        className="text-white/20 group-hover:text-purple-accent/60 transition-all group-hover:translate-x-1"
+                      />
                     </span>
                   </div>
                 </div>
