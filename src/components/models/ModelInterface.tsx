@@ -1,3 +1,5 @@
+// ModelInterface.tsx - Updated with search state
+
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -43,6 +45,7 @@ export const ModelInterface = () => {
   const [downloadProgress, setDownloadProgress] = useState<
     Map<DownloadKey, DownloadProgress>
   >(new Map());
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
@@ -169,6 +172,13 @@ export const ModelInterface = () => {
     await changeFilter(filter as any);
   };
 
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    // TODO: Implement search logic in useHuggingFaceModels hook
+    // For now, this is just UI
+    console.log("Search query:", query);
+  };
+
   return (
     <div className="w-full h-full">
       <div className="flex items-center justify-between p-6 pb-0">
@@ -209,6 +219,8 @@ export const ModelInterface = () => {
           onRefresh={refreshModels}
           onFilterChange={handleFilterChange}
           error={error}
+          searchQuery={searchQuery}
+          onSearchChange={handleSearchChange}
         />
       </div>
 

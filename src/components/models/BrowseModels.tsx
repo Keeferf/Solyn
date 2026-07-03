@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+// BrowseModels.tsx - Updated with search bar UI
+
+import { useEffect, useState } from "react";
 import {
   FiLoader,
   FiServer,
@@ -9,6 +11,8 @@ import {
   FiClock,
   FiThumbsUp,
   FiChevronRight,
+  FiSearch,
+  FiX,
 } from "react-icons/fi";
 import { HFModelSummary } from "./hooks/useHuggingFaceModels";
 import { useIntersectionObserver } from "./hooks/useIntersectionObserver";
@@ -28,6 +32,9 @@ interface BrowseModelsProps {
   onRefresh?: () => void;
   onFilterChange: (filter: string) => void;
   error?: string | null;
+  // New search props
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 const formatDownloads = (downloads?: number): string => {
@@ -78,11 +85,34 @@ export const BrowseModels = ({
   onRefresh,
   onFilterChange,
   error,
+  searchQuery = "",
+  onSearchChange,
 }: BrowseModelsProps) => {
   const { targetRef, isIntersecting } = useIntersectionObserver({
     threshold: 0.1,
     rootMargin: "100px",
   });
+
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+
+  // Sync local search with prop
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  const handleSearchChange = (value: string) => {
+    setLocalSearch(value);
+    if (onSearchChange) {
+      onSearchChange(value);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setLocalSearch("");
+    if (onSearchChange) {
+      onSearchChange("");
+    }
+  };
 
   useEffect(() => {
     if (
@@ -147,29 +177,72 @@ export const BrowseModels = ({
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5 flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <FiServer className="text-purple-accent" size={16} />
-          <span>GGUF models from Hugging Face</span>
+      {/* Header with filter and search */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5 flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <FiServer className="text-purple-accent" size={16} />
+            <span>GGUF models from Hugging Face</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {filterOptions.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={() => onFilterChange(value)}
+                disabled={isSwitchingFilter}
+                className={`px-3 py-1 rounded-lg text-xs transition-all flex items-center gap-1 cursor-pointer ${
+                  isSwitchingFilter ? "opacity-50 cursor-not-allowed" : ""
+                } ${
+                  currentFilter === value
+                    ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
+                    : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Icon size={12} />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {filterOptions.map(({ value, label, icon: Icon }) => (
-            <button
-              key={value}
-              onClick={() => onFilterChange(value)}
-              disabled={isSwitchingFilter}
-              className={`px-3 py-1 rounded-lg text-xs transition-all flex items-center gap-1 cursor-pointer ${
-                isSwitchingFilter ? "opacity-50 cursor-not-allowed" : ""
-              } ${
-                currentFilter === value
-                  ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
-                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <Icon size={12} />
-              {label}
-            </button>
-          ))}
+
+        {/* Search Bar */}
+        <div className="relative">
+          <div className="relative">
+            <FiSearch
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+              size={16}
+            />
+            <input
+              type="text"
+              value={localSearch}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search models by name, author, or description..."
+              className="w-full bg-black/50 border border-white/10 rounded-lg px-10 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-purple-accent/50 focus:ring-1 focus:ring-purple-accent/50 transition-all"
+              disabled={loading || isSwitchingFilter}
+            />
+            {localSearch && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+                aria-label="Clear search"
+              >
+                <FiX size={16} />
+              </button>
+            )}
+          </div>
+          {localSearch && !loading && !isSwitchingFilter && (
+            <div className="mt-2 text-xs text-white/40 flex items-center gap-2">
+              <span>
+                Found {models.length} result{models.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={handleClearSearch}
+                className="text-purple-accent/70 hover:text-purple-accent transition-colors cursor-pointer"
+              >
+                Clear search
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -181,18 +254,36 @@ export const BrowseModels = ({
         </div>
       ) : models.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-white/40 text-lg">No models available</p>
-          <p className="text-white/30 text-sm mt-2">
-            Try refreshing or check your connection
-          </p>
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
-            >
-              <FiRefreshCw size={16} />
-              Refresh
-            </button>
+          {localSearch ? (
+            <>
+              <p className="text-white/40 text-lg">No models found</p>
+              <p className="text-white/30 text-sm mt-2">
+                No models match "{localSearch}"
+              </p>
+              <button
+                onClick={handleClearSearch}
+                className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
+              >
+                <FiX size={16} />
+                Clear search
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-white/40 text-lg">No models available</p>
+              <p className="text-white/30 text-sm mt-2">
+                Try refreshing or check your connection
+              </p>
+              {onRefresh && (
+                <button
+                  onClick={onRefresh}
+                  className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
+                >
+                  <FiRefreshCw size={16} />
+                  Refresh
+                </button>
+              )}
+            </>
           )}
         </div>
       ) : (
