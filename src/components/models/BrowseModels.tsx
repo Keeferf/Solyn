@@ -91,10 +91,22 @@ export const BrowseModels = ({
   });
 
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  const [contentVisible, setContentVisible] = useState(true);
 
   useEffect(() => {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
+
+  // Handle content visibility for smooth transitions
+  useEffect(() => {
+    if (isSwitchingFilter) {
+      setContentVisible(false);
+      // Show content after a brief delay with transition
+      setTimeout(() => {
+        setContentVisible(true);
+      }, 150);
+    }
+  }, [isSwitchingFilter]);
 
   const handleSearchChange = (value: string) => {
     setLocalSearch(value);
@@ -237,133 +249,158 @@ export const BrowseModels = ({
         </div>
       </div>
 
-      {isSwitchingFilter ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <FiLoader className="animate-spin text-purple-accent" size={40} />
-          <p className="text-white/60 mt-4 text-sm">Loading models...</p>
-          <p className="text-white/30 text-xs mt-1">This may take a moment</p>
-        </div>
-      ) : models.length === 0 ? (
-        <div className="text-center py-16">
-          {localSearch ? (
-            <>
-              <p className="text-white/40 text-lg">No models found</p>
-              <p className="text-white/30 text-sm mt-2">
-                No models match "{localSearch}"
-              </p>
-              <button
-                onClick={handleClearSearch}
-                className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
-              >
-                <FiX size={16} />
-                Clear search
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="text-white/40 text-lg">No models available</p>
-              <p className="text-white/30 text-sm mt-2">
-                Try refreshing or check your connection
-              </p>
-              {onRefresh && (
-                <button
-                  onClick={onRefresh}
-                  className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
-                >
-                  <FiRefreshCw size={16} />
-                  Refresh
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-            {models.map((model, index) => {
-              const isDownloading = downloadingModels.has(model.model_id);
-
-              return (
-                <div
-                  key={`${model.id}-${index}`}
-                  onClick={() => onModelClick(model)}
-                  className={`group bg-black border border-white/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-white/5 hover:border-white/20 cursor-pointer hover:scale-[1.02] ${
-                    isDownloading ? "opacity-50 pointer-events-none" : ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-white font-semibold truncate text-base">
-                        {model.name || model.model_id}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <FiUser className="text-white/30" size={12} />
-                        <span className="text-white/40 text-xs">
-                          {model.author || "Unknown"}
-                        </span>
-                      </div>
-                    </div>
-                    {isDownloading && (
-                      <div className="text-purple-accent">
-                        <FiLoader className="animate-spin" size={16} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {model.downloads !== undefined && model.downloads > 0 && (
-                      <span className="text-xs bg-green-500/15 text-green-400 px-2 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
-                        <FiDownloadCloud size={12} />
-                        {formatDownloads(model.downloads)}
-                      </span>
-                    )}
-                    {model.likes !== undefined && model.likes > 0 && (
-                      <span className="text-xs bg-red-500/15 text-red-400 px-2 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
-                        <FiHeart size={12} />
-                        {formatLikes(model.likes)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-end mt-auto pt-3 border-t border-white/5">
-                    <span className="text-xs text-white/30 flex items-center gap-1 group-hover:text-white/60 transition-colors">
-                      View all quantizations
-                      <FiChevronRight
-                        size={14}
-                        className="text-white/20 group-hover:text-purple-accent/60 transition-all group-hover:translate-x-1"
-                      />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Content with smooth transitions */}
+      <div
+        className={`relative transition-all duration-300 ${
+          isSwitchingFilter
+            ? "opacity-50 transform scale-[0.99]"
+            : "opacity-100 transform scale-100"
+        }`}
+      >
+        {isSwitchingFilter && (
+          <div className="flex flex-col items-center justify-center py-12 min-h-50">
+            <div className="flex items-center gap-3">
+              <FiLoader className="animate-spin text-purple-accent" size={32} />
+              <span className="text-white/60 text-sm">Loading models...</span>
+            </div>
           </div>
+        )}
 
-          {hasMore && (
-            <div ref={targetRef} className="py-8 flex justify-center">
-              {loadingMore ? (
-                <div className="flex items-center gap-3 text-white/60">
-                  <FiLoader className="animate-spin" size={20} />
-                  <span className="text-sm">Loading more models...</span>
+        {!isSwitchingFilter && (
+          <div
+            className={`transition-all duration-300 ${
+              contentVisible
+                ? "opacity-100 transform translate-y-0"
+                : "opacity-0 transform -translate-y-2"
+            }`}
+          >
+            {models.length === 0 ? (
+              <div className="text-center py-16">
+                {localSearch ? (
+                  <>
+                    <p className="text-white/40 text-lg">No models found</p>
+                    <p className="text-white/30 text-sm mt-2">
+                      No models match "{localSearch}"
+                    </p>
+                    <button
+                      onClick={handleClearSearch}
+                      className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
+                    >
+                      <FiX size={16} />
+                      Clear search
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-white/40 text-lg">No models available</p>
+                    <p className="text-white/30 text-sm mt-2">
+                      Try refreshing or check your connection
+                    </p>
+                    {onRefresh && (
+                      <button
+                        onClick={onRefresh}
+                        className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
+                      >
+                        <FiRefreshCw size={16} />
+                        Refresh
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+                  {models.map((model, index) => {
+                    const isDownloading = downloadingModels.has(model.model_id);
+
+                    return (
+                      <div
+                        key={`${model.id}-${index}`}
+                        onClick={() => onModelClick(model)}
+                        className={`group bg-black border border-white/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-white/5 hover:border-white/20 cursor-pointer hover:scale-[1.02] ${
+                          isDownloading ? "opacity-50 pointer-events-none" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-white font-semibold truncate text-base">
+                              {model.name || model.model_id}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <FiUser className="text-white/30" size={12} />
+                              <span className="text-white/40 text-xs">
+                                {model.author || "Unknown"}
+                              </span>
+                            </div>
+                          </div>
+                          {isDownloading && (
+                            <div className="text-purple-accent">
+                              <FiLoader className="animate-spin" size={16} />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {model.downloads !== undefined &&
+                            model.downloads > 0 && (
+                              <span className="text-xs bg-green-500/15 text-green-400 px-2 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
+                                <FiDownloadCloud size={12} />
+                                {formatDownloads(model.downloads)}
+                              </span>
+                            )}
+                          {model.likes !== undefined && model.likes > 0 && (
+                            <span className="text-xs bg-red-500/15 text-red-400 px-2 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
+                              <FiHeart size={12} />
+                              {formatLikes(model.likes)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-end mt-auto pt-3 border-t border-white/5">
+                          <span className="text-xs text-white/30 flex items-center gap-1 group-hover:text-white/60 transition-colors">
+                            View all quantizations
+                            <FiChevronRight
+                              size={14}
+                              className="text-white/20 group-hover:text-purple-accent/60 transition-all group-hover:translate-x-1"
+                            />
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : (
-                <div className="text-white/30 text-sm">Scroll for more</div>
-              )}
-            </div>
-          )}
 
-          {!hasMore && models.length > 0 && (
-            <div className="py-8 text-center text-white/30 text-sm border-t border-white/5">
-              All {models.length} models loaded
-              {totalModels > 0 && totalModels < maxModels && (
-                <span className="block text-xs text-white/20 mt-2">
-                  ({totalModels} available from Hugging Face)
-                </span>
-              )}
-            </div>
-          )}
-        </>
-      )}
+                {hasMore && (
+                  <div ref={targetRef} className="py-8 flex justify-center">
+                    {loadingMore ? (
+                      <div className="flex items-center gap-3 text-white/60">
+                        <FiLoader className="animate-spin" size={20} />
+                        <span className="text-sm">Loading more models...</span>
+                      </div>
+                    ) : (
+                      <div className="text-white/30 text-sm">
+                        Scroll for more
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!hasMore && models.length > 0 && (
+                  <div className="py-8 text-center text-white/30 text-sm border-t border-white/5">
+                    All {models.length} top models loaded
+                    {totalModels > 0 && totalModels < maxModels && (
+                      <span className="block text-xs text-white/20 mt-2">
+                        ({totalModels} available from Hugging Face)
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

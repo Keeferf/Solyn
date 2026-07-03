@@ -53,6 +53,9 @@ export const useHuggingFaceModels = (
   const hasLoadedAllRef = useRef(false);
   const loadedIdsRef = useRef<Set<string>>(new Set());
   const isChangingFilterRef = useRef(false);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const switchFilterStartTimeRef = useRef<number | null>(null);
+  const MIN_LOADING_TIME = 300; // Minimum 300ms to show loading state
 
   const loadInitialModels = useCallback(
     async (filter: ModelFilter, keepExistingModels: boolean = false) => {
@@ -113,8 +116,7 @@ export const useHuggingFaceModels = (
         setError(String(err));
       } finally {
         setLoading(false);
-        setIsSwitchingFilter(false);
-        isChangingFilterRef.current = false;
+        // Don't set isSwitchingFilter to false here - let changeFilter handle it
       }
     },
     [modelsPerPage, maxModels, currentFilter],
@@ -193,6 +195,12 @@ export const useHuggingFaceModels = (
     async (newFilter: ModelFilter) => {
       if (newFilter === currentFilter) return;
 
+      // Clear any existing timeout
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+
       setModels([]);
       setHasMore(true);
       setTotalModels(0);
@@ -203,7 +211,36 @@ export const useHuggingFaceModels = (
       isChangingFilterRef.current = true;
       initialLoadDone.current = false;
 
+      // Start timing for minimum loading display
+      switchFilterStartTimeRef.current = Date.now();
+
+      // Debounce the loading state - only show if operation takes > 150ms
+      const showLoading = setTimeout(() => {
+        setIsSwitchingFilter(true);
+      }, 150);
+      loadingTimeoutRef.current = showLoading;
+
       await loadInitialModels(newFilter, true);
+
+      // Clear the debounce timeout since we're done
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+
+      // Ensure minimum loading time for visual consistency
+      if (switchFilterStartTimeRef.current) {
+        const elapsed = Date.now() - switchFilterStartTimeRef.current;
+        if (elapsed < MIN_LOADING_TIME) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, MIN_LOADING_TIME - elapsed),
+          );
+        }
+        switchFilterStartTimeRef.current = null;
+      }
+
+      setIsSwitchingFilter(false);
+      isChangingFilterRef.current = false;
     },
     [currentFilter, loadInitialModels],
   );
@@ -218,6 +255,15 @@ export const useHuggingFaceModels = (
     currentPageRef.current = 0;
     await loadInitialModels(currentFilter, false);
   }, [loadInitialModels, currentFilter]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadInitialModels(initialFilter, false);
