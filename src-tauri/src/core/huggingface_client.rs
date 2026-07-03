@@ -10,7 +10,6 @@ use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFF
 static MODEL_DETAILS_CACHE: Lazy<Mutex<HashMap<String, HFModelDetails>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-// Cache for GGUF models with filters - store per filter type
 static GGUF_MODELS_CACHE: Lazy<Mutex<HashMap<ModelFilter, Vec<HFModelSummary>>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -191,9 +190,7 @@ async fn fetch_file_sizes(model_id: &str, filenames: &[String]) -> HashMap<Strin
     size_map
 }
 
-// Fetch up to 100 GGUF models with specific filter
 async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFModelSummary>, String> {
-    // Check cache first for this filter
     {
         let cache = GGUF_MODELS_CACHE.lock().unwrap();
         if let Some(models) = cache.get(&filter) {
@@ -206,15 +203,12 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
     let mut page = 1;
     let mut consecutive_empty_pages = 0;
     
-    // Determine sort parameter based on filter
     let sort_param = match filter {
         ModelFilter::MostDownloads => "downloads",
         ModelFilter::MostLiked => "likes",
-        ModelFilter::Trending => "trending",
-        ModelFilter::Recent => "last_modified",
+        ModelFilter::Recent => "lastModified",
     };
     
-    // Keep fetching pages until we reach MAX_MODELS or run out of models
     loop {
         if all_models.len() >= MAX_MODELS {
             break;
@@ -262,7 +256,6 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
 
         consecutive_empty_pages = 0;
         
-        // Process items and verify they actually have GGUF files
         let remaining = MAX_MODELS - all_models.len();
         
         for item in items.iter().take(remaining) {
@@ -271,7 +264,6 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
                 continue;
             }
             
-            // Verify this model actually has GGUF files by checking siblings
             let siblings = item.get("siblings").and_then(|s| s.as_array());
             let has_gguf = siblings
                 .map(|s| s.iter().any(|f| {
@@ -282,7 +274,6 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
                 }))
                 .unwrap_or(false);
             
-            // If the search API didn't include siblings, we'll include the model
             if siblings.is_none() || has_gguf {
                 let parts: Vec<&str> = id.split('/').collect();
                 let author = parts.get(0).unwrap_or(&"").to_string();
@@ -309,21 +300,17 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
             }
         }
         
-        // Move to next page
         page += 1;
         
-        // If page was smaller than requested size, we've reached the end
         if items.len() < BATCH_SIZE {
             break;
         }
         
-        // Safety: If we're not finding any models with GGUF files for several pages, stop
         if all_models.len() == 0 && page > 5 {
             break;
         }
     }
     
-    // Cache the models for this filter
     {
         let mut cache = GGUF_MODELS_CACHE.lock().unwrap();
         cache.insert(filter, all_models.clone());
@@ -332,7 +319,6 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
     Ok(all_models)
 }
 
-// Fetch a page from the cached GGUF models with filter
 pub async fn fetch_hugging_face_models_page(
     page: usize,
     limit: usize,
@@ -351,14 +337,12 @@ pub async fn fetch_hugging_face_models_page(
     Ok(page_models)
 }
 
-// Get total count for a specific filter
 pub async fn get_total_model_count_for_filter(filter: &ModelFilter) -> Result<usize, String> {
     let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
     Ok(all_models.len())
 }
 
 pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, String> {
-    // Check cache first
     {
         let cache = MODEL_DETAILS_CACHE.lock().unwrap();
         if let Some(cached) = cache.get(model_id) {
@@ -456,7 +440,6 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, Strin
     Ok(model)
 }
 
-// Clear cache for a specific filter or all
 pub fn clear_model_cache(filter: Option<ModelFilter>) {
     let mut cache = GGUF_MODELS_CACHE.lock().unwrap();
     if let Some(filter) = filter {

@@ -18,7 +18,6 @@ pub async fn fetch_huggingface_models_page(
     let filter = match filter.as_deref() {
         Some("most_downloads") => ModelFilter::MostDownloads,
         Some("most_liked") => ModelFilter::MostLiked,
-        Some("trending") => ModelFilter::Trending,
         Some("recent") => ModelFilter::Recent,
         _ => ModelFilter::default(),
     };
@@ -32,7 +31,6 @@ pub async fn get_huggingface_model_count(
     let filter = match filter.as_deref() {
         Some("most_downloads") => ModelFilter::MostDownloads,
         Some("most_liked") => ModelFilter::MostLiked,
-        Some("trending") => ModelFilter::Trending,
         Some("recent") => ModelFilter::Recent,
         _ => ModelFilter::default(),
     };
@@ -98,7 +96,6 @@ pub async fn clear_models_cache(
     let filter = match filter.as_deref() {
         Some("most_downloads") => Some(ModelFilter::MostDownloads),
         Some("most_liked") => Some(ModelFilter::MostLiked),
-        Some("trending") => Some(ModelFilter::Trending),
         Some("recent") => Some(ModelFilter::Recent),
         _ => None,
     };

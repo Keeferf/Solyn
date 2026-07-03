@@ -7,7 +7,6 @@ import {
   FiRefreshCw,
   FiHeart,
   FiDownloadCloud,
-  FiTrendingUp,
   FiClock,
   FiThumbsUp,
 } from "react-icons/fi";
@@ -60,7 +59,6 @@ const formatLikes = (likes?: number): string => {
 const filterOptions = [
   { value: "most_downloads", label: "Most Downloads", icon: FiDownloadCloud },
   { value: "most_liked", label: "Most Liked", icon: FiThumbsUp },
-  { value: "trending", label: "Trending", icon: FiTrendingUp },
   { value: "recent", label: "Recent", icon: FiClock },
 ];
 

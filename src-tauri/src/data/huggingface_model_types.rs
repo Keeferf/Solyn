@@ -10,7 +10,7 @@ pub struct HFModelSummary {
     pub downloads: Option<u64>,
     pub likes: Option<u64>,
     pub created_at: Option<String>,
-    pub last_modified: Option<String>, // Add this field
+    pub last_modified: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,11 +36,10 @@ pub struct GGUFFileInfo {
     pub quantization: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)] // Add Eq, Hash, PartialEq
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ModelFilter {
     MostDownloads,
     MostLiked,
-    Trending,
     Recent,
 }
 
@@ -55,8 +54,7 @@ impl ModelFilter {
         match self {
             ModelFilter::MostDownloads => "downloads",
             ModelFilter::MostLiked => "likes",
-            ModelFilter::Trending => "trending",
-            ModelFilter::Recent => "recent",
+            ModelFilter::Recent => "lastModified",
         }
     }
     
@@ -64,7 +62,6 @@ impl ModelFilter {
         match self {
             ModelFilter::MostDownloads => "Most Downloads",
             ModelFilter::MostLiked => "Most Liked",
-            ModelFilter::Trending => "Trending",
             ModelFilter::Recent => "Recent",
         }
     }

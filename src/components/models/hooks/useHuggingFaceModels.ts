@@ -27,11 +27,7 @@ export interface HFModelDetails extends HFModelSummary {
 
 export type HFModel = HFModelSummary | HFModelDetails;
 
-export type ModelFilter =
-  | "most_downloads"
-  | "most_liked"
-  | "trending"
-  | "recent";
+export type ModelFilter = "most_downloads" | "most_liked" | "recent";
 
 export function hasDetails(model: HFModel): model is HFModelDetails {
   return (
@@ -187,11 +183,8 @@ export const useHuggingFaceModels = (
     async (newFilter: ModelFilter) => {
       if (newFilter === currentFilter) return;
 
-      // Mark that we're changing filters to prevent flashing
       isChangingFilterRef.current = true;
 
-      // Keep existing models while loading new ones
-      // Don't clear models or reset state immediately
       initialLoadDone.current = false;
       hasLoadedAllRef.current = false;
       loadedIdsRef.current = new Set();
