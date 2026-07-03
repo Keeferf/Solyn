@@ -27,7 +27,6 @@ pub fn run() {
             // Hugging Face commands - UPDATED for infinite scroll
             api::huggingface_commands::fetch_huggingface_models_page,
             api::huggingface_commands::get_huggingface_model_count,
-            api::huggingface_commands::download_huggingface_model,
             api::huggingface_commands::fetch_model_details,
             
             // NEW: Search commands
