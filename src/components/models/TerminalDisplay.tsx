@@ -1,4 +1,3 @@
-// src/components/models/TerminalDisplay.tsx
 import { FiTerminal, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { TerminalOutput } from "./hooks/useOllamaInstallation";
 import {

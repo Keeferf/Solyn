@@ -1,4 +1,3 @@
-// src/components/models/hooks/useIntersectionObserver.ts
 import { useEffect, useRef, useState } from "react";
 
 export const useIntersectionObserver = (
@@ -12,25 +11,16 @@ export const useIntersectionObserver = (
 
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
-      console.log(
-        `👁️ [IntersectionObserver] Intersection observed: isIntersecting=${entry.isIntersecting}, target=${entry.target}`,
-      );
       setIsIntersecting(entry.isIntersecting);
     }, options);
 
     const currentTarget = targetRef.current;
     if (currentTarget) {
-      console.log(
-        `👁️ [IntersectionObserver] Starting to observe sentinel element`,
-      );
       observer.observe(currentTarget);
-    } else {
-      console.log(`👁️ [IntersectionObserver] No target element to observe yet`);
     }
 
     return () => {
       if (currentTarget) {
-        console.log(`👁️ [IntersectionObserver] Stopping observation`);
         observer.unobserve(currentTarget);
       }
     };

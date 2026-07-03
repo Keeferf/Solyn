@@ -1,4 +1,3 @@
-// src/components/models/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -25,6 +24,7 @@ export const ModelInterface = () => {
     models,
     loading,
     loadingMore,
+    isSwitchingFilter,
     error,
     hasMore,
     totalModels,
@@ -43,6 +43,7 @@ export const ModelInterface = () => {
   const [downloadProgress, setDownloadProgress] = useState<
     Map<DownloadKey, DownloadProgress>
   >(new Map());
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
@@ -121,9 +122,7 @@ export const ModelInterface = () => {
             });
           },
         );
-      } catch (err) {
-        console.error("Failed to setup event listeners:", err);
-      }
+      } catch (err) {}
     };
 
     setupListeners();
@@ -152,7 +151,6 @@ export const ModelInterface = () => {
         filename,
       });
     } catch (error) {
-      console.error("Failed to start download:", error);
       setDownloadingModels((prev) => {
         const newSet = new Set(prev);
         newSet.delete(key);
@@ -167,17 +165,28 @@ export const ModelInterface = () => {
   };
 
   const handleFilterChange = async (filter: string) => {
-    // Use the filter type directly from the hook
     await changeFilter(filter as any);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    console.log("Search query:", query);
   };
 
   return (
     <div className="w-full h-full">
       <div className="flex items-center justify-between p-6 pb-0">
-        <h2 className="text-2xl font-bold text-white">Browse Models</h2>
+        <div className="flex items-center gap-8">
+          <h2 className="font-anton text-3xl sm:text-4xl text-white tracking-wide">
+            Browse
+          </h2>
+          <h2 className="font-anton text-3xl sm:text-4xl text-white/30 tracking-wide">
+            Installed
+          </h2>
+        </div>
         <button
           onClick={refreshModels}
-          disabled={loading}
+          disabled={loading || isSwitchingFilter}
           className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
         >
           Refresh
@@ -200,6 +209,7 @@ export const ModelInterface = () => {
           models={models}
           loading={loading}
           loadingMore={loadingMore}
+          isSwitchingFilter={isSwitchingFilter}
           hasMore={hasMore}
           totalModels={totalModels}
           maxModels={maxModels}
@@ -210,6 +220,8 @@ export const ModelInterface = () => {
           onRefresh={refreshModels}
           onFilterChange={handleFilterChange}
           error={error}
+          searchQuery={searchQuery}
+          onSearchChange={handleSearchChange}
         />
       </div>
 
