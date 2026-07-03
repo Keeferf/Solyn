@@ -1,3 +1,4 @@
+// src/data/huggingface_model_types.rs
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -8,6 +9,8 @@ pub struct HFModelSummary {
     pub name: String,
     pub downloads: Option<u64>,
     pub likes: Option<u64>,
+    pub created_at: Option<String>,
+    pub last_modified: Option<String>, // Add this field
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,8 +36,36 @@ pub struct GGUFFileInfo {
     pub quantization: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DownloadRequest {
-    pub model_id: String,
-    pub filename: String,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)] // Add Eq, Hash, PartialEq
+pub enum ModelFilter {
+    MostDownloads,
+    MostLiked,
+    Trending,
+    Recent,
+}
+
+impl Default for ModelFilter {
+    fn default() -> Self {
+        Self::MostDownloads
+    }
+}
+
+impl ModelFilter {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ModelFilter::MostDownloads => "downloads",
+            ModelFilter::MostLiked => "likes",
+            ModelFilter::Trending => "trending",
+            ModelFilter::Recent => "recent",
+        }
+    }
+    
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ModelFilter::MostDownloads => "Most Downloads",
+            ModelFilter::MostLiked => "Most Liked",
+            ModelFilter::Trending => "Trending",
+            ModelFilter::Recent => "Recent",
+        }
+    }
 }

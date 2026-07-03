@@ -1,13 +1,20 @@
+// src/api/huggingface_client.rs
 use reqwest;
 use serde_json;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo};
+use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo, ModelFilter};
 
 static MODEL_DETAILS_CACHE: Lazy<Mutex<HashMap<String, HFModelDetails>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+// Cache for GGUF models with filters - store per filter type
+static GGUF_MODELS_CACHE: Lazy<Mutex<HashMap<ModelFilter, Vec<HFModelSummary>>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+const MAX_MODELS: usize = 100; // Reduced to 100 models total
 
 fn extract_parameter_count(filename: &str) -> Option<String> {
     let lower = filename.to_lowercase();
@@ -121,7 +128,6 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
                 };
 
                 let parameter_count = extract_parameter_count(filename);
-
                 let quantization = extract_quantization(filename);
                 
                 gguf_files.push(GGUFFileInfo {
@@ -139,74 +145,276 @@ pub fn extract_gguf_files(siblings: Option<&Vec<serde_json::Value>>) -> Vec<GGUF
     gguf_files
 }
 
-pub async fn fetch_hugging_face_models(
-    page: Option<usize>,
-    limit: Option<usize>,
-) -> Result<Vec<HFModelSummary>, String> {
-    let page = page.unwrap_or(1);
-    let limit = limit.unwrap_or(20);
+async fn fetch_file_sizes(model_id: &str, filenames: &[String]) -> HashMap<String, u64> {
+    let mut size_map = HashMap::new();
     let client = reqwest::Client::new();
-    let offset = (page - 1) * limit;
-    let url = format!(
-        "https://huggingface.co/api/models?filter=gguf&sort=downloads&direction=-1&limit={}&offset={}",
-        limit, offset
-    );
     
-    let response = client
-        .get(&url)
-        .header("User-Agent", "SolynApp/1.0")
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch Hugging Face models: {}", e))?;
+    let mut tasks = Vec::new();
     
-    if !response.status().is_success() {
-        return Err(format!("Hugging Face API error: {}", response.status()));
+    for filename in filenames {
+        let client = client.clone();
+        let model_id = model_id.to_string();
+        let filename = filename.clone();
+        
+        let task = tokio::spawn(async move {
+            let url = format!("https://huggingface.co/{}/resolve/main/{}", model_id, filename);
+            let response = client
+                .head(&url)
+                .header("User-Agent", "SolynApp/1.0")
+                .timeout(Duration::from_secs(10))
+                .send()
+                .await;
+            
+            if let Ok(response) = response {
+                if let Some(size) = response
+                    .headers()
+                    .get("content-length")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok())
+                {
+                    return Some((filename, size));
+                }
+            }
+            None
+        });
+        
+        tasks.push(task);
     }
     
-    let data: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-    
-    let mut models = Vec::new();
-    
-    // The response could be an array or an object with a "models" field
-    let items = if let Some(items_array) = data.as_array() {
-        items_array
-    } else if let Some(models_array) = data.get("models").and_then(|v| v.as_array()) {
-        models_array
-    } else {
-        return Err("Invalid response format - expected array or object with 'models' field".to_string());
-    };
-    
-    for item in items {
-        let id = item["id"].as_str().unwrap_or("").to_string();
-        if id.is_empty() {
-            continue;
+    for task in tasks {
+        if let Ok(Some((filename, size))) = task.await {
+            size_map.insert(filename, size);
         }
-        
-        // Split the ID into author and name components
-        let parts: Vec<&str> = id.split('/').collect();
-        let author = parts.get(0).unwrap_or(&"").to_string();
-        let name = parts.get(1).unwrap_or(&"").to_string();
-        
-        let model = HFModelSummary {
-            id: id.clone(),
-            model_id: id.clone(),
-            author,
-            name: name.clone(),
-            downloads: item["downloads"].as_u64(),
-            likes: item["likes"].as_u64(),
-        };
-        
-        models.push(model);
     }
     
-    Ok(models)
+    size_map
 }
 
-// Fetch full model details with GGUF files - WITH CACHING
+// Fetch up to 100 GGUF models with specific filter
+async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFModelSummary>, String> {
+    // Check cache first for this filter
+    {
+        let cache = GGUF_MODELS_CACHE.lock().unwrap();
+        if let Some(models) = cache.get(&filter) {
+            println!("📊 [BACKEND] Returning cached GGUF models for filter {:?}: {}", filter, models.len());
+            return Ok(models.clone());
+        }
+    }
+    
+    println!("🔄 [BACKEND] Fetching up to {} GGUF models with filter {:?}...", MAX_MODELS, filter);
+    
+    let client = reqwest::Client::new();
+    let batch_size = 50; // HF API limit
+    let mut all_models = Vec::new();
+    let mut page = 1;
+    let mut consecutive_empty_pages = 0;
+    
+    // Determine sort parameter based on filter
+    let sort_param = match filter {
+        ModelFilter::MostDownloads => "downloads",
+        ModelFilter::MostLiked => "likes",
+        ModelFilter::Trending => "trending",
+        ModelFilter::Recent => "last_modified", // Use last_modified for recency
+    };
+    
+    // Keep fetching pages until we reach MAX_MODELS or run out of models
+    loop {
+        // Stop if we've reached our target
+        if all_models.len() >= MAX_MODELS {
+            println!("✅ [BACKEND] Reached target of {} models", MAX_MODELS);
+            break;
+        }
+
+        // Use the models API with proper sorting
+        let url = format!(
+            "https://huggingface.co/api/models?search=gguf&sort={}&direction=-1&limit={}&page={}",
+            sort_param, batch_size, page
+        );
+        
+        println!("🔍 [BACKEND] Fetching page {} with filter {:?}: {}", page, filter, url);
+        
+        let response = client
+            .get(&url)
+            .header("User-Agent", "SolynApp/1.0")
+            .header("Cache-Control", "no-cache")
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch Hugging Face models: {}", e))?;
+        
+        if !response.status().is_success() {
+            return Err(format!("Hugging Face API error: {}", response.status()));
+        }
+        
+        let data: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        
+        // Search API returns array directly
+        let items = if let Some(items_array) = data.as_array() {
+            items_array.clone()
+        } else if let Some(models_array) = data.get("models").and_then(|v| v.as_array()) {
+            models_array.clone()
+        } else {
+            println!("⚠️ [BACKEND] Could not parse response as array or models object");
+            break;
+        };
+        
+        if items.is_empty() {
+            println!("📭 [BACKEND] Received empty page at page {}", page);
+            consecutive_empty_pages += 1;
+            if consecutive_empty_pages > 2 {
+                println!("⚠️ [BACKEND] Got multiple empty pages, stopping");
+                break;
+            }
+            page += 1;
+            continue;
+        }
+
+        consecutive_empty_pages = 0;
+        
+        println!("📊 [BACKEND] Received {} items in page {}", items.len(), page);
+        
+        // Debug: Print first 3 model IDs from this page
+        println!("🔍 [BACKEND] First 3 model IDs in this page:");
+        for (i, item) in items.iter().take(3).enumerate() {
+            if let Some(id) = item["id"].as_str() {
+                println!("  [{}] {}", i + 1, id);
+            }
+        }
+        
+        // Process items and verify they actually have GGUF files
+        let remaining = MAX_MODELS - all_models.len();
+        let mut batch_added = 0;
+        
+        for item in items.iter().take(remaining) {
+            let id = item["id"].as_str().unwrap_or("").to_string();
+            if id.is_empty() {
+                continue;
+            }
+            
+            // Verify this model actually has GGUF files by checking siblings
+            let siblings = item.get("siblings").and_then(|s| s.as_array());
+            let has_gguf = siblings
+                .map(|s| s.iter().any(|f| {
+                    f["rfilename"].as_str()
+                        .or_else(|| f["filename"].as_str())
+                        .map(|name| name.ends_with(".gguf"))
+                        .unwrap_or(false)
+                }))
+                .unwrap_or(false);
+            
+            // If the search API didn't include siblings, we'll include the model
+            if siblings.is_none() || has_gguf {
+                let parts: Vec<&str> = id.split('/').collect();
+                let author = parts.get(0).unwrap_or(&"").to_string();
+                let name = parts.get(1).unwrap_or(&"").to_string();
+                
+                // Extract created_at and last_modified for recency
+                let created_at = item["created_at"].as_str()
+                    .or_else(|| item["createdAt"].as_str())
+                    .map(|s| s.to_string());
+                
+                let last_modified = item["last_modified"].as_str()
+                    .or_else(|| item["lastModified"].as_str())
+                    .map(|s| s.to_string());
+                
+                all_models.push(HFModelSummary {
+                    id: id.clone(),
+                    model_id: id,
+                    author,
+                    name,
+                    downloads: item["downloads"].as_u64(),
+                    likes: item["likes"].as_u64(),
+                    created_at: created_at.clone(),
+                    last_modified: last_modified.or(created_at),
+                });
+                
+                batch_added += 1;
+            } else {
+                println!("⏭️ [BACKEND] Skipping {} - no GGUF files found", id);
+            }
+        }
+        
+        println!("📊 [BACKEND] Added {} models from page, total: {} / {}", 
+            batch_added, all_models.len(), MAX_MODELS);
+        
+        // Move to next page
+        page += 1;
+        
+        // If page was smaller than requested size, we've reached the end
+        if items.len() < batch_size {
+            println!("📭 [BACKEND] Got less than {} items (got {}), reached end",
+                batch_size, items.len());
+            break;
+        }
+        
+        // Safety: If we're not finding any models with GGUF files for several pages, stop
+        if batch_added == 0 && page > 5 {
+            println!("⚠️ [BACKEND] No models with GGUF files found in last 5 pages, stopping");
+            break;
+        }
+    }
+    
+    println!("✅ [BACKEND] Fetched {} GGUF models with filter {:?}", all_models.len(), filter);
+    
+    // Cache the models for this filter
+    {
+        let mut cache = GGUF_MODELS_CACHE.lock().unwrap();
+        cache.insert(filter, all_models.clone());
+    }
+    
+    Ok(all_models)
+}
+
+// Fetch a page from the cached GGUF models with filter
+pub async fn fetch_hugging_face_models_page(
+    page: usize,
+    limit: usize,
+    filter: &ModelFilter, // Change to borrow
+) -> Result<Vec<HFModelSummary>, String> {
+    println!("📤 [BACKEND] fetch_hugging_face_models_page called with page: {}, limit: {}, filter: {:?}", 
+        page, limit, filter);
+    
+    // Fetch models with the specified filter
+    let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
+    
+    let start = (page - 1) * limit;
+    let end = std::cmp::min(start + limit, all_models.len());
+    
+    println!("📊 [BACKEND] Total cached models for filter {:?}: {}, Requested page: {} (returning models {}-{})", 
+        filter, all_models.len(), page, start, end);
+    
+    if start >= all_models.len() {
+        println!("📭 [BACKEND] Start index {} >= total {}, returning empty", start, all_models.len());
+        return Ok(Vec::new());
+    }
+    
+    let page_models = all_models[start..end].to_vec();
+    
+    // Debug: Print first 3 model IDs from this page
+    if !page_models.is_empty() {
+        println!("🔍 [BACKEND] First 3 model IDs on page {}:", page);
+        for (i, model) in page_models.iter().take(3).enumerate() {
+            println!("  [{}] {}", i + 1, model.model_id);
+        }
+    }
+    
+    println!("✅ [BACKEND] Returning {} models for page {}", page_models.len(), page);
+    Ok(page_models)
+}
+
+// Get total count for a specific filter
+pub async fn get_total_model_count_for_filter(filter: &ModelFilter) -> Result<usize, String> {
+    println!("📤 [BACKEND] get_total_model_count_for_filter called with filter: {:?}", filter);
+    
+    let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
+    let count = all_models.len();
+    println!("📊 [BACKEND] Total GGUF models for filter {:?}: {}", filter, count);
+    Ok(count)
+}
+
 pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, String> {
     // Check cache first
     {
@@ -218,7 +426,6 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, Strin
     
     let client = reqwest::Client::new();
     
-    // Use full=true to get all siblings with GGUF files
     let url = format!("https://huggingface.co/api/models/{}?full=true", model_id);
     
     let response = client
@@ -243,27 +450,47 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, Strin
         return Err("Invalid model ID".to_string());
     }
     
-    // Get siblings with full data
     let siblings = data["siblings"].as_array();
     
-    // Add model_id to each sibling for URL construction
-    let siblings_with_model_id = siblings.map(|siblings_vec| {
-        let mut enhanced_siblings = Vec::new();
-        for sibling in siblings_vec {
-            let mut enhanced = sibling.clone();
-            enhanced["model_id"] = serde_json::Value::String(id.clone());
-            enhanced_siblings.push(enhanced);
-        }
-        enhanced_siblings
-    });
+    let mut gguf_filenames = Vec::new();
+    let mut siblings_with_model_id = Vec::new();
     
-    let gguf_files = extract_gguf_files(siblings_with_model_id.as_ref());
+    if let Some(siblings_vec) = siblings {
+        for sibling in siblings_vec {
+            let filename = sibling["rfilename"].as_str()
+                .or_else(|| sibling["filename"].as_str())
+                .unwrap_or("");
+            
+            if filename.ends_with(".gguf") {
+                gguf_filenames.push(filename.to_string());
+                
+                let mut enhanced = sibling.clone();
+                enhanced["model_id"] = serde_json::Value::String(id.clone());
+                siblings_with_model_id.push(enhanced);
+            }
+        }
+    }
+    
+    if !gguf_filenames.is_empty() {
+        let size_map = fetch_file_sizes(&id, &gguf_filenames).await;
+        
+        for sibling in &mut siblings_with_model_id {
+            if let Some(filename) = sibling["rfilename"].as_str()
+                .or_else(|| sibling["filename"].as_str())
+            {
+                if let Some(&size) = size_map.get(filename) {
+                    sibling["size"] = serde_json::Value::Number(size.into());
+                }
+            }
+        }
+    }
+    
+    let gguf_files = extract_gguf_files(Some(&siblings_with_model_id));
     
     if gguf_files.is_empty() {
         return Err("No GGUF files found in this model repository".to_string());
     }
     
-    // Split the ID into author and name components
     let parts: Vec<&str> = id.split('/').collect();
     let author = parts.get(0).unwrap_or(&"").to_string();
     let name = parts.get(1).unwrap_or(&"").to_string();
@@ -279,7 +506,6 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, Strin
         gguf_files,
     };
     
-    // Store in cache
     {
         let mut cache = MODEL_DETAILS_CACHE.lock().unwrap();
         cache.insert(model_id.to_string(), model.clone());
@@ -288,56 +514,14 @@ pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, Strin
     Ok(model)
 }
 
-pub async fn get_total_model_count() -> Result<usize, String> {
-    let client = reqwest::Client::new();
-    let url = "https://huggingface.co/api/models?filter=gguf&limit=1";
-    
-    let response = client
-        .get(url)
-        .header("User-Agent", "SolynApp/1.0")
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch model count: {}", e))?;
-    
-    if !response.status().is_success() {
-        return Err(format!("Hugging Face API error: {}", response.status()));
-    }
-    
-    // Get the total count from the Link header
-    let link_header = response.headers()
-        .get("link")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    
-    // Parse the last page number from the Link header
-    // Example: <https://huggingface.co/api/models?filter=gguf&limit=1&offset=100>; rel="last"
-    if let Some(last_url) = link_header.split(',')
-        .find(|part| part.contains("rel=\"last\""))
-        .and_then(|part| part.split('>').next())
-    {
-        // The type is now &str, not Option
-        let last_url = last_url.trim_start_matches('<');
-        if let Some(offset_param) = last_url.split('&').find(|p| p.starts_with("offset=")) {
-            if let Ok(offset) = offset_param.split('=').nth(1).unwrap_or("0").parse::<usize>() {
-                return Ok(offset + 1); // offset + 1 gives total count
-            }
-        }
-    }
-    
-    // Fallback: get the data and count manually
-    let data: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-    
-    let count = if let Some(items_array) = data.as_array() {
-        items_array.len()
-    } else if let Some(models_array) = data.get("models").and_then(|v| v.as_array()) {
-        models_array.len()
+// Clear cache for a specific filter or all
+pub fn clear_model_cache(filter: Option<ModelFilter>) {
+    let mut cache = GGUF_MODELS_CACHE.lock().unwrap();
+    if let Some(filter) = filter {
+        cache.remove(&filter);
+        println!("🧹 [BACKEND] Cleared cache for filter: {:?}", filter);
     } else {
-        0
-    };
-    
-    Ok(count)
+        cache.clear();
+        println!("🧹 [BACKEND] Cleared all model cache");
+    }
 }

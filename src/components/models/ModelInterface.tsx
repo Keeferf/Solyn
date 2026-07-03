@@ -8,7 +8,6 @@ import { ModelDetailModal } from "./ModelDetailModal";
 import {
   useHuggingFaceModels,
   HFModelSummary,
-  HFModelDetails,
 } from "./hooks/useHuggingFaceModels";
 
 interface DownloadProgress {
@@ -19,26 +18,24 @@ interface DownloadProgress {
   message: string;
 }
 
-// Key for tracking downloads includes filename
-type DownloadKey = string; // format: "model_id::filename"
+type DownloadKey = string;
 
 export const ModelInterface = () => {
   const {
     models,
     loading,
+    loadingMore,
     error,
-    currentPage,
+    hasMore,
     totalModels,
-    modelsPerPage,
-    setCurrentPage,
-    nextPage,
-    previousPage,
-    fetchModels,
+    maxModels,
+    currentFilter,
+    changeFilter,
+    loadMoreModels,
+    refreshModels,
   } = useHuggingFaceModels();
 
-  const [selectedModel, setSelectedModel] = useState<HFModelSummary | null>(
-    null,
-  );
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingModels, setDownloadingModels] = useState<Set<DownloadKey>>(
     new Set(),
@@ -47,17 +44,14 @@ export const ModelInterface = () => {
     Map<DownloadKey, DownloadProgress>
   >(new Map());
 
-  // Helper to create unique key
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
   };
 
-  // Check if a specific file is downloading
   const isDownloading = (modelId: string, filename: string): boolean => {
     return downloadingModels.has(getDownloadKey(modelId, filename));
   };
 
-  // Listen for download progress events
   useEffect(() => {
     let unlistenProgress: (() => void) | undefined;
     let unlistenComplete: (() => void) | undefined;
@@ -73,7 +67,6 @@ export const ModelInterface = () => {
 
             setDownloadProgress((prev) => new Map(prev).set(key, progress));
 
-            // If status is complete or error, remove from downloading set after a delay
             if (progress.status === "complete" || progress.status === "error") {
               setTimeout(() => {
                 setDownloadingModels((prev) => {
@@ -143,7 +136,7 @@ export const ModelInterface = () => {
   }, []);
 
   const handleModelClick = (model: HFModelSummary) => {
-    setSelectedModel(model);
+    setSelectedModelId(model.model_id);
     setIsModalOpen(true);
   };
 
@@ -170,26 +163,28 @@ export const ModelInterface = () => {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSelectedModel(null);
+    setSelectedModelId(null);
+  };
+
+  const handleFilterChange = async (filter: string) => {
+    // Use the filter type directly from the hook
+    await changeFilter(filter as any);
   };
 
   return (
     <div className="w-full h-full">
-      {/* Header - always at top */}
       <div className="flex items-center justify-between p-6 pb-0">
-        <h2 className="text-2xl font-bold text-[#d8d4cf]">Browse Models</h2>
+        <h2 className="text-2xl font-bold text-white">Browse Models</h2>
         <button
-          onClick={() => fetchModels(currentPage)}
+          onClick={refreshModels}
           disabled={loading}
-          className="px-4 py-2 bg-[#121212] hover:bg-[#d8d4cf]/10 rounded-lg text-[#d8d4cf] transition-all disabled:opacity-50 cursor-pointer"
+          className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
         >
           Refresh
         </button>
       </div>
 
-      {/* Content area */}
       <div className="p-6 pt-4 space-y-6">
-        {/* Download progress displays */}
         {Array.from(downloadProgress.entries()).map(([key, progress]) => (
           <DownloadStatusDisplay
             key={key}
@@ -201,26 +196,25 @@ export const ModelInterface = () => {
           />
         ))}
 
-        {/* Browse models */}
         <BrowseModels
           models={models}
           loading={loading}
-          downloadingModels={downloadingModels}
-          currentPage={currentPage}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
           totalModels={totalModels}
-          modelsPerPage={modelsPerPage}
-          onGoToPage={setCurrentPage}
-          onNextPage={nextPage}
-          onPreviousPage={previousPage}
+          maxModels={maxModels}
+          currentFilter={currentFilter}
+          downloadingModels={downloadingModels}
           onModelClick={handleModelClick}
-          onRefresh={() => fetchModels(currentPage)}
+          onLoadMore={loadMoreModels}
+          onRefresh={refreshModels}
+          onFilterChange={handleFilterChange}
           error={error}
         />
       </div>
 
-      {/* Model detail modal */}
       <ModelDetailModal
-        model={selectedModel}
+        modelId={selectedModelId}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onDownload={handleDownload}

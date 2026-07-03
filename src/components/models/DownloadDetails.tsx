@@ -51,7 +51,7 @@ export const DownloadDetails = ({
       <button
         onClick={onDownload}
         disabled={isDownloading}
-        className="px-8 py-3 bg-(--color-purple-accent) hover:bg-(--color-purple-accent)/80 disabled:opacity-50 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer"
+        className="px-8 py-3 bg-purple-accent hover:bg-purple-accent/80 disabled:opacity-50 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer"
       >
         <FiDownload size={18} />
         {isOllamaInstalled
@@ -65,7 +65,7 @@ export const DownloadDetails = ({
           href="https://ollama.com/download"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-(--color-purple-accent) hover:underline inline-flex items-center gap-1"
+          className="text-purple-accent hover:underline inline-flex items-center gap-1"
         >
           ollama.com/download
           <FiExternalLink size={12} />

@@ -1,34 +1,32 @@
 // src/components/models/BrowseModels.tsx
-import { useState } from "react";
+import { useEffect } from "react";
 import {
-  FiDownload,
   FiLoader,
-  FiFile,
-  FiChevronLeft,
-  FiChevronRight,
   FiServer,
   FiUser,
   FiRefreshCw,
   FiHeart,
   FiDownloadCloud,
-  FiFolder,
-  FiChevronDown,
-  FiCpu,
+  FiTrendingUp,
+  FiClock,
+  FiThumbsUp,
 } from "react-icons/fi";
 import { HFModelSummary } from "./hooks/useHuggingFaceModels";
+import { useIntersectionObserver } from "./hooks/useIntersectionObserver";
 
 interface BrowseModelsProps {
   models: HFModelSummary[];
   loading: boolean;
-  downloadingModels: Set<string>;
-  currentPage: number;
+  loadingMore: boolean;
+  hasMore: boolean;
   totalModels: number;
-  modelsPerPage: number;
-  onGoToPage: (page: number) => void;
-  onNextPage: () => void;
-  onPreviousPage: () => void;
+  maxModels: number;
+  currentFilter: string;
+  downloadingModels: Set<string>;
   onModelClick: (model: HFModelSummary) => void;
+  onLoadMore: () => void;
   onRefresh?: () => void;
+  onFilterChange: (filter: string) => void;
   error?: string | null;
 }
 
@@ -49,11 +47,8 @@ const formatLikes = (likes?: number): string => {
     return `${(likes / 1_000_000).toFixed(1)}M`;
   }
   if (likes >= 1_000) {
-    // Round down to nearest hundred
     const roundedDown = Math.floor(likes / 100) * 100;
     const thousands = roundedDown / 1000;
-
-    // Check if it's a whole number (e.g., 10.0 → 10)
     if (Number.isInteger(thousands)) {
       return `${thousands}k`;
     }
@@ -62,67 +57,88 @@ const formatLikes = (likes?: number): string => {
   return likes.toString();
 };
 
+const filterOptions = [
+  { value: "most_downloads", label: "Most Downloads", icon: FiDownloadCloud },
+  { value: "most_liked", label: "Most Liked", icon: FiThumbsUp },
+  { value: "trending", label: "Trending", icon: FiTrendingUp },
+  { value: "recent", label: "Recent", icon: FiClock },
+];
+
 export const BrowseModels = ({
   models,
   loading,
-  downloadingModels,
-  currentPage,
+  loadingMore,
+  hasMore,
   totalModels,
-  modelsPerPage,
-  onGoToPage,
-  onNextPage,
-  onPreviousPage,
+  maxModels,
+  currentFilter,
+  downloadingModels,
   onModelClick,
+  onLoadMore,
   onRefresh,
+  onFilterChange,
   error,
 }: BrowseModelsProps) => {
-  const totalPages = Math.max(1, Math.ceil(totalModels / modelsPerPage));
+  const { targetRef, isIntersecting } = useIntersectionObserver({
+    threshold: 0.1,
+    rootMargin: "100px",
+  });
 
-  // Loading state - keeps the info banner visible
+  useEffect(() => {
+    console.log(
+      `🔍 [UI] Intersection: isIntersecting=${isIntersecting}, hasMore=${hasMore}, loadingMore=${loadingMore}`,
+    );
+    console.log(
+      `🔍 [UI] Models: ${models.length}/${totalModels}, hasMore: ${hasMore}, filter: ${currentFilter}`,
+    );
+  }, [
+    isIntersecting,
+    hasMore,
+    loadingMore,
+    models.length,
+    totalModels,
+    currentFilter,
+  ]);
+
+  useEffect(() => {
+    if (isIntersecting && hasMore && !loadingMore && !loading) {
+      console.log(`🚀 [UI] Triggering load more from intersection observer`);
+      onLoadMore();
+    }
+  }, [isIntersecting, hasMore, loadingMore, loading, onLoadMore]);
+
   if (loading && models.length === 0) {
     return (
       <div className="w-full space-y-6">
-        {/* Info banner - stays visible during loading */}
-        <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+        <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
           <div className="flex items-center gap-3">
-            <FiServer className="text-[var(--color-purple-accent)]" size={16} />
-            <span>Loading models from Hugging Face...</span>
+            <FiServer className="text-purple-accent" size={16} />
+            <span>Loading GGUF models from Hugging Face...</span>
           </div>
         </div>
-
-        {/* Loading spinner */}
         <div className="flex items-center justify-center py-16">
-          <FiLoader
-            className="animate-spin text-[var(--color-purple-accent)]"
-            size={40}
-          />
+          <FiLoader className="animate-spin text-purple-accent" size={40} />
         </div>
       </div>
     );
   }
 
-  // Error state - keeps the info banner visible
   if (error && models.length === 0) {
     return (
       <div className="w-full space-y-6">
-        {/* Info banner */}
-        <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+        <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
           <div className="flex items-center gap-3">
-            <FiServer className="text-[var(--color-purple-accent)]" size={16} />
-            <span>Error loading models</span>
+            <FiServer className="text-purple-accent" size={16} />
+            <span>Error loading GGUF models</span>
           </div>
         </div>
-
-        {/* Error message */}
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-[var(--color-white)] text-lg mb-2">
-            Failed to load models
-          </p>
-          <p className="text-[var(--color-white)]/40 text-sm mb-4">{error}</p>
+          <p className="text-white text-lg mb-2">Failed to load models</p>
+          <p className="text-white/40 text-sm mb-4">{error}</p>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="px-4 py-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 rounded-lg text-[var(--color-white)] transition-all flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 cursor-pointer"
             >
               <FiRefreshCw size={16} />
               Retry
@@ -135,32 +151,53 @@ export const BrowseModels = ({
 
   return (
     <div className="w-full space-y-6">
-      {/* Info banner */}
-      <div className="flex items-center justify-between text-sm text-[var(--color-white)]/40 px-2 py-2 bg-[var(--color-black)]/50 rounded-lg border border-[var(--color-white)]/5">
+      {/* Filter Bar */}
+      <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5 flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <FiServer className="text-[var(--color-purple-accent)]" size={16} />
+          <FiServer className="text-purple-accent" size={16} />
           <span>GGUF models from Hugging Face</span>
         </div>
-        {totalModels > 0 && (
-          <span>
-            Page {currentPage} of {totalPages} · {totalModels} total
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {filterOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => onFilterChange(value)}
+              className={`px-3 py-1 rounded-lg text-xs transition-all flex items-center gap-1 cursor-pointer ${
+                currentFilter === value
+                  ? "bg-purple-accent/20 text-purple-accent border border-purple-accent/30"
+                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          ))}
+          <div className="flex items-center gap-3 ml-2 pl-2 border-l border-white/10">
+            <span className="font-mono text-white/60">
+              {models.length}/{totalModels > 0 ? totalModels : maxModels}
+            </span>
+            {hasMore && (
+              <span className="text-purple-accent text-xs">
+                · Scroll for more
+              </span>
+            )}
+            {!hasMore && models.length > 0 && (
+              <span className="text-green-500 text-xs">· All loaded</span>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Model grid */}
       {models.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-[var(--color-white)]/40 text-lg">
-            No models available
-          </p>
-          <p className="text-[var(--color-white)]/30 text-sm mt-2">
+          <p className="text-white/40 text-lg">No models available</p>
+          <p className="text-white/30 text-sm mt-2">
             Try refreshing or check your connection
           </p>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="mt-4 px-4 py-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 rounded-lg text-[var(--color-white)] transition-all flex items-center gap-2 mx-auto cursor-pointer"
+              className="mt-4 px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all flex items-center gap-2 mx-auto cursor-pointer"
             >
               <FiRefreshCw size={16} />
               Refresh
@@ -168,110 +205,87 @@ export const BrowseModels = ({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-          {models.map((model) => (
-            <div
-              key={model.id}
-              onClick={() => onModelClick(model)}
-              className={`bg-[var(--color-black)] border border-[var(--color-white)]/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-[var(--color-white)]/5 hover:border-[var(--color-white)]/20 cursor-pointer hover:scale-[1.02]`}
-            >
-              {/* Model header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-[var(--color-white)] font-semibold truncate text-base">
-                    {model.name || model.model_id}
-                  </h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <FiUser
-                      className="text-[var(--color-white)]/30"
-                      size={12}
-                    />
-                    <span className="text-[var(--color-white)]/40 text-xs">
-                      {model.author || "Unknown"}
+        <>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+            {models.map((model, index) => {
+              const isDownloading = downloadingModels.has(model.model_id);
+              return (
+                <div
+                  key={`${model.id}-${index}`}
+                  onClick={() => onModelClick(model)}
+                  className={`bg-black border border-white/10 rounded-xl p-5 transition-all duration-200 flex flex-col h-full hover:bg-white/5 hover:border-white/20 cursor-pointer hover:scale-[1.02] ${
+                    isDownloading ? "opacity-50 pointer-events-none" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-white font-semibold truncate text-base">
+                        {model.name || model.model_id}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <FiUser className="text-white/30" size={12} />
+                        <span className="text-white/40 text-xs">
+                          {model.author || "Unknown"}
+                        </span>
+                      </div>
+                    </div>
+                    {isDownloading && (
+                      <div className="text-purple-accent">
+                        <FiLoader className="animate-spin" size={16} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {model.downloads !== undefined && model.downloads > 0 && (
+                      <span className="text-xs bg-green-500/15 text-green-400 px-2 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
+                        <FiDownloadCloud size={12} />
+                        {formatDownloads(model.downloads)}
+                      </span>
+                    )}
+                    {model.likes !== undefined && model.likes > 0 && (
+                      <span className="text-xs bg-red-500/15 text-red-400 px-2 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
+                        <FiHeart size={12} />
+                        {formatLikes(model.likes)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-white/5">
+                    <span className="text-xs text-white/30">
+                      Click to view quantizations
                     </span>
                   </div>
                 </div>
-                <div className="text-[var(--color-white)]/30 text-xs bg-[var(--color-purple-accent)]/10 px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20">
-                  <FiChevronDown size={14} />
-                </div>
-              </div>
-
-              {/* Model stats */}
-              <div className="flex flex-wrap gap-2 mb-3">
-                {model.downloads !== undefined && model.downloads > 0 && (
-                  <span className="text-xs bg-[var(--color-purple-accent)]/15 text-[var(--color-purple-accent)] px-2 py-1 rounded-full border border-[var(--color-purple-accent)]/20 flex items-center gap-1">
-                    <FiDownloadCloud size={12} />
-                    {formatDownloads(model.downloads)}
-                  </span>
-                )}
-                {model.likes !== undefined && model.likes > 0 && (
-                  <span className="text-xs bg-rose-500/15 text-rose-400 px-2 py-1 rounded-full border border-rose-500/20 flex items-center gap-1">
-                    <FiHeart size={12} />
-                    {formatLikes(model.likes)}
-                  </span>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-[var(--color-white)]/5">
-                <span className="text-xs text-[var(--color-white)]/30">
-                  Click to view available quantizations
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Pagination controls */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <button
-            onClick={onPreviousPage}
-            disabled={currentPage === 1 || loading}
-            className="p-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 disabled:opacity-30 rounded-lg text-[var(--color-white)]/60 transition-all cursor-pointer disabled:cursor-not-allowed"
-          >
-            <FiChevronLeft size={18} />
-          </button>
-
-          <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum: number;
-              if (totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
-
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => onGoToPage(pageNum)}
-                  disabled={loading}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-all cursor-pointer ${
-                    currentPage === pageNum
-                      ? "bg-[var(--color-purple-accent)] text-[var(--color-white)]"
-                      : "bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 text-[var(--color-white)]/60"
-                  }`}
-                >
-                  {pageNum}
-                </button>
               );
             })}
           </div>
 
-          <button
-            onClick={onNextPage}
-            disabled={currentPage === totalPages || loading}
-            className="p-2 bg-[var(--color-black)] hover:bg-[var(--color-white)]/10 disabled:opacity-30 rounded-lg text-[var(--color-white)]/60 transition-all cursor-pointer disabled:cursor-not-allowed"
-          >
-            <FiChevronRight size={18} />
-          </button>
-        </div>
+          {/* Infinite scroll sentinel */}
+          {hasMore && (
+            <div ref={targetRef} className="py-8 flex justify-center">
+              {loadingMore ? (
+                <div className="flex items-center gap-3 text-white/60">
+                  <FiLoader className="animate-spin" size={20} />
+                  <span className="text-sm">Loading more models...</span>
+                </div>
+              ) : (
+                <div className="text-white/30 text-sm">Scroll for more</div>
+              )}
+            </div>
+          )}
+
+          {!hasMore && models.length > 0 && (
+            <div className="py-8 text-center text-white/30 text-sm border-t border-white/5">
+              All {models.length} models loaded
+              {totalModels > 0 && totalModels < maxModels && (
+                <span className="block text-xs text-white/20 mt-2">
+                  ({totalModels} available from Hugging Face)
+                </span>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
