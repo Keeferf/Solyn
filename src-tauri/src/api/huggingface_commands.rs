@@ -8,7 +8,6 @@ use crate::core::model_downloader::{fetch_gguf_metadata, download_gguf_model};
 use crate::events::progress_broadcaster::broadcast_model_acquisition_progress;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter};
 
-// This is the command that will be called from the frontend
 #[tauri::command]
 pub async fn fetch_huggingface_models_page(
     page: usize,
@@ -23,7 +22,6 @@ pub async fn fetch_huggingface_models_page(
         Some("recent") => ModelFilter::Recent,
         _ => ModelFilter::default(),
     };
-    // Pass a reference to filter
     fetch_hugging_face_models_page(page, limit, &filter).await
 }
 
@@ -38,7 +36,6 @@ pub async fn get_huggingface_model_count(
         Some("recent") => ModelFilter::Recent,
         _ => ModelFilter::default(),
     };
-    // Pass a reference to filter
     get_total_model_count_for_filter(&filter).await
 }
 

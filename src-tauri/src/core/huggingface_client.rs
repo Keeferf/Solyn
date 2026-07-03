@@ -14,7 +14,8 @@ static MODEL_DETAILS_CACHE: Lazy<Mutex<HashMap<String, HFModelDetails>>> =
 static GGUF_MODELS_CACHE: Lazy<Mutex<HashMap<ModelFilter, Vec<HFModelSummary>>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-const MAX_MODELS: usize = 100; // Reduced to 100 models total
+const MAX_MODELS: usize = 100;
+const BATCH_SIZE: usize = 100;
 
 fn extract_parameter_count(filename: &str) -> Option<String> {
     let lower = filename.to_lowercase();
@@ -196,15 +197,11 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
     {
         let cache = GGUF_MODELS_CACHE.lock().unwrap();
         if let Some(models) = cache.get(&filter) {
-            println!("📊 [BACKEND] Returning cached GGUF models for filter {:?}: {}", filter, models.len());
             return Ok(models.clone());
         }
     }
     
-    println!("🔄 [BACKEND] Fetching up to {} GGUF models with filter {:?}...", MAX_MODELS, filter);
-    
     let client = reqwest::Client::new();
-    let batch_size = 50; // HF API limit
     let mut all_models = Vec::new();
     let mut page = 1;
     let mut consecutive_empty_pages = 0;
@@ -214,24 +211,19 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
         ModelFilter::MostDownloads => "downloads",
         ModelFilter::MostLiked => "likes",
         ModelFilter::Trending => "trending",
-        ModelFilter::Recent => "last_modified", // Use last_modified for recency
+        ModelFilter::Recent => "last_modified",
     };
     
     // Keep fetching pages until we reach MAX_MODELS or run out of models
     loop {
-        // Stop if we've reached our target
         if all_models.len() >= MAX_MODELS {
-            println!("✅ [BACKEND] Reached target of {} models", MAX_MODELS);
             break;
         }
 
-        // Use the models API with proper sorting
         let url = format!(
             "https://huggingface.co/api/models?search=gguf&sort={}&direction=-1&limit={}&page={}",
-            sort_param, batch_size, page
+            sort_param, BATCH_SIZE, page
         );
-        
-        println!("🔍 [BACKEND] Fetching page {} with filter {:?}: {}", page, filter, url);
         
         let response = client
             .get(&url)
@@ -251,21 +243,17 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
             .await
             .map_err(|e| format!("Failed to parse response: {}", e))?;
         
-        // Search API returns array directly
         let items = if let Some(items_array) = data.as_array() {
             items_array.clone()
         } else if let Some(models_array) = data.get("models").and_then(|v| v.as_array()) {
             models_array.clone()
         } else {
-            println!("⚠️ [BACKEND] Could not parse response as array or models object");
             break;
         };
         
         if items.is_empty() {
-            println!("📭 [BACKEND] Received empty page at page {}", page);
             consecutive_empty_pages += 1;
             if consecutive_empty_pages > 2 {
-                println!("⚠️ [BACKEND] Got multiple empty pages, stopping");
                 break;
             }
             page += 1;
@@ -274,19 +262,8 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
 
         consecutive_empty_pages = 0;
         
-        println!("📊 [BACKEND] Received {} items in page {}", items.len(), page);
-        
-        // Debug: Print first 3 model IDs from this page
-        println!("🔍 [BACKEND] First 3 model IDs in this page:");
-        for (i, item) in items.iter().take(3).enumerate() {
-            if let Some(id) = item["id"].as_str() {
-                println!("  [{}] {}", i + 1, id);
-            }
-        }
-        
         // Process items and verify they actually have GGUF files
         let remaining = MAX_MODELS - all_models.len();
-        let mut batch_added = 0;
         
         for item in items.iter().take(remaining) {
             let id = item["id"].as_str().unwrap_or("").to_string();
@@ -311,7 +288,6 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
                 let author = parts.get(0).unwrap_or(&"").to_string();
                 let name = parts.get(1).unwrap_or(&"").to_string();
                 
-                // Extract created_at and last_modified for recency
                 let created_at = item["created_at"].as_str()
                     .or_else(|| item["createdAt"].as_str())
                     .map(|s| s.to_string());
@@ -330,34 +306,22 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
                     created_at: created_at.clone(),
                     last_modified: last_modified.or(created_at),
                 });
-                
-                batch_added += 1;
-            } else {
-                println!("⏭️ [BACKEND] Skipping {} - no GGUF files found", id);
             }
         }
-        
-        println!("📊 [BACKEND] Added {} models from page, total: {} / {}", 
-            batch_added, all_models.len(), MAX_MODELS);
         
         // Move to next page
         page += 1;
         
         // If page was smaller than requested size, we've reached the end
-        if items.len() < batch_size {
-            println!("📭 [BACKEND] Got less than {} items (got {}), reached end",
-                batch_size, items.len());
+        if items.len() < BATCH_SIZE {
             break;
         }
         
         // Safety: If we're not finding any models with GGUF files for several pages, stop
-        if batch_added == 0 && page > 5 {
-            println!("⚠️ [BACKEND] No models with GGUF files found in last 5 pages, stopping");
+        if all_models.len() == 0 && page > 5 {
             break;
         }
     }
-    
-    println!("✅ [BACKEND] Fetched {} GGUF models with filter {:?}", all_models.len(), filter);
     
     // Cache the models for this filter
     {
@@ -372,47 +336,25 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
 pub async fn fetch_hugging_face_models_page(
     page: usize,
     limit: usize,
-    filter: &ModelFilter, // Change to borrow
+    filter: &ModelFilter,
 ) -> Result<Vec<HFModelSummary>, String> {
-    println!("📤 [BACKEND] fetch_hugging_face_models_page called with page: {}, limit: {}, filter: {:?}", 
-        page, limit, filter);
-    
-    // Fetch models with the specified filter
     let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
     
     let start = (page - 1) * limit;
     let end = std::cmp::min(start + limit, all_models.len());
     
-    println!("📊 [BACKEND] Total cached models for filter {:?}: {}, Requested page: {} (returning models {}-{})", 
-        filter, all_models.len(), page, start, end);
-    
     if start >= all_models.len() {
-        println!("📭 [BACKEND] Start index {} >= total {}, returning empty", start, all_models.len());
         return Ok(Vec::new());
     }
     
     let page_models = all_models[start..end].to_vec();
-    
-    // Debug: Print first 3 model IDs from this page
-    if !page_models.is_empty() {
-        println!("🔍 [BACKEND] First 3 model IDs on page {}:", page);
-        for (i, model) in page_models.iter().take(3).enumerate() {
-            println!("  [{}] {}", i + 1, model.model_id);
-        }
-    }
-    
-    println!("✅ [BACKEND] Returning {} models for page {}", page_models.len(), page);
     Ok(page_models)
 }
 
 // Get total count for a specific filter
 pub async fn get_total_model_count_for_filter(filter: &ModelFilter) -> Result<usize, String> {
-    println!("📤 [BACKEND] get_total_model_count_for_filter called with filter: {:?}", filter);
-    
     let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
-    let count = all_models.len();
-    println!("📊 [BACKEND] Total GGUF models for filter {:?}: {}", filter, count);
-    Ok(count)
+    Ok(all_models.len())
 }
 
 pub async fn fetch_model_details(model_id: &str) -> Result<HFModelDetails, String> {
@@ -519,9 +461,7 @@ pub fn clear_model_cache(filter: Option<ModelFilter>) {
     let mut cache = GGUF_MODELS_CACHE.lock().unwrap();
     if let Some(filter) = filter {
         cache.remove(&filter);
-        println!("🧹 [BACKEND] Cleared cache for filter: {:?}", filter);
     } else {
         cache.clear();
-        println!("🧹 [BACKEND] Cleared all model cache");
     }
 }

@@ -85,24 +85,7 @@ export const BrowseModels = ({
   });
 
   useEffect(() => {
-    console.log(
-      `🔍 [UI] Intersection: isIntersecting=${isIntersecting}, hasMore=${hasMore}, loadingMore=${loadingMore}`,
-    );
-    console.log(
-      `🔍 [UI] Models: ${models.length}/${totalModels}, hasMore: ${hasMore}, filter: ${currentFilter}`,
-    );
-  }, [
-    isIntersecting,
-    hasMore,
-    loadingMore,
-    models.length,
-    totalModels,
-    currentFilter,
-  ]);
-
-  useEffect(() => {
     if (isIntersecting && hasMore && !loadingMore && !loading) {
-      console.log(`🚀 [UI] Triggering load more from intersection observer`);
       onLoadMore();
     }
   }, [isIntersecting, hasMore, loadingMore, loading, onLoadMore]);
@@ -151,7 +134,6 @@ export const BrowseModels = ({
 
   return (
     <div className="w-full space-y-6">
-      {/* Filter Bar */}
       <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <FiServer className="text-purple-accent" size={16} />
@@ -172,19 +154,6 @@ export const BrowseModels = ({
               {label}
             </button>
           ))}
-          <div className="flex items-center gap-3 ml-2 pl-2 border-l border-white/10">
-            <span className="font-mono text-white/60">
-              {models.length}/{totalModels > 0 ? totalModels : maxModels}
-            </span>
-            {hasMore && (
-              <span className="text-purple-accent text-xs">
-                · Scroll for more
-              </span>
-            )}
-            {!hasMore && models.length > 0 && (
-              <span className="text-green-500 text-xs">· All loaded</span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -261,7 +230,6 @@ export const BrowseModels = ({
             })}
           </div>
 
-          {/* Infinite scroll sentinel */}
           {hasMore && (
             <div ref={targetRef} className="py-8 flex justify-center">
               {loadingMore ? (
