@@ -24,15 +24,16 @@ pub fn run() {
             // Platform commands
             api::platform_commands::get_platform_info,
             
-            // Hugging Face commands - UPDATED for infinite scroll
+            // Hugging Face commands
             api::huggingface_commands::fetch_huggingface_models_page,
             api::huggingface_commands::get_huggingface_model_count,
             api::huggingface_commands::fetch_model_details,
-            
-            // NEW: Search commands
             api::huggingface_commands::search_huggingface_models,
             api::huggingface_commands::get_huggingface_search_count,
-            api::huggingface_commands::clear_models_cache, // Optional but good to have
+            api::huggingface_commands::clear_models_cache,
+            
+            // Download command
+            api::huggingface_commands::download_huggingface_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

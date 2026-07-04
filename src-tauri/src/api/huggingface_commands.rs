@@ -1,4 +1,3 @@
-// src/api/huggingface_commands.rs
 use tauri;
 use crate::core::huggingface_client::{
     fetch_hugging_face_models_page, 
@@ -6,6 +5,7 @@ use crate::core::huggingface_client::{
     clear_model_cache,
     search_hugging_face_models,
     get_search_model_count,
+    download_model_file,
 };
 use crate::core::huggingface_client::fetch_model_details as client_fetch_model_details;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter, SearchModelsResponse};
@@ -46,8 +46,6 @@ pub async fn fetch_model_details(
     client_fetch_model_details(&model_id).await
 }
 
-
-
 #[tauri::command]
 pub async fn clear_models_cache(
     filter: Option<String>,
@@ -62,7 +60,6 @@ pub async fn clear_models_cache(
     Ok(())
 }
 
-// NEW: Search commands
 #[tauri::command]
 pub async fn search_huggingface_models(
     query: String,
@@ -92,4 +89,13 @@ pub async fn get_huggingface_search_count(
         _ => ModelFilter::default(),
     };
     get_search_model_count(&query, &filter).await
+}
+
+#[tauri::command]
+pub async fn download_huggingface_model(
+    model_id: String,
+    filename: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    download_model_file(&model_id, &filename, &app_handle).await
 }

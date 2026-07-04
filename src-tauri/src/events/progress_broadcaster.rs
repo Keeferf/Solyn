@@ -28,8 +28,9 @@ pub fn broadcast_model_acquisition_progress(
 ) {
     let progress_data = ModelAcquisitionProgress {
         model_id: model_id.to_string(),
+        filename: "".to_string(),
         status: status.to_string(),
-        progress,
+        progress: progress as f64,
         message: message.to_string(),
     };
     

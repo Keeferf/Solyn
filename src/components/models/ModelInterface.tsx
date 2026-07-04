@@ -10,6 +10,7 @@ import {
   HFModelSummary,
 } from "./hooks/useHuggingFaceModels";
 
+// Match the Rust ModelAcquisitionProgress type
 interface DownloadProgress {
   model_id: string;
   filename: string;
@@ -60,18 +61,24 @@ export const ModelInterface = () => {
   useEffect(() => {
     let unlistenProgress: (() => void) | undefined;
     let unlistenComplete: (() => void) | undefined;
-    let unlistenError: (() => void) | undefined;
 
     const setupListeners = async () => {
       try {
+        // Listen for progress updates
         unlistenProgress = await listen<DownloadProgress>(
           "model-download-progress",
           (event) => {
             const progress = event.payload;
             const key = getDownloadKey(progress.model_id, progress.filename);
 
+            // Add to downloading set if not already present
+            if (!downloadingModels.has(key)) {
+              setDownloadingModels((prev) => new Set(prev).add(key));
+            }
+
             setDownloadProgress((prev) => new Map(prev).set(key, progress));
 
+            // If status is complete or error, remove after delay
             if (progress.status === "complete" || progress.status === "error") {
               setTimeout(() => {
                 setDownloadingModels((prev) => {
@@ -89,41 +96,42 @@ export const ModelInterface = () => {
           },
         );
 
+        // Listen for completion events
         unlistenComplete = await listen<{ model_id: string; filename: string }>(
           "model-download-complete",
           (event) => {
             const { model_id, filename } = event.payload;
             const key = getDownloadKey(model_id, filename);
 
-            setDownloadingModels((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(key);
-              return newSet;
-            });
+            // Update progress to complete if it's still in the map
             setDownloadProgress((prev) => {
-              const newMap = new Map(prev);
-              newMap.delete(key);
-              return newMap;
+              const existing = prev.get(key);
+              if (existing) {
+                const newMap = new Map(prev);
+                newMap.set(key, {
+                  ...existing,
+                  status: "complete",
+                  progress: 100,
+                  message: "Download complete!",
+                });
+                return newMap;
+              }
+              return prev;
             });
-          },
-        );
 
-        unlistenError = await listen<{ model_id: string; filename: string }>(
-          "model-download-error",
-          (event) => {
-            const { model_id, filename } = event.payload;
-            const key = getDownloadKey(model_id, filename);
-
-            setDownloadingModels((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(key);
-              return newSet;
-            });
-            setDownloadProgress((prev) => {
-              const newMap = new Map(prev);
-              newMap.delete(key);
-              return newMap;
-            });
+            // Remove after delay
+            setTimeout(() => {
+              setDownloadingModels((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(key);
+                return newSet;
+              });
+              setDownloadProgress((prev) => {
+                const newMap = new Map(prev);
+                newMap.delete(key);
+                return newMap;
+              });
+            }, 3000);
           },
         );
       } catch (err) {
@@ -136,9 +144,8 @@ export const ModelInterface = () => {
     return () => {
       if (unlistenProgress) unlistenProgress();
       if (unlistenComplete) unlistenComplete();
-      if (unlistenError) unlistenError();
     };
-  }, []);
+  }, [downloadingModels]);
 
   const handleModelClick = (model: HFModelSummary) => {
     setSelectedModelId(model.model_id);
@@ -157,6 +164,7 @@ export const ModelInterface = () => {
         filename,
       });
     } catch (error) {
+      console.error("Download failed:", error);
       setDownloadingModels((prev) => {
         const newSet = new Set(prev);
         newSet.delete(key);
