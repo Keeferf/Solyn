@@ -51,7 +51,7 @@ pub async fn download_ollama(app_handle: tauri::AppHandle) -> Result<String, Str
 
     broadcast_download_progress(
         &window,
-        DownloadStatus::Completed,
+        DownloadStatus::Complete,  // Changed from Completed to Complete
         100,
         "Ollama installed successfully!".to_string(),
         None,

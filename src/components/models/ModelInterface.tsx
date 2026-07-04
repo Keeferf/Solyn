@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { BrowseModels } from "./BrowseModels";
+import { ModelToolbar } from "./ModelToolbar";
 import { DownloadStatusDisplay } from "./DownloadStatusDisplay";
 import { ModelDetailModal } from "./ModelDetailModal";
 import {
@@ -9,6 +10,7 @@ import {
   HFModelSummary,
 } from "./hooks/useHuggingFaceModels";
 
+// Match the Rust ModelAcquisitionProgress type
 interface DownloadProgress {
   model_id: string;
   filename: string;
@@ -30,9 +32,13 @@ export const ModelInterface = () => {
     totalModels,
     maxModels,
     currentFilter,
+    searchQuery,
+    isSearching,
     changeFilter,
     loadMoreModels,
     refreshModels,
+    searchModels,
+    clearSearch,
   } = useHuggingFaceModels();
 
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -43,7 +49,6 @@ export const ModelInterface = () => {
   const [downloadProgress, setDownloadProgress] = useState<
     Map<DownloadKey, DownloadProgress>
   >(new Map());
-  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
@@ -56,18 +61,24 @@ export const ModelInterface = () => {
   useEffect(() => {
     let unlistenProgress: (() => void) | undefined;
     let unlistenComplete: (() => void) | undefined;
-    let unlistenError: (() => void) | undefined;
 
     const setupListeners = async () => {
       try {
+        // Listen for progress updates
         unlistenProgress = await listen<DownloadProgress>(
           "model-download-progress",
           (event) => {
             const progress = event.payload;
             const key = getDownloadKey(progress.model_id, progress.filename);
 
+            // Add to downloading set if not already present
+            if (!downloadingModels.has(key)) {
+              setDownloadingModels((prev) => new Set(prev).add(key));
+            }
+
             setDownloadProgress((prev) => new Map(prev).set(key, progress));
 
+            // If status is complete or error, remove after delay
             if (progress.status === "complete" || progress.status === "error") {
               setTimeout(() => {
                 setDownloadingModels((prev) => {
@@ -85,44 +96,47 @@ export const ModelInterface = () => {
           },
         );
 
+        // Listen for completion events
         unlistenComplete = await listen<{ model_id: string; filename: string }>(
           "model-download-complete",
           (event) => {
             const { model_id, filename } = event.payload;
             const key = getDownloadKey(model_id, filename);
 
-            setDownloadingModels((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(key);
-              return newSet;
-            });
+            // Update progress to complete if it's still in the map
             setDownloadProgress((prev) => {
-              const newMap = new Map(prev);
-              newMap.delete(key);
-              return newMap;
+              const existing = prev.get(key);
+              if (existing) {
+                const newMap = new Map(prev);
+                newMap.set(key, {
+                  ...existing,
+                  status: "complete",
+                  progress: 100,
+                  message: "Download complete!",
+                });
+                return newMap;
+              }
+              return prev;
             });
+
+            // Remove after delay
+            setTimeout(() => {
+              setDownloadingModels((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(key);
+                return newSet;
+              });
+              setDownloadProgress((prev) => {
+                const newMap = new Map(prev);
+                newMap.delete(key);
+                return newMap;
+              });
+            }, 3000);
           },
         );
-
-        unlistenError = await listen<{ model_id: string; filename: string }>(
-          "model-download-error",
-          (event) => {
-            const { model_id, filename } = event.payload;
-            const key = getDownloadKey(model_id, filename);
-
-            setDownloadingModels((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(key);
-              return newSet;
-            });
-            setDownloadProgress((prev) => {
-              const newMap = new Map(prev);
-              newMap.delete(key);
-              return newMap;
-            });
-          },
-        );
-      } catch (err) {}
+      } catch (err) {
+        console.error("Failed to setup download listeners:", err);
+      }
     };
 
     setupListeners();
@@ -130,9 +144,8 @@ export const ModelInterface = () => {
     return () => {
       if (unlistenProgress) unlistenProgress();
       if (unlistenComplete) unlistenComplete();
-      if (unlistenError) unlistenError();
     };
-  }, []);
+  }, [downloadingModels]);
 
   const handleModelClick = (model: HFModelSummary) => {
     setSelectedModelId(model.model_id);
@@ -151,6 +164,7 @@ export const ModelInterface = () => {
         filename,
       });
     } catch (error) {
+      console.error("Download failed:", error);
       setDownloadingModels((prev) => {
         const newSet = new Set(prev);
         newSet.delete(key);
@@ -164,13 +178,16 @@ export const ModelInterface = () => {
     setSelectedModelId(null);
   };
 
-  const handleFilterChange = async (filter: string) => {
-    await changeFilter(filter as any);
+  const handleFilterChange = (filter: string) => {
+    changeFilter(filter as any);
   };
 
   const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
-    console.log("Search query:", query);
+    searchModels(query);
+  };
+
+  const handleClearSearch = () => {
+    clearSearch();
   };
 
   return (
@@ -186,7 +203,7 @@ export const ModelInterface = () => {
         </div>
         <button
           onClick={refreshModels}
-          disabled={loading || isSwitchingFilter}
+          disabled={loading || isSwitchingFilter || isSearching}
           className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
         >
           Refresh
@@ -194,6 +211,7 @@ export const ModelInterface = () => {
       </div>
 
       <div className="p-6 pt-4 space-y-6">
+        {/* Download Status */}
         {Array.from(downloadProgress.entries()).map(([key, progress]) => (
           <DownloadStatusDisplay
             key={key}
@@ -205,23 +223,34 @@ export const ModelInterface = () => {
           />
         ))}
 
+        {/* Toolbar - Search and Filters */}
+        <ModelToolbar
+          searchQuery={searchQuery}
+          onSearchChange={handleSearchChange}
+          onClearSearch={handleClearSearch}
+          currentFilter={currentFilter}
+          onFilterChange={handleFilterChange}
+          loading={loading || isSearching}
+          disabled={isSwitchingFilter}
+        />
+
+        {/* Models Grid */}
         <BrowseModels
           models={models}
           loading={loading}
           loadingMore={loadingMore}
           isSwitchingFilter={isSwitchingFilter}
+          isSearching={isSearching}
           hasMore={hasMore}
           totalModels={totalModels}
           maxModels={maxModels}
-          currentFilter={currentFilter}
           downloadingModels={downloadingModels}
           onModelClick={handleModelClick}
           onLoadMore={loadMoreModels}
           onRefresh={refreshModels}
-          onFilterChange={handleFilterChange}
           error={error}
           searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
+          onClearSearch={handleClearSearch}
         />
       </div>
 

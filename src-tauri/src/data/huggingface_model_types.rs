@@ -66,3 +66,19 @@ impl ModelFilter {
         }
     }
 }
+
+// Add search request/response types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchModelsRequest {
+    pub query: String,
+    pub filter: ModelFilter,
+    pub page: usize,
+    pub limit: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchModelsResponse {
+    pub models: Vec<HFModelSummary>,
+    pub total: usize,
+    pub has_more: bool,
+}

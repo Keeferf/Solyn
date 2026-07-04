@@ -1,16 +1,26 @@
-// src/api/huggingface_client.rs
+// src/core/huggingface_client.rs
 use reqwest;
 use serde_json;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo, ModelFilter};
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
+use tauri;
+use tauri::Manager;      // Add this for path()
+use tauri::Emitter;       // Add this for emit()
+use futures_util::StreamExt;
+use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo, ModelFilter, SearchModelsResponse};
+use crate::data::download_state::ModelAcquisitionProgress;
 
 static MODEL_DETAILS_CACHE: Lazy<Mutex<HashMap<String, HFModelDetails>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 static GGUF_MODELS_CACHE: Lazy<Mutex<HashMap<ModelFilter, Vec<HFModelSummary>>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+static SEARCH_CACHE: Lazy<Mutex<HashMap<String, Vec<HFModelSummary>>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 const MAX_MODELS: usize = 100;
@@ -319,6 +329,140 @@ async fn fetch_gguf_models_with_filter(filter: ModelFilter) -> Result<Vec<HFMode
     Ok(all_models)
 }
 
+async fn search_gguf_models(
+    query: &str,
+    filter: ModelFilter,
+) -> Result<Vec<HFModelSummary>, String> {
+    let cache_key = format!("{}:{}", query, filter.as_str());
+    {
+        let cache = SEARCH_CACHE.lock().unwrap();
+        if let Some(models) = cache.get(&cache_key) {
+            return Ok(models.clone());
+        }
+    }
+    
+    let client = reqwest::Client::new();
+    let mut all_models = Vec::new();
+    let mut page = 1;
+    let mut consecutive_empty_pages = 0;
+    
+    let sort_param = match filter {
+        ModelFilter::MostDownloads => "downloads",
+        ModelFilter::MostLiked => "likes",
+        ModelFilter::Recent => "lastModified",
+    };
+    
+    let encoded_query = urlencoding::encode(query);
+    
+    loop {
+        if all_models.len() >= MAX_MODELS {
+            break;
+        }
+        
+        let url = format!(
+            "https://huggingface.co/api/models?search={}+gguf&sort={}&direction=-1&limit={}&page={}",
+            encoded_query, sort_param, BATCH_SIZE, page
+        );
+        
+        let response = client
+            .get(&url)
+            .header("User-Agent", "SolynApp/1.0")
+            .header("Cache-Control", "no-cache")
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to search Hugging Face models: {}", e))?;
+        
+        if !response.status().is_success() {
+            return Err(format!("Hugging Face API error: {}", response.status()));
+        }
+        
+        let data: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        
+        let items = if let Some(items_array) = data.as_array() {
+            items_array.clone()
+        } else if let Some(models_array) = data.get("models").and_then(|v| v.as_array()) {
+            models_array.clone()
+        } else {
+            break;
+        };
+        
+        if items.is_empty() {
+            consecutive_empty_pages += 1;
+            if consecutive_empty_pages > 2 {
+                break;
+            }
+            page += 1;
+            continue;
+        }
+        
+        consecutive_empty_pages = 0;
+        let remaining = MAX_MODELS - all_models.len();
+        
+        for item in items.iter().take(remaining) {
+            let id = item["id"].as_str().unwrap_or("").to_string();
+            if id.is_empty() {
+                continue;
+            }
+            
+            let siblings = item.get("siblings").and_then(|s| s.as_array());
+            let has_gguf = siblings
+                .map(|s| s.iter().any(|f| {
+                    f["rfilename"].as_str()
+                        .or_else(|| f["filename"].as_str())
+                        .map(|name| name.ends_with(".gguf"))
+                        .unwrap_or(false)
+                }))
+                .unwrap_or(false);
+            
+            if siblings.is_none() || has_gguf {
+                let parts: Vec<&str> = id.split('/').collect();
+                let author = parts.get(0).unwrap_or(&"").to_string();
+                let name = parts.get(1).unwrap_or(&"").to_string();
+                
+                let created_at = item["created_at"].as_str()
+                    .or_else(|| item["createdAt"].as_str())
+                    .map(|s| s.to_string());
+                
+                let last_modified = item["last_modified"].as_str()
+                    .or_else(|| item["lastModified"].as_str())
+                    .map(|s| s.to_string());
+                
+                all_models.push(HFModelSummary {
+                    id: id.clone(),
+                    model_id: id,
+                    author,
+                    name,
+                    downloads: item["downloads"].as_u64(),
+                    likes: item["likes"].as_u64(),
+                    created_at: created_at.clone(),
+                    last_modified: last_modified.or(created_at),
+                });
+            }
+        }
+        
+        page += 1;
+        
+        if items.len() < BATCH_SIZE {
+            break;
+        }
+        
+        if all_models.is_empty() && page > 5 {
+            break;
+        }
+    }
+    
+    {
+        let mut cache = SEARCH_CACHE.lock().unwrap();
+        cache.insert(cache_key, all_models.clone());
+    }
+    
+    Ok(all_models)
+}
+
 pub async fn fetch_hugging_face_models_page(
     page: usize,
     limit: usize,
@@ -337,8 +481,57 @@ pub async fn fetch_hugging_face_models_page(
     Ok(page_models)
 }
 
+pub async fn search_hugging_face_models(
+    query: &str,
+    page: usize,
+    limit: usize,
+    filter: &ModelFilter,
+) -> Result<SearchModelsResponse, String> {
+    if query.trim().is_empty() {
+        let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
+        let start = (page - 1) * limit;
+        let end = std::cmp::min(start + limit, all_models.len());
+        
+        let models = if start >= all_models.len() {
+            Vec::new()
+        } else {
+            all_models[start..end].to_vec()
+        };
+        
+        return Ok(SearchModelsResponse {
+            models,
+            total: all_models.len(),
+            has_more: end < all_models.len(),
+        });
+    }
+    
+    let all_models = search_gguf_models(query, filter.clone()).await?;
+    let start = (page - 1) * limit;
+    let end = std::cmp::min(start + limit, all_models.len());
+    
+    let models = if start >= all_models.len() {
+        Vec::new()
+    } else {
+        all_models[start..end].to_vec()
+    };
+    
+    Ok(SearchModelsResponse {
+        models,
+        total: all_models.len(),
+        has_more: end < all_models.len(),
+    })
+}
+
 pub async fn get_total_model_count_for_filter(filter: &ModelFilter) -> Result<usize, String> {
     let all_models = fetch_gguf_models_with_filter(filter.clone()).await?;
+    Ok(all_models.len())
+}
+
+pub async fn get_search_model_count(query: &str, filter: &ModelFilter) -> Result<usize, String> {
+    if query.trim().is_empty() {
+        return get_total_model_count_for_filter(filter).await;
+    }
+    let all_models = search_gguf_models(query, filter.clone()).await?;
     Ok(all_models.len())
 }
 
@@ -447,4 +640,144 @@ pub fn clear_model_cache(filter: Option<ModelFilter>) {
     } else {
         cache.clear();
     }
+    
+    let mut search_cache = SEARCH_CACHE.lock().unwrap();
+    search_cache.clear();
+}
+
+// Download function - Fixed for Tauri 2.0
+pub async fn download_model_file(
+    model_id: &str,
+    filename: &str,
+    app_handle: &tauri::AppHandle,
+) -> Result<(), String> {
+    // Get the app's data directory
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+    
+    // Create models directory if it doesn't exist
+    let models_dir = app_dir.join("models");
+    if !models_dir.exists() {
+        fs::create_dir_all(&models_dir)
+            .await
+            .map_err(|e| format!("Failed to create models directory: {}", e))?;
+    }
+    
+    // Create model-specific subdirectory
+    let model_folder_name = model_id.replace("/", "_");
+    let model_dir = models_dir.join(&model_folder_name);
+    if !model_dir.exists() {
+        fs::create_dir_all(&model_dir)
+            .await
+            .map_err(|e| format!("Failed to create model directory: {}", e))?;
+    }
+    
+    let file_path = model_dir.join(filename);
+    
+    // Check if file already exists
+    if file_path.exists() {
+        return Err(format!("File {} already exists", filename));
+    }
+    
+    // Create download URL
+    let url = format!(
+        "https://huggingface.co/{}/resolve/main/{}",
+        model_id, filename
+    );
+    
+    let client = reqwest::Client::new();
+    
+    // Send initial progress
+    let initial_progress = ModelAcquisitionProgress {
+        model_id: model_id.to_string(),
+        filename: filename.to_string(),
+        status: "starting".to_string(),
+        progress: 0.0,
+        message: "Starting download...".to_string(),
+    };
+    let _ = app_handle.emit("model-download-progress", initial_progress);
+    
+    // Start download
+    let response = client
+        .get(&url)
+        .header("User-Agent", "SolynApp/1.0")
+        .timeout(Duration::from_secs(3600))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to start download: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Download failed with status: {}", response.status()));
+    }
+    
+    // Get total file size
+    let total_size = response
+        .content_length()
+        .ok_or_else(|| "Failed to get file size".to_string())?;
+    
+    // Create file and download with progress
+    let mut file = fs::File::create(&file_path)
+        .await
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    
+    let mut downloaded: u64 = 0;
+    let mut stream = response.bytes_stream();
+    
+    let mut last_update = tokio::time::Instant::now();
+    let update_interval = tokio::time::Duration::from_millis(500);
+    
+    while let Some(chunk_result) = stream.next().await {
+        let chunk = chunk_result
+            .map_err(|e| format!("Download error: {}", e))?;
+        
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("Write error: {}", e))?;
+        
+        downloaded += chunk.len() as u64;
+        
+        // Update progress at most every 500ms
+        if last_update.elapsed() >= update_interval {
+            let progress_percent = (downloaded as f64 / total_size as f64) * 100.0;
+            let progress_rounded = (progress_percent * 10.0).round() / 10.0;
+            
+            let progress_msg = ModelAcquisitionProgress {
+                model_id: model_id.to_string(),
+                filename: filename.to_string(),
+                status: "downloading".to_string(),
+                progress: progress_rounded,
+                message: format!("Downloading... {:.1}%", progress_rounded),
+            };
+            let _ = app_handle.emit("model-download-progress", progress_msg);
+            
+            last_update = tokio::time::Instant::now();
+        }
+    }
+    
+    // Flush and sync file
+    file.flush().await
+        .map_err(|e| format!("Failed to flush file: {}", e))?;
+    file.sync_all().await
+        .map_err(|e| format!("Failed to sync file: {}", e))?;
+    
+    // Send completion progress
+    let complete_progress = ModelAcquisitionProgress {
+        model_id: model_id.to_string(),
+        filename: filename.to_string(),
+        status: "complete".to_string(),
+        progress: 100.0,
+        message: "Download complete!".to_string(),
+    };
+    let _ = app_handle.emit("model-download-progress", complete_progress);
+    
+    // Send separate completion event
+    let _ = app_handle.emit("model-download-complete", &serde_json::json!({
+        "model_id": model_id,
+        "filename": filename,
+        "path": file_path.to_str().unwrap_or(""),
+    }));
+    
+    Ok(())
 }

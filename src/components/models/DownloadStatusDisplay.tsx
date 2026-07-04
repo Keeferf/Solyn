@@ -1,11 +1,3 @@
-import {
-  FiLoader,
-  FiCheckCircle,
-  FiXCircle,
-  FiDownload,
-  FiFile,
-} from "react-icons/fi";
-
 interface DownloadStatusDisplayProps {
   modelId: string;
   filename: string;
@@ -21,77 +13,57 @@ export const DownloadStatusDisplay = ({
   message,
   status,
 }: DownloadStatusDisplayProps) => {
-  const getStatusIcon = () => {
-    switch (status) {
-      case "complete":
-        return <FiCheckCircle className="text-green-400" size={20} />;
-      case "error":
-        return <FiXCircle className="text-red-400" size={20} />;
-      case "downloading":
-        return (
-          <FiLoader className="animate-spin text-purple-accent" size={20} />
-        );
-      default:
-        return <FiDownload className="text-white/40" size={20} />;
-    }
-  };
+  // Format filename for display
+  const displayName =
+    filename.length > 40 ? filename.substring(0, 37) + "..." : filename;
 
-  const getStatusColor = () => {
-    switch (status) {
-      case "complete":
-        return "border-green-500/30 bg-green-500/10";
-      case "error":
-        return "border-red-500/30 bg-red-500/10";
-      case "downloading":
-        return "border-purple-accent/30 bg-purple-accent/10";
-      default:
-        return "border-white/10 bg-white/5";
-    }
-  };
+  const isComplete = status === "complete";
+  const isError = status === "error";
 
-  const getQuantizationLabel = (filename: string): string => {
-    const match = filename.match(
-      /Q[0-9]_[0-9K]|Q[0-9]_[0-9]|F[0-9]{2}|[IQ][0-9]_[0-9]/,
-    );
-    if (match) return match[0];
-    if (filename.includes("q4")) return "Q4";
-    if (filename.includes("q5")) return "Q5";
-    if (filename.includes("q8")) return "Q8";
-    if (filename.includes("f16")) return "F16";
-    if (filename.includes("f32")) return "F32";
-    return "GGUF";
-  };
+  const progressColor = isError
+    ? "bg-red-500"
+    : isComplete
+      ? "bg-green-500"
+      : "bg-purple-accent";
+  const progressValue = Math.min(Math.max(progress, 0), 100);
 
   return (
-    <div className={`border rounded-lg p-4 ${getStatusColor()} transition-all`}>
-      <div className="flex items-center gap-3 mb-2">
-        {getStatusIcon()}
+    <div className="bg-black/50 rounded-lg border border-white/10 p-4">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-white font-medium truncate">{modelId}</p>
-            <span className="text-xs text-white/30 bg-white/5 px-2 py-0.5 rounded-full whitespace-nowrap">
-              {getQuantizationLabel(filename)}
+            <span className="text-white/60 text-sm">Downloading:</span>
+            <span className="text-white text-sm font-mono truncate">
+              {displayName}
+            </span>
+            <span className="text-white/40 text-xs ml-2">
+              {modelId.split("/").pop()}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <FiFile className="text-white/30" size={12} />
-            <p className="text-white/60 text-sm truncate">{filename}</p>
-          </div>
-          <p className="text-white/40 text-xs mt-0.5">{message}</p>
+          <span
+            className={`text-xs ${
+              isError
+                ? "text-red-400"
+                : isComplete
+                  ? "text-green-400"
+                  : "text-white/40"
+            }`}
+          >
+            {message}
+          </span>
         </div>
-        <span className="text-white/40 text-sm font-mono">{progress}%</span>
+        <span className="text-white/60 text-sm font-mono ml-4 whitespace-nowrap">
+          {isComplete ? "✓" : isError ? "✗" : `${progressValue.toFixed(1)}%`}
+        </span>
       </div>
 
+      {/* Progress bar */}
       <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-500 ${
-            status === "error"
-              ? "bg-red-500"
-              : status === "complete"
-                ? "bg-green-500"
-                : "bg-purple-accent"
-          }`}
-          style={{ width: `${Math.min(100, progress)}%` }}
+          className={`h-full transition-all duration-300 ${progressColor}`}
+          style={{
+            width: isComplete ? "100%" : isError ? "100%" : `${progressValue}%`,
+          }}
         />
       </div>
     </div>

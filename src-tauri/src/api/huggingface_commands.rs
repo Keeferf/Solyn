@@ -1,12 +1,14 @@
-// src/api/huggingface_commands.rs
 use tauri;
-use tauri::Manager;
-use tauri::Emitter;
-use crate::core::huggingface_client::{fetch_hugging_face_models_page, get_total_model_count_for_filter, clear_model_cache};
+use crate::core::huggingface_client::{
+    fetch_hugging_face_models_page, 
+    get_total_model_count_for_filter, 
+    clear_model_cache,
+    search_hugging_face_models,
+    get_search_model_count,
+    download_model_file,
+};
 use crate::core::huggingface_client::fetch_model_details as client_fetch_model_details;
-use crate::core::model_downloader::{fetch_gguf_metadata, download_gguf_model};
-use crate::events::progress_broadcaster::broadcast_model_acquisition_progress;
-use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter};
+use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter, SearchModelsResponse};
 
 #[tauri::command]
 pub async fn fetch_huggingface_models_page(
@@ -45,51 +47,6 @@ pub async fn fetch_model_details(
 }
 
 #[tauri::command]
-pub async fn download_huggingface_model(
-    app_handle: tauri::AppHandle,
-    model_id: String,
-    _filename: String,
-) -> Result<String, String> {
-    let window = app_handle
-        .get_webview_window("main")
-        .ok_or("Main window not found")?;
-    
-    let window_clone = window.clone();
-    let model_id_clone = model_id.clone();
-    
-    tokio::spawn(async move {
-        broadcast_model_acquisition_progress(&window_clone, &model_id_clone, "downloading", 0, "Starting download...");
-        
-        let gguf_metadata = match fetch_gguf_metadata(&model_id_clone).await {
-            Ok(info) => info,
-            Err(e) => {
-                let error_msg = format!("Failed to find GGUF file: {}", e);
-                broadcast_model_acquisition_progress(&window_clone, &model_id_clone, "error", 0, &error_msg);
-                let _ = window_clone.emit("model-download-error", model_id_clone);
-                return;
-            }
-        };
-        
-        broadcast_model_acquisition_progress(&window_clone, &model_id_clone, "downloading", 20, 
-            &format!("Downloading GGUF file: {}", gguf_metadata.filename));
-        
-        match download_gguf_model(&window_clone, &model_id_clone, &gguf_metadata).await {
-            Ok(result) => {
-                broadcast_model_acquisition_progress(&window_clone, &model_id_clone, "complete", 100, &result);
-                let _ = window_clone.emit("model-download-complete", model_id_clone);
-            }
-            Err(e) => {
-                let error_msg = format!("Download failed: {}", e);
-                broadcast_model_acquisition_progress(&window_clone, &model_id_clone, "error", 0, &error_msg);
-                let _ = window_clone.emit("model-download-error", model_id_clone);
-            }
-        }
-    });
-    
-    Ok(format!("Started downloading model: {}", model_id))
-}
-
-#[tauri::command]
 pub async fn clear_models_cache(
     filter: Option<String>,
 ) -> Result<(), String> {
@@ -101,4 +58,44 @@ pub async fn clear_models_cache(
     };
     clear_model_cache(filter);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn search_huggingface_models(
+    query: String,
+    page: usize,
+    limit: Option<usize>,
+    filter: Option<String>,
+) -> Result<SearchModelsResponse, String> {
+    let limit = limit.unwrap_or(20);
+    let filter = match filter.as_deref() {
+        Some("most_downloads") => ModelFilter::MostDownloads,
+        Some("most_liked") => ModelFilter::MostLiked,
+        Some("recent") => ModelFilter::Recent,
+        _ => ModelFilter::default(),
+    };
+    search_hugging_face_models(&query, page, limit, &filter).await
+}
+
+#[tauri::command]
+pub async fn get_huggingface_search_count(
+    query: String,
+    filter: Option<String>,
+) -> Result<usize, String> {
+    let filter = match filter.as_deref() {
+        Some("most_downloads") => ModelFilter::MostDownloads,
+        Some("most_liked") => ModelFilter::MostLiked,
+        Some("recent") => ModelFilter::Recent,
+        _ => ModelFilter::default(),
+    };
+    get_search_model_count(&query, &filter).await
+}
+
+#[tauri::command]
+pub async fn download_huggingface_model(
+    model_id: String,
+    filename: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    download_model_file(&model_id, &filename, &app_handle).await
 }
