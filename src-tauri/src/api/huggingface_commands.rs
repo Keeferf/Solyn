@@ -1,14 +1,14 @@
 use tauri;
-use crate::core::huggingface_client::{
+use crate::core::huggingface::{
     fetch_hugging_face_models_page, 
     get_total_model_count_for_filter, 
     clear_model_cache,
     search_hugging_face_models,
     get_search_model_count,
     download_model_file,
-    cancel_download,  // Add this import
+    cancel_download,
 };
-use crate::core::huggingface_client::fetch_model_details as client_fetch_model_details;
+use crate::core::huggingface::fetch_model_details as client_fetch_model_details;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter, SearchModelsResponse};
 
 #[tauri::command]
@@ -101,7 +101,6 @@ pub async fn download_huggingface_model(
     download_model_file(&model_id, &filename, &app_handle).await
 }
 
-// Add new cancel command
 #[tauri::command]
 pub fn cancel_huggingface_download(
     model_id: String,
