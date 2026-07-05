@@ -4,12 +4,14 @@ use serde_json;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use once_cell::sync::Lazy;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tauri;
-use tauri::Manager;      // Add this for path()
-use tauri::Emitter;       // Add this for emit()
+use tauri::Manager;
+use tauri::Emitter;
 use futures_util::StreamExt;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, GGUFFileInfo, ModelFilter, SearchModelsResponse};
 use crate::data::download_state::ModelAcquisitionProgress;
@@ -23,8 +25,16 @@ static GGUF_MODELS_CACHE: Lazy<Mutex<HashMap<ModelFilter, Vec<HFModelSummary>>>>
 static SEARCH_CACHE: Lazy<Mutex<HashMap<String, Vec<HFModelSummary>>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+// Store cancellation tokens for active downloads
+static DOWNLOAD_CANCELLATION_TOKENS: Lazy<Mutex<HashMap<String, Arc<AtomicBool>>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
 const MAX_MODELS: usize = 100;
 const BATCH_SIZE: usize = 100;
+
+fn generate_download_id(model_id: &str, filename: &str) -> String {
+    format!("{}:{}", model_id, filename)
+}
 
 fn extract_parameter_count(filename: &str) -> Option<String> {
     let lower = filename.to_lowercase();
@@ -645,12 +655,36 @@ pub fn clear_model_cache(filter: Option<ModelFilter>) {
     search_cache.clear();
 }
 
-// Download function - Fixed for Tauri 2.0
+// Cancel a download by setting its cancellation flag
+pub fn cancel_download(model_id: &str, filename: &str) -> bool {
+    let download_id = generate_download_id(model_id, filename);
+    let tokens = DOWNLOAD_CANCELLATION_TOKENS.lock().unwrap();
+    
+    if let Some(token) = tokens.get(&download_id) {
+        token.store(true, Ordering::SeqCst);
+        true
+    } else {
+        false
+    }
+}
+
+// Download function with cancellation support
 pub async fn download_model_file(
     model_id: &str,
     filename: &str,
     app_handle: &tauri::AppHandle,
 ) -> Result<(), String> {
+    let download_id = generate_download_id(model_id, filename);
+    
+    // Create cancellation token
+    let cancel_token = Arc::new(AtomicBool::new(false));
+    
+    // Store the token
+    {
+        let mut tokens = DOWNLOAD_CANCELLATION_TOKENS.lock().unwrap();
+        tokens.insert(download_id.clone(), cancel_token.clone());
+    }
+    
     // Get the app's data directory
     let app_dir = app_handle
         .path()
@@ -678,6 +712,11 @@ pub async fn download_model_file(
     
     // Check if file already exists
     if file_path.exists() {
+        // Clean up token
+        {
+            let mut tokens = DOWNLOAD_CANCELLATION_TOKENS.lock().unwrap();
+            tokens.remove(&download_id);
+        }
         return Err(format!("File {} already exists", filename));
     }
     
@@ -709,6 +748,11 @@ pub async fn download_model_file(
         .map_err(|e| format!("Failed to start download: {}", e))?;
     
     if !response.status().is_success() {
+        // Clean up token
+        {
+            let mut tokens = DOWNLOAD_CANCELLATION_TOKENS.lock().unwrap();
+            tokens.remove(&download_id);
+        }
         return Err(format!("Download failed with status: {}", response.status()));
     }
     
@@ -729,6 +773,30 @@ pub async fn download_model_file(
     let update_interval = tokio::time::Duration::from_millis(500);
     
     while let Some(chunk_result) = stream.next().await {
+        // Check for cancellation
+        if cancel_token.load(Ordering::SeqCst) {
+            // Send cancelled status
+            let cancelled_progress = ModelAcquisitionProgress {
+                model_id: model_id.to_string(),
+                filename: filename.to_string(),
+                status: "cancelled".to_string(),
+                progress: (downloaded as f64 / total_size as f64) * 100.0,
+                message: "Download cancelled".to_string(),
+            };
+            let _ = app_handle.emit("model-download-progress", cancelled_progress);
+            
+            // Delete the incomplete file
+            let _ = fs::remove_file(&file_path).await;
+            
+            // Clean up token
+            {
+                let mut tokens = DOWNLOAD_CANCELLATION_TOKENS.lock().unwrap();
+                tokens.remove(&download_id);
+            }
+            
+            return Err("Download cancelled".to_string());
+        }
+        
         let chunk = chunk_result
             .map_err(|e| format!("Download error: {}", e))?;
         
@@ -778,6 +846,12 @@ pub async fn download_model_file(
         "filename": filename,
         "path": file_path.to_str().unwrap_or(""),
     }));
+    
+    // Clean up token
+    {
+        let mut tokens = DOWNLOAD_CANCELLATION_TOKENS.lock().unwrap();
+        tokens.remove(&download_id);
+    }
     
     Ok(())
 }

@@ -32,8 +32,9 @@ pub fn run() {
             api::huggingface_commands::get_huggingface_search_count,
             api::huggingface_commands::clear_models_cache,
             
-            // Download command
+            // Download commands
             api::huggingface_commands::download_huggingface_model,
+            api::huggingface_commands::cancel_huggingface_download,  
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
