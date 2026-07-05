@@ -31,6 +31,9 @@ const defaultFilterOptions = [
   { value: "recent", label: "Recent", icon: FiClock },
 ];
 
+// Minimum characters required before triggering a search
+const MIN_SEARCH_CHARS = 3;
+
 export const ModelToolbar = ({
   searchQuery,
   onSearchChange,
@@ -48,6 +51,75 @@ export const ModelToolbar = ({
 
   // Use the maintain focus hook
   const inputRef = useMaintainFocus<HTMLInputElement>();
+
+  // Additional focus maintenance during loading/loading states
+  useEffect(() => {
+    // Only run this effect when loading is true (search is in progress)
+    if (loading && inputRef.current) {
+      // Store the input element reference
+      const input = inputRef.current;
+
+      // Function to restore focus if lost
+      const restoreFocus = () => {
+        if (
+          input &&
+          document.activeElement !== input &&
+          document.contains(input)
+        ) {
+          // Small delay to let DOM settle
+          setTimeout(() => {
+            if (
+              input &&
+              document.activeElement !== input &&
+              document.contains(input)
+            ) {
+              input.focus();
+            }
+          }, 10);
+        }
+      };
+
+      // Listen for focusout events to catch focus loss
+      const handleFocusOut = (e: FocusEvent) => {
+        // If focus is moving to something else and we're still loading
+        if (loading && input && document.activeElement !== input) {
+          // Schedule focus restoration
+          restoreFocus();
+        }
+      };
+
+      // Also watch for DOM changes that might steal focus
+      const observer = new MutationObserver(() => {
+        if (
+          loading &&
+          input &&
+          document.activeElement !== input &&
+          document.contains(input)
+        ) {
+          restoreFocus();
+        }
+      });
+
+      // Observe the parent for changes
+      const parent = input.parentElement?.parentElement;
+      if (parent) {
+        observer.observe(parent, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      }
+
+      // Add event listener for focusout
+      document.addEventListener("focusout", handleFocusOut);
+
+      // Cleanup
+      return () => {
+        document.removeEventListener("focusout", handleFocusOut);
+        observer.disconnect();
+      };
+    }
+  }, [loading, inputRef]);
 
   // Sync local state when search is cleared externally
   useEffect(() => {
@@ -70,7 +142,12 @@ export const ModelToolbar = ({
 
     // Debounce the actual search API call
     debounceTimerRef.current = setTimeout(() => {
-      onSearchChange(newValue);
+      // Only trigger search if:
+      // 1. We have at least MIN_SEARCH_CHARS characters, OR
+      // 2. The search is being cleared (empty string)
+      if (newValue.length >= MIN_SEARCH_CHARS || newValue === "") {
+        onSearchChange(newValue);
+      }
     }, 300);
   };
 
@@ -118,6 +195,12 @@ export const ModelToolbar = ({
             </button>
           )}
         </div>
+        {/* Show hint about minimum characters */}
+        {localQuery.length > 0 && localQuery.length < MIN_SEARCH_CHARS && (
+          <p className="text-xs text-white/30 mt-1 ml-3">
+            Type at least {MIN_SEARCH_CHARS} characters to search
+          </p>
+        )}
       </div>
 
       {/* Filter Buttons */}
