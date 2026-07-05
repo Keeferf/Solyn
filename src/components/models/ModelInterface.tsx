@@ -1,3 +1,4 @@
+// src/components/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -49,6 +50,9 @@ export const ModelInterface = () => {
   const [downloadProgress, setDownloadProgress] = useState<
     Map<DownloadKey, DownloadProgress>
   >(new Map());
+  const [cancellingDownloads, setCancellingDownloads] = useState<
+    Set<DownloadKey>
+  >(new Set());
 
   const getDownloadKey = (modelId: string, filename: string): DownloadKey => {
     return `${modelId}::${filename}`;
@@ -56,6 +60,11 @@ export const ModelInterface = () => {
 
   const isDownloading = (modelId: string, filename: string): boolean => {
     return downloadingModels.has(getDownloadKey(modelId, filename));
+  };
+
+  const handleCancelDownload = (modelId: string, filename: string) => {
+    const key = getDownloadKey(modelId, filename);
+    setCancellingDownloads((prev) => new Set(prev).add(key));
   };
 
   useEffect(() => {
@@ -71,15 +80,32 @@ export const ModelInterface = () => {
             const progress = event.payload;
             const key = getDownloadKey(progress.model_id, progress.filename);
 
-            // Add to downloading set if not already present
-            if (!downloadingModels.has(key)) {
+            // Remove from cancelling set when status changes
+            setCancellingDownloads((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(key);
+              return newSet;
+            });
+
+            // Add to downloading set if not already present and status is active
+            if (
+              !downloadingModels.has(key) &&
+              (progress.status === "starting" ||
+                progress.status === "downloading")
+            ) {
               setDownloadingModels((prev) => new Set(prev).add(key));
             }
 
             setDownloadProgress((prev) => new Map(prev).set(key, progress));
 
-            // If status is complete or error, remove after delay
-            if (progress.status === "complete" || progress.status === "error") {
+            // If status is complete or error or cancelled, remove after delay
+            if (
+              progress.status === "complete" ||
+              progress.status === "error" ||
+              progress.status === "cancelled"
+            ) {
+              // For cancelled, keep showing the status for a bit longer
+              const delay = progress.status === "cancelled" ? 5000 : 3000;
               setTimeout(() => {
                 setDownloadingModels((prev) => {
                   const newSet = new Set(prev);
@@ -91,7 +117,12 @@ export const ModelInterface = () => {
                   newMap.delete(key);
                   return newMap;
                 });
-              }, 3000);
+                setCancellingDownloads((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.delete(key);
+                  return newSet;
+                });
+              }, delay);
             }
           },
         );
@@ -154,7 +185,7 @@ export const ModelInterface = () => {
 
   const handleDownload = async (modelId: string, filename: string) => {
     const key = getDownloadKey(modelId, filename);
-    if (downloadingModels.has(key)) return;
+    if (downloadingModels.has(key) || cancellingDownloads.has(key)) return;
 
     setDownloadingModels((prev) => new Set(prev).add(key));
 
@@ -165,11 +196,19 @@ export const ModelInterface = () => {
       });
     } catch (error) {
       console.error("Download failed:", error);
-      setDownloadingModels((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(key);
-        return newSet;
-      });
+      // If error is "Download cancelled", don't show as error
+      if (error !== "Download cancelled") {
+        setDownloadingModels((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(key);
+          return newSet;
+        });
+        setDownloadProgress((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(key);
+          return newMap;
+        });
+      }
     }
   };
 
@@ -211,7 +250,7 @@ export const ModelInterface = () => {
       </div>
 
       <div className="p-6 pt-4 space-y-6">
-        {/* Download Status */}
+        {/* Download Status - Shows at top with cancel button */}
         {Array.from(downloadProgress.entries()).map(([key, progress]) => (
           <DownloadStatusDisplay
             key={key}
@@ -220,6 +259,9 @@ export const ModelInterface = () => {
             progress={progress.progress}
             message={progress.message}
             status={progress.status}
+            onCancel={() =>
+              handleCancelDownload(progress.model_id, progress.filename)
+            }
           />
         ))}
 
@@ -254,6 +296,7 @@ export const ModelInterface = () => {
         />
       </div>
 
+      {/* Model Detail Modal - Also has cancel button for individual files */}
       <ModelDetailModal
         modelId={selectedModelId}
         isOpen={isModalOpen}

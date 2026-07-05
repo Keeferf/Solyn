@@ -1,3 +1,4 @@
+// src/components/ModelDetailModal.tsx
 import { useState, useEffect } from "react";
 import { FiFolder, FiX } from "react-icons/fi";
 import { GGUFFile } from "./hooks/useHuggingFaceModels";
@@ -14,6 +15,7 @@ import {
   QuantizationCard,
   SelectedFileDetails,
 } from "./ModalDetails";
+import { invoke } from "@tauri-apps/api/core";
 
 interface ModelDetailModalProps {
   modelId: string | null;
@@ -22,6 +24,7 @@ interface ModelDetailModalProps {
   onDownload: (modelId: string, filename: string) => Promise<void>;
   downloadingModels: Set<string>;
   isDownloading?: (modelId: string, filename: string) => boolean;
+  onCancelDownload?: (modelId: string, filename: string) => void;
 }
 
 export const ModelDetailModal = ({
@@ -33,9 +36,11 @@ export const ModelDetailModal = ({
   isDownloading = (modelId: string, filename: string) => {
     return downloadingModels.has(`${modelId}::${filename}`);
   },
+  onCancelDownload,
 }: ModelDetailModalProps) => {
   const { details, isLoading, error } = useModelDetails(modelId, isOpen);
   const [selectedFile, setSelectedFile] = useState<GGUFFile | null>(null);
+  const [cancellingFile, setCancellingFile] = useState<string | null>(null);
 
   useEffect(() => {
     if (details && details.gguf_files.length > 0) {
@@ -45,6 +50,41 @@ export const ModelDetailModal = ({
       setSelectedFile(null);
     }
   }, [details]);
+
+  // Reset cancelling state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setCancellingFile(null);
+    }
+  }, [isOpen]);
+
+  const handleCancelDownload = async (modelId: string, filename: string) => {
+    setCancellingFile(filename);
+    try {
+      await invoke("cancel_huggingface_download", {
+        modelId,
+        filename,
+      });
+      // Call the parent's cancel handler if provided
+      if (onCancelDownload) {
+        onCancelDownload(modelId, filename);
+      }
+    } catch (error) {
+      console.error("Failed to cancel download:", error);
+      setCancellingFile(null);
+    }
+  };
+
+  // Check if a specific file is being downloaded
+  const isFileDownloading = (filename: string): boolean => {
+    if (!modelId) return false;
+    return isDownloading(modelId, filename);
+  };
+
+  // Check if a file is being cancelled
+  const isFileCancelling = (filename: string): boolean => {
+    return cancellingFile === filename;
+  };
 
   if (isLoading) {
     return <LoadingState onClose={onClose} />;
@@ -124,8 +164,10 @@ export const ModelDetailModal = ({
             <SelectedFileDetails
               file={selectedFile}
               modelId={modelId}
-              isDownloading={isDownloading(modelId, selectedFile.filename)}
-              onDownload={onDownload}
+              isDownloading={isFileDownloading(selectedFile.filename)}
+              isCancelling={isFileCancelling(selectedFile.filename)}
+              onDownload={onDownload} // Pass onDownload directly - it expects (modelId, filename)
+              onCancel={handleCancelDownload}
             />
           )}
         </div>
