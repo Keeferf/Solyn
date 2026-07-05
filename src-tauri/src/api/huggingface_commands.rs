@@ -7,9 +7,13 @@ use crate::core::huggingface::{
     get_search_model_count,
     download_model_file,
     cancel_download,
+    get_installed_models,
+    delete_installed_model,
 };
 use crate::core::huggingface::fetch_model_details as client_fetch_model_details;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter, SearchModelsResponse};
+
+// Remove the direct import of installed::InstalledModel since we're re-exporting it from the huggingface module
 
 #[tauri::command]
 pub async fn fetch_huggingface_models_page(
@@ -107,4 +111,21 @@ pub fn cancel_huggingface_download(
     filename: String,
 ) -> Result<bool, String> {
     Ok(cancel_download(&model_id, &filename))
+}
+
+// --- New Commands for Installed Models ---
+
+#[tauri::command]
+pub async fn get_installed_models_command(
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<crate::core::huggingface::InstalledModel>, String> {
+    get_installed_models(&app_handle).await
+}
+
+#[tauri::command]
+pub async fn delete_installed_model_command(
+    app_handle: tauri::AppHandle,
+    model_id: String,
+) -> Result<(), String> {
+    delete_installed_model(&app_handle, &model_id).await
 }

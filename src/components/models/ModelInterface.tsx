@@ -1,8 +1,9 @@
-// src/components/ModelInterface.tsx
+// src/components/models/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { BrowseModels } from "./BrowseModels";
+import { InstalledModels } from "./InstalledModels";
 import { ModelToolbar } from "./ModelToolbar";
 import { DownloadStatusDisplay } from "./DownloadStatusDisplay";
 import { ModelDetailModal } from "./ModelDetailModal";
@@ -23,6 +24,9 @@ interface DownloadProgress {
 type DownloadKey = string;
 
 export const ModelInterface = () => {
+  // Add tab state
+  const [activeTab, setActiveTab] = useState<"browse" | "installed">("browse");
+
   const {
     models,
     loading,
@@ -233,20 +237,37 @@ export const ModelInterface = () => {
     <div className="w-full h-full">
       <div className="flex items-center justify-between p-6 pb-0">
         <div className="flex items-center gap-8">
-          <h2 className="font-anton text-3xl sm:text-4xl text-white tracking-wide">
+          {/* Tab buttons with cursor-pointer */}
+          <button
+            onClick={() => setActiveTab("browse")}
+            className={`font-anton text-3xl sm:text-4xl tracking-wide transition-all cursor-pointer ${
+              activeTab === "browse"
+                ? "text-white"
+                : "text-white/30 hover:text-white/50"
+            }`}
+          >
             Browse
-          </h2>
-          <h2 className="font-anton text-3xl sm:text-4xl text-white/30 tracking-wide">
+          </button>
+          <button
+            onClick={() => setActiveTab("installed")}
+            className={`font-anton text-3xl sm:text-4xl tracking-wide transition-all cursor-pointer ${
+              activeTab === "installed"
+                ? "text-white"
+                : "text-white/30 hover:text-white/50"
+            }`}
+          >
             Installed
-          </h2>
+          </button>
         </div>
-        <button
-          onClick={refreshModels}
-          disabled={loading || isSwitchingFilter || isSearching}
-          className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
-        >
-          Refresh
-        </button>
+        {activeTab === "browse" && (
+          <button
+            onClick={refreshModels}
+            disabled={loading || isSwitchingFilter || isSearching}
+            className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
+          >
+            Refresh
+          </button>
+        )}
       </div>
 
       <div className="p-6 pt-4 space-y-6">
@@ -265,35 +286,46 @@ export const ModelInterface = () => {
           />
         ))}
 
-        {/* Toolbar - Search and Filters */}
-        <ModelToolbar
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          onClearSearch={handleClearSearch}
-          currentFilter={currentFilter}
-          onFilterChange={handleFilterChange}
-          loading={loading || isSearching}
-          disabled={isSwitchingFilter}
-        />
+        {activeTab === "browse" ? (
+          <>
+            {/* Toolbar - Search and Filters */}
+            <ModelToolbar
+              searchQuery={searchQuery}
+              onSearchChange={handleSearchChange}
+              onClearSearch={handleClearSearch}
+              currentFilter={currentFilter}
+              onFilterChange={handleFilterChange}
+              loading={loading || isSearching}
+              disabled={isSwitchingFilter}
+            />
 
-        {/* Models Grid */}
-        <BrowseModels
-          models={models}
-          loading={loading}
-          loadingMore={loadingMore}
-          isSwitchingFilter={isSwitchingFilter}
-          isSearching={isSearching}
-          hasMore={hasMore}
-          totalModels={totalModels}
-          maxModels={maxModels}
-          downloadingModels={downloadingModels}
-          onModelClick={handleModelClick}
-          onLoadMore={loadMoreModels}
-          onRefresh={refreshModels}
-          error={error}
-          searchQuery={searchQuery}
-          onClearSearch={handleClearSearch}
-        />
+            {/* Models Grid */}
+            <BrowseModels
+              models={models}
+              loading={loading}
+              loadingMore={loadingMore}
+              isSwitchingFilter={isSwitchingFilter}
+              isSearching={isSearching}
+              hasMore={hasMore}
+              totalModels={totalModels}
+              maxModels={maxModels}
+              downloadingModels={downloadingModels}
+              onModelClick={handleModelClick}
+              onLoadMore={loadMoreModels}
+              onRefresh={refreshModels}
+              error={error}
+              searchQuery={searchQuery}
+              onClearSearch={handleClearSearch}
+            />
+          </>
+        ) : (
+          <InstalledModels
+            onModelClick={(model) => {
+              // Optional: handle clicking an installed model
+              console.log("Clicked installed model:", model.model_id);
+            }}
+          />
+        )}
       </div>
 
       {/* Model Detail Modal - Also has cancel button for individual files */}

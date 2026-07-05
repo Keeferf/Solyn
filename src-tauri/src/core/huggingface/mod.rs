@@ -3,6 +3,7 @@ mod client;
 mod download;
 mod parsing;
 mod utils;
+mod installed;
 
 pub use client::{
     fetch_model_details,
@@ -14,3 +15,4 @@ pub use client::{
 pub use download::{download_model_file, cancel_download};
 pub use parsing::extract_gguf_files;
 pub use cache::clear_model_cache;
+pub use installed::{get_installed_models, delete_installed_model, InstalledModel, InstalledModelFile};
