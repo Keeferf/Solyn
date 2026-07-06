@@ -2,7 +2,8 @@ import { FiSearch, FiTerminal, FiPaperclip, FiArrowUp } from "react-icons/fi";
 import { ToggleButton } from "./ToggleButton";
 import { ModelSelector } from "./ModelSelector";
 import { ModeToggle } from "./ModeToggle";
-import { ModelType, ModeType } from "./ChatInterface";
+import { ModelType, ChatModel } from "./hooks/useModelSelection";
+import { ModeType } from "./ChatInterface";
 
 interface ChatControlsProps {
   // Search
@@ -16,8 +17,9 @@ interface ChatControlsProps {
   onAttachmentClick: () => void;
   // Model
   selectedModel: ModelType;
-  models: { value: ModelType; label: string }[];
+  models: ChatModel[];
   isModelDropdownOpen: boolean;
+  isLoading: boolean;
   onModelToggle: () => void;
   onModelSelect: (model: ModelType) => void;
   onModelClose: () => void;
@@ -42,6 +44,7 @@ export const ChatControls = ({
   selectedModel,
   models,
   isModelDropdownOpen,
+  isLoading,
   onModelToggle,
   onModelSelect,
   onModelClose,
@@ -86,6 +89,7 @@ export const ChatControls = ({
           selectedModel={selectedModel}
           models={models}
           isOpen={isModelDropdownOpen}
+          isLoading={isLoading}
           onToggle={onModelToggle}
           onSelect={onModelSelect}
           onClose={onModelClose}
