@@ -44,6 +44,9 @@ pub fn run() {
             
             // Modelfile generation command
             api::huggingface_commands::generate_modelfile,
+            
+            // Chat models command
+            api::huggingface_commands::get_chat_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

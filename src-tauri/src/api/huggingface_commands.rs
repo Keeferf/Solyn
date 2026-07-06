@@ -10,8 +10,8 @@ use crate::core::huggingface::{
     cancel_download,
     get_installed_models,
     delete_installed_model,
-    delete_model_file,        // New
-    delete_model_quantization, // New
+    delete_model_file,
+    delete_model_quantization,
     write_modelfile,
     ModelFileConfig,
     extract_parameter_count,
@@ -135,7 +135,6 @@ pub async fn delete_installed_model_command(
     delete_installed_model(&app_handle, &model_id).await
 }
 
-// NEW: Delete a single file
 #[tauri::command]
 pub async fn delete_model_file_command(
     app_handle: tauri::AppHandle,
@@ -145,7 +144,6 @@ pub async fn delete_model_file_command(
     delete_model_file(&app_handle, &model_id, &filename).await
 }
 
-// NEW: Delete all files with a specific quantization
 #[tauri::command]
 pub async fn delete_model_quantization_command(
     app_handle: tauri::AppHandle,
@@ -179,7 +177,6 @@ pub async fn generate_modelfile(
     let author = parts.get(0).unwrap_or(&"").to_string();
     let model_name = parts.get(1).unwrap_or(&"").to_string();
     
-    // Clone filename before using it
     let filename_clone = filename.clone();
     let quantization = extract_quantization(&filename);
     let parameter_count = extract_parameter_count(&filename_clone);
@@ -187,11 +184,44 @@ pub async fn generate_modelfile(
     let config = ModelFileConfig {
         model_name: format!("{}/{}", author, model_name),
         model_id: model_id.clone(),
-        gguf_filename: filename,  // Move occurs here
+        gguf_filename: filename,
         quantization,
         parameter_count,
     };
     
     let modelfile_path = write_modelfile(&model_dir, &config).await?;
     Ok(modelfile_path.to_str().unwrap_or("").to_string())
+}
+
+// --- Command for getting chat models ---
+
+#[tauri::command]
+pub async fn get_chat_models(
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<serde_json::Value>, String> {
+    let installed = get_installed_models(&app_handle).await?;
+    
+    let mut chat_models = Vec::new();
+    
+    for model in installed {
+        // Create a separate entry for each GGUF file (quantization variant)
+        for file in &model.files {
+            let model_value = serde_json::json!({
+                "value": format!("{}:{}", model.model_id, file.filename),
+                "label": format!("{} ({})", model.name, file.quantization.as_deref().unwrap_or("default")),
+                "model_id": model.model_id,
+                "author": model.author,
+                "name": model.name,
+                "quantization": file.quantization,
+                "parameter_count": file.parameter_count,
+                "filename": file.filename,
+                "path": file.path,
+                "has_modelfile": file.has_modelfile,
+                "size": file.size,
+            });
+            chat_models.push(model_value);
+        }
+    }
+    
+    Ok(chat_models)
 }

@@ -3,9 +3,8 @@ import { ChatInput } from "./ChatInput";
 import { ChatControls } from "./ChatControls";
 import { useChatInput } from "./hooks/useChatInput";
 import { useFileAttachment } from "./hooks/useFileAttachment";
-import { useModelSelection } from "./hooks/useModelSelection";
+import { useModelSelection, ModelType } from "./hooks/useModelSelection";
 
-export type ModelType = "gpt-4" | "claude-3" | "gemini-pro" | "llama-3";
 export type ModeType = "chat" | "agent";
 
 export const ChatInterface = () => {
@@ -25,19 +24,26 @@ export const ChatInterface = () => {
     selectedModel,
     models,
     isModelDropdownOpen,
+    isLoading,
     selectModel,
     toggleDropdown,
     closeDropdown,
+    getSelectedModelData,
   } = useModelSelection();
 
   const handleSubmit = () => {
-    if (input.trim()) {
+    if (input.trim() && !isLoading && models.length > 0) {
+      const modelData = getSelectedModelData();
       console.log("Sending message:", input);
       console.log("Mode:", mode);
       console.log("Model:", selectedModel);
+      console.log("Model data:", modelData);
       console.log("Search enabled:", isSearchEnabled);
       console.log("Code enabled:", isCodeEnabled);
       console.log("Attachment enabled:", isAttachmentEnabled);
+
+      // Here you would actually send the message to the model
+      // For now, just log it
       resetInput();
     }
   };
@@ -53,6 +59,12 @@ export const ChatInterface = () => {
     setMode(mode === "chat" ? "agent" : "chat");
   };
 
+  const hasValidModels =
+    models.length > 0 &&
+    models[0].value !== "no-models" &&
+    models[0].value !== "error";
+  const isSubmitDisabled = !input.trim() || isLoading || !hasValidModels;
+
   return (
     <div className="w-full">
       <div className="relative bg-white/5 rounded-2xl border border-white/10 hover:border-white/20 transition-colors">
@@ -61,6 +73,7 @@ export const ChatInterface = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={!hasValidModels}
         />
 
         <ChatControls
@@ -73,20 +86,25 @@ export const ChatInterface = () => {
           selectedModel={selectedModel}
           models={models}
           isModelDropdownOpen={isModelDropdownOpen}
+          isLoading={isLoading}
           onModelToggle={toggleDropdown}
           onModelSelect={selectModel}
           onModelClose={closeDropdown}
           mode={mode}
           onModeToggle={toggleMode}
           onSubmit={handleSubmit}
-          isSubmitDisabled={!input.trim()}
+          isSubmitDisabled={isSubmitDisabled}
           fileInputRef={fileInputRef}
           onFileChange={handleFileChange}
         />
       </div>
 
       <div className="mt-3 text-xs text-white/30 text-center">
-        Press Enter to send, Shift+Enter for new line
+        {!hasValidModels && !isLoading
+          ? "No models installed. Please download a model from the Hugging Face page."
+          : isLoading
+            ? "Loading models..."
+            : "Press Enter to send, Shift+Enter for new line"}
       </div>
     </div>
   );
