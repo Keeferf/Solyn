@@ -1,9 +1,11 @@
+// src/core/huggingface/installed.rs
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tauri::{AppHandle, Manager};
 
 use super::utils::{extract_parameter_count, extract_quantization};
+use super::modelfile::get_modelfile_name;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstalledModelFile {
@@ -13,6 +15,7 @@ pub struct InstalledModelFile {
     pub parameter_count: Option<String>,
     pub quantization: Option<String>,
     pub has_modelfile: bool,
+    pub modelfile_name: Option<String>, // Track which Modelfile belongs to this file
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +77,7 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
     let mut files = Vec::new();
     let mut total_size = 0;
     let mut has_modelfile = false;
+    let mut modelfiles: Vec<String> = Vec::new();
     
     let metadata = fs::metadata(dir_path).await.ok()?;
     let downloaded_at = metadata
@@ -108,9 +112,10 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
         if path.is_file() {
             let filename = path.file_name()?.to_str()?.to_string();
             
-            // Check for Modelfile
-            if filename == "Modelfile" {
+            // Check for Modelfiles (both Modelfile and Modelfile_*)
+            if filename.starts_with("Modelfile") {
                 has_modelfile = true;
+                modelfiles.push(filename);
                 continue;
             }
             
@@ -121,13 +126,33 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
                 let parameter_count = extract_parameter_count(&filename);
                 let quantization = extract_quantization(&filename);
                 
+                // Determine which Modelfile belongs to this file
+                let modelfile_name = if let Some(quant) = &quantization {
+                    let expected_name = get_modelfile_name(Some(quant));
+                    if modelfiles.contains(&expected_name) {
+                        Some(expected_name)
+                    } else if modelfiles.contains(&"Modelfile".to_string()) {
+                        // Fallback to generic Modelfile
+                        Some("Modelfile".to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    if modelfiles.contains(&"Modelfile".to_string()) {
+                        Some("Modelfile".to_string())
+                    } else {
+                        None
+                    }
+                };
+                
                 let file_info = InstalledModelFile {
                     filename,
                     size,
                     path: path.to_str()?.to_string(),
                     parameter_count,
                     quantization,
-                    has_modelfile,
+                    has_modelfile: modelfile_name.is_some(),
+                    modelfile_name,
                 };
                 files.push(file_info);
             }
@@ -189,15 +214,24 @@ pub async fn delete_model_file(
         return Err(format!("File not found: {}", filename));
     }
     
-    // Don't allow deleting Modelfile
-    if filename == "Modelfile" {
-        return Err("Cannot delete Modelfile".to_string());
+    // Don't allow deleting Modelfiles directly
+    if filename.starts_with("Modelfile") {
+        return Err("Cannot delete Modelfile directly. Delete the GGUF file instead.".to_string());
     }
     
     // Remove the file
     fs::remove_file(&file_path)
         .await
         .map_err(|e| format!("Failed to delete file: {}", e))?;
+    
+    // Also delete associated Modelfile if it exists
+    if let Some(quantization) = extract_quantization(filename) {
+        let modelfile_name = get_modelfile_name(Some(&quantization));
+        let modelfile_path = file_path.parent().unwrap().join(&modelfile_name);
+        if modelfile_path.exists() {
+            let _ = fs::remove_file(&modelfile_path).await;
+        }
+    }
     
     // Check if directory is empty after deletion
     let model_dir = file_path.parent().unwrap();
@@ -251,16 +285,26 @@ pub async fn delete_model_quantization(
                 .and_then(|n| n.to_str())
                 .unwrap_or("");
             
-            if filename == "Modelfile" {
+            // Skip Modelfiles directly
+            if filename.starts_with("Modelfile") {
                 continue;
             }
             
             // Check if this file has the target quantization
             if let Some(file_quant) = extract_quantization(filename) {
                 if file_quant == quantization {
+                    // Delete the file
                     fs::remove_file(&path)
                         .await
                         .map_err(|e| format!("Failed to delete file {}: {}", filename, e))?;
+                    
+                    // Delete associated Modelfile
+                    let modelfile_name = get_modelfile_name(Some(&quantization.to_string()));
+                    let modelfile_path = model_dir.join(&modelfile_name);
+                    if modelfile_path.exists() {
+                        let _ = fs::remove_file(&modelfile_path).await;
+                    }
+                    
                     deleted_count += 1;
                 }
             }

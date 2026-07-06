@@ -1,3 +1,4 @@
+// src/core/huggingface/download.rs
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};  
@@ -8,7 +9,7 @@ use log;
 
 use crate::data::download_state::ModelAcquisitionProgress;
 use super::cache::{generate_download_id, insert_cancellation_token, remove_cancellation_token, get_cancellation_token};
-use super::modelfile::{write_modelfile, ModelFileConfig};
+use super::modelfile::{write_modelfile, ModelFileConfig, get_modelfile_name};
 use super::utils::{extract_parameter_count, extract_quantization};
 
 pub async fn download_model_file(
@@ -145,19 +146,21 @@ pub async fn download_model_file(
     let quantization = extract_quantization(filename);
     let parameter_count = extract_parameter_count(filename);
     
-    // Create Modelfile config
+    // Create Modelfile config with quantization-specific settings
     let config = ModelFileConfig {
         model_name: format!("{}/{}", author, model_name),
         model_id: model_id.to_string(),
         gguf_filename: filename.to_string(),
-        quantization,
+        quantization: quantization.clone(),
         parameter_count,
     };
     
     match write_modelfile(&model_dir, &config).await {
         Ok(modelfile_path) => {
             log::info!("Modelfile created at: {:?}", modelfile_path);
-            send_progress(app_handle, model_id, filename, "modelfile_created", 100.0, "Modelfile created!");
+            let modelfile_name = get_modelfile_name(quantization.as_ref());
+            send_progress(app_handle, model_id, filename, "modelfile_created", 100.0, 
+                &format!("Modelfile created: {}", modelfile_name));
         }
         Err(e) => {
             log::warn!("Failed to create Modelfile: {}", e);
@@ -169,11 +172,13 @@ pub async fn download_model_file(
     send_progress(app_handle, model_id, filename, "complete", 100.0, "Download complete!");
     
     // Send separate completion event with Modelfile info
+    let modelfile_name = get_modelfile_name(quantization.as_ref());
     let _ = app_handle.emit("model-download-complete", &serde_json::json!({
         "model_id": model_id,
         "filename": filename,
         "path": file_path.to_str().unwrap_or(""),
-        "modelfile_path": model_dir.join("Modelfile").to_str().unwrap_or(""),
+        "modelfile_path": model_dir.join(&modelfile_name).to_str().unwrap_or(""),
+        "quantization": quantization,
     }));
     
     remove_cancellation_token(&download_id);

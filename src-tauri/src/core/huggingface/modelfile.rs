@@ -1,3 +1,4 @@
+// src/core/huggingface/modelfile.rs
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -71,13 +72,21 @@ fn get_recommended_params(quantization: &str) -> (String, String, String) {
     (num_ctx, num_keep, num_threads)
 }
 
-/// Write Modelfile to the model directory
+/// Get the Modelfile name for a specific quantization
+pub fn get_modelfile_name(quantization: Option<&String>) -> String {
+    match quantization {
+        Some(quant) => format!("Modelfile_{}", quant.to_uppercase()),
+        None => "Modelfile".to_string(),
+    }
+}
+
 pub async fn write_modelfile(
     model_dir: &PathBuf,
     config: &ModelFileConfig,
 ) -> Result<PathBuf, String> {
     let modelfile_content = generate_modelfile_content(config);
-    let modelfile_path = model_dir.join("Modelfile");
+    let modelfile_name = get_modelfile_name(config.quantization.as_ref());
+    let modelfile_path = model_dir.join(&modelfile_name);
     
     fs::write(&modelfile_path, modelfile_content)
         .await

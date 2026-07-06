@@ -24,5 +24,5 @@ pub use installed::{
     InstalledModel, 
     InstalledModelFile
 };
-pub use modelfile::{generate_modelfile_content, write_modelfile, ModelFileConfig};
+pub use modelfile::{generate_modelfile_content, write_modelfile, ModelFileConfig, get_modelfile_name};
 pub use utils::{extract_parameter_count, extract_quantization};
