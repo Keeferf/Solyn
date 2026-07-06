@@ -50,6 +50,76 @@ export const useInstalledModels = () => {
     }
   }, []);
 
+  // New: Delete individual file
+  const deleteFile = useCallback(async (modelId: string, filename: string) => {
+    try {
+      await invoke("delete_model_file_command", { modelId, filename });
+      // Update the model's files list
+      setModels(
+        (prev) =>
+          prev
+            .map((model) => {
+              if (model.model_id !== modelId) return model;
+              const updatedFiles = model.files.filter(
+                (f) => f.filename !== filename,
+              );
+              const newTotalSize = updatedFiles.reduce(
+                (sum, f) => sum + f.size,
+                0,
+              );
+              return {
+                ...model,
+                files: updatedFiles,
+                total_size: newTotalSize,
+              };
+            })
+            .filter((model) => model.files.length > 0), // Remove models with no files
+      );
+      return true;
+    } catch (err) {
+      setError(String(err));
+      return false;
+    }
+  }, []);
+
+  // New: Delete all files with a specific quantization
+  const deleteQuantization = useCallback(
+    async (modelId: string, quantization: string) => {
+      try {
+        await invoke("delete_model_quantization_command", {
+          modelId,
+          quantization,
+        });
+        // Update the model's files list
+        setModels(
+          (prev) =>
+            prev
+              .map((model) => {
+                if (model.model_id !== modelId) return model;
+                const updatedFiles = model.files.filter(
+                  (f) => f.quantization !== quantization,
+                );
+                const newTotalSize = updatedFiles.reduce(
+                  (sum, f) => sum + f.size,
+                  0,
+                );
+                return {
+                  ...model,
+                  files: updatedFiles,
+                  total_size: newTotalSize,
+                };
+              })
+              .filter((model) => model.files.length > 0), // Remove models with no files
+        );
+        return true;
+      } catch (err) {
+        setError(String(err));
+        return false;
+      }
+    },
+    [],
+  );
+
   const refresh = useCallback(() => {
     loadInstalledModels();
   }, [loadInstalledModels]);
@@ -77,6 +147,8 @@ export const useInstalledModels = () => {
     searchQuery,
     setSearchQuery,
     deleteModel,
+    deleteFile, // New
+    deleteQuantization, // New
     refresh,
   };
 };

@@ -10,6 +10,8 @@ use crate::core::huggingface::{
     cancel_download,
     get_installed_models,
     delete_installed_model,
+    delete_model_file,        // New
+    delete_model_quantization, // New
     write_modelfile,
     ModelFileConfig,
     extract_parameter_count,
@@ -17,8 +19,6 @@ use crate::core::huggingface::{
 };
 use crate::core::huggingface::fetch_model_details as client_fetch_model_details;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter, SearchModelsResponse};
-
-// Remove the direct import of installed::InstalledModel since we're re-exporting it from the huggingface module
 
 #[tauri::command]
 pub async fn fetch_huggingface_models_page(
@@ -118,7 +118,7 @@ pub fn cancel_huggingface_download(
     Ok(cancel_download(&model_id, &filename))
 }
 
-// --- New Commands for Installed Models ---
+// --- Commands for Installed Models ---
 
 #[tauri::command]
 pub async fn get_installed_models_command(
@@ -135,7 +135,27 @@ pub async fn delete_installed_model_command(
     delete_installed_model(&app_handle, &model_id).await
 }
 
-// --- New Command for Generating Modelfile ---
+// NEW: Delete a single file
+#[tauri::command]
+pub async fn delete_model_file_command(
+    app_handle: tauri::AppHandle,
+    model_id: String,
+    filename: String,
+) -> Result<(), String> {
+    delete_model_file(&app_handle, &model_id, &filename).await
+}
+
+// NEW: Delete all files with a specific quantization
+#[tauri::command]
+pub async fn delete_model_quantization_command(
+    app_handle: tauri::AppHandle,
+    model_id: String,
+    quantization: String,
+) -> Result<(), String> {
+    delete_model_quantization(&app_handle, &model_id, &quantization).await
+}
+
+// --- Command for Generating Modelfile ---
 
 #[tauri::command]
 pub async fn generate_modelfile(

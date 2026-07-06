@@ -15,7 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            // Ollama commands (only installation related)
+            // Ollama commands
             api::ollama_commands::check_ollama_installed,
             api::ollama_commands::get_ollama_version,
             api::ollama_commands::download_ollama,
@@ -39,6 +39,8 @@ pub fn run() {
             // Installed models commands
             api::huggingface_commands::get_installed_models_command,
             api::huggingface_commands::delete_installed_model_command,
+            api::huggingface_commands::delete_model_file_command,
+            api::huggingface_commands::delete_model_quantization_command,
             
             // Modelfile generation command
             api::huggingface_commands::generate_modelfile,

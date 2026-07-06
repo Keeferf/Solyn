@@ -170,3 +170,122 @@ pub async fn delete_installed_model(app_handle: &AppHandle, model_id: &str) -> R
     
     Ok(())
 }
+
+/// Delete a single file from an installed model
+pub async fn delete_model_file(
+    app_handle: &AppHandle,
+    model_id: &str,
+    filename: &str,
+) -> Result<(), String> {
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+    
+    let model_folder_name = model_id.replace("/", "_");
+    let file_path = app_dir.join("models").join(&model_folder_name).join(filename);
+    
+    if !file_path.exists() {
+        return Err(format!("File not found: {}", filename));
+    }
+    
+    // Don't allow deleting Modelfile
+    if filename == "Modelfile" {
+        return Err("Cannot delete Modelfile".to_string());
+    }
+    
+    // Remove the file
+    fs::remove_file(&file_path)
+        .await
+        .map_err(|e| format!("Failed to delete file: {}", e))?;
+    
+    // Check if directory is empty after deletion
+    let model_dir = file_path.parent().unwrap();
+    let mut entries = fs::read_dir(model_dir)
+        .await
+        .map_err(|e| format!("Failed to read model directory: {}", e))?;
+    let has_any_files = entries.next_entry()
+        .await
+        .map_err(|e| format!("Failed to read directory entry: {}", e))?
+        .is_some();
+    
+    // If no files left, delete the entire model directory
+    if !has_any_files {
+        fs::remove_dir_all(model_dir)
+            .await
+            .map_err(|e| format!("Failed to remove empty model directory: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+/// Delete all files with a specific quantization
+pub async fn delete_model_quantization(
+    app_handle: &AppHandle,
+    model_id: &str,
+    quantization: &str,
+) -> Result<(), String> {
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+    
+    let model_folder_name = model_id.replace("/", "_");
+    let model_dir = app_dir.join("models").join(&model_folder_name);
+    
+    if !model_dir.exists() {
+        return Err(format!("Model directory not found: {}", model_id));
+    }
+    
+    let mut deleted_count = 0;
+    let mut entries = fs::read_dir(&model_dir)
+        .await
+        .map_err(|e| format!("Failed to read model directory: {}", e))?;
+    
+    while let Some(entry) = entries.next_entry().await
+        .map_err(|e| format!("Failed to read directory entry: {}", e))? 
+    {
+        let path = entry.path();
+        if path.is_file() {
+            let filename = path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
+            
+            if filename == "Modelfile" {
+                continue;
+            }
+            
+            // Check if this file has the target quantization
+            if let Some(file_quant) = extract_quantization(filename) {
+                if file_quant == quantization {
+                    fs::remove_file(&path)
+                        .await
+                        .map_err(|e| format!("Failed to delete file {}: {}", filename, e))?;
+                    deleted_count += 1;
+                }
+            }
+        }
+    }
+    
+    if deleted_count == 0 {
+        return Err(format!("No files found with quantization: {}", quantization));
+    }
+    
+    // Check if directory is empty after deletion
+    let mut entries = fs::read_dir(&model_dir)
+        .await
+        .map_err(|e| format!("Failed to read model directory: {}", e))?;
+    let has_any_files = entries.next_entry()
+        .await
+        .map_err(|e| format!("Failed to read directory entry: {}", e))?
+        .is_some();
+    
+    // If no files left, delete the entire model directory
+    if !has_any_files {
+        fs::remove_dir_all(&model_dir)
+            .await
+            .map_err(|e| format!("Failed to remove empty model directory: {}", e))?;
+    }
+    
+    Ok(())
+}
