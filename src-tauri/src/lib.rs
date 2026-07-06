@@ -15,7 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            // Ollama commands (only installation related)
+            // Ollama commands
             api::ollama_commands::check_ollama_installed,
             api::ollama_commands::get_ollama_version,
             api::ollama_commands::download_ollama,
@@ -34,7 +34,16 @@ pub fn run() {
             
             // Download commands
             api::huggingface_commands::download_huggingface_model,
-            api::huggingface_commands::cancel_huggingface_download,  
+            api::huggingface_commands::cancel_huggingface_download,
+            
+            // Installed models commands
+            api::huggingface_commands::get_installed_models_command,
+            api::huggingface_commands::delete_installed_model_command,
+            api::huggingface_commands::delete_model_file_command,
+            api::huggingface_commands::delete_model_quantization_command,
+            
+            // Modelfile generation command
+            api::huggingface_commands::generate_modelfile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

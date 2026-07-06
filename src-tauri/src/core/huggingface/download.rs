@@ -1,12 +1,16 @@
+// src/core/huggingface/download.rs
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};  
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use futures_util::StreamExt;
+use log;
 
 use crate::data::download_state::ModelAcquisitionProgress;
 use super::cache::{generate_download_id, insert_cancellation_token, remove_cancellation_token, get_cancellation_token};
+use super::modelfile::{write_modelfile, ModelFileConfig, get_modelfile_name};
+use super::utils::{extract_parameter_count, extract_quantization};
 
 pub async fn download_model_file(
     model_id: &str,
@@ -132,14 +136,49 @@ pub async fn download_model_file(
     file.sync_all().await
         .map_err(|e| format!("Failed to sync file: {}", e))?;
     
+    // --- Generate Modelfile ---
+    send_progress(app_handle, model_id, filename, "generating_modelfile", 100.0, "Generating Modelfile...");
+    
+    // Extract model info
+    let parts: Vec<&str> = model_id.split('/').collect();
+    let author = parts.get(0).unwrap_or(&"").to_string();
+    let model_name = parts.get(1).unwrap_or(&"").to_string();
+    let quantization = extract_quantization(filename);
+    let parameter_count = extract_parameter_count(filename);
+    
+    // Create Modelfile config with quantization-specific settings
+    let config = ModelFileConfig {
+        model_name: format!("{}/{}", author, model_name),
+        model_id: model_id.to_string(),
+        gguf_filename: filename.to_string(),
+        quantization: quantization.clone(),
+        parameter_count,
+    };
+    
+    match write_modelfile(&model_dir, &config).await {
+        Ok(modelfile_path) => {
+            log::info!("Modelfile created at: {:?}", modelfile_path);
+            let modelfile_name = get_modelfile_name(quantization.as_ref());
+            send_progress(app_handle, model_id, filename, "modelfile_created", 100.0, 
+                &format!("Modelfile created: {}", modelfile_name));
+        }
+        Err(e) => {
+            log::warn!("Failed to create Modelfile: {}", e);
+            // Don't fail the whole download if Modelfile creation fails
+        }
+    }
+    
     // Send completion
     send_progress(app_handle, model_id, filename, "complete", 100.0, "Download complete!");
     
-    // Send separate completion event
+    // Send separate completion event with Modelfile info
+    let modelfile_name = get_modelfile_name(quantization.as_ref());
     let _ = app_handle.emit("model-download-complete", &serde_json::json!({
         "model_id": model_id,
         "filename": filename,
         "path": file_path.to_str().unwrap_or(""),
+        "modelfile_path": model_dir.join(&modelfile_name).to_str().unwrap_or(""),
+        "quantization": quantization,
     }));
     
     remove_cancellation_token(&download_id);
