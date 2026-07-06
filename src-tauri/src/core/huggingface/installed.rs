@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
-use tauri::{AppHandle, Manager};  // Add Manager here
+use tauri::{AppHandle, Manager};
 
 use super::utils::{extract_parameter_count, extract_quantization};
 
@@ -12,6 +12,7 @@ pub struct InstalledModelFile {
     pub path: String,
     pub parameter_count: Option<String>,
     pub quantization: Option<String>,
+    pub has_modelfile: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +23,7 @@ pub struct InstalledModel {
     pub files: Vec<InstalledModelFile>,
     pub total_size: u64,
     pub downloaded_at: String,
+    pub has_modelfile: bool,
 }
 
 /// Get all installed models from the app data directory
@@ -71,6 +73,7 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
     
     let mut files = Vec::new();
     let mut total_size = 0;
+    let mut has_modelfile = false;
     
     let metadata = fs::metadata(dir_path).await.ok()?;
     let downloaded_at = metadata
@@ -104,6 +107,13 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
         let path = entry.path();
         if path.is_file() {
             let filename = path.file_name()?.to_str()?.to_string();
+            
+            // Check for Modelfile
+            if filename == "Modelfile" {
+                has_modelfile = true;
+                continue;
+            }
+            
             if filename.ends_with(".gguf") {
                 let size = fs::metadata(&path).await.ok().map(|m| m.len()).unwrap_or(0);
                 total_size += size;
@@ -117,6 +127,7 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
                     path: path.to_str()?.to_string(),
                     parameter_count,
                     quantization,
+                    has_modelfile,
                 };
                 files.push(file_info);
             }
@@ -134,6 +145,7 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
         files,
         total_size,
         downloaded_at,
+        has_modelfile,
     })
 }
 

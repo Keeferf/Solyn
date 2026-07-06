@@ -39,6 +39,9 @@ pub fn run() {
             // Installed models commands
             api::huggingface_commands::get_installed_models_command,
             api::huggingface_commands::delete_installed_model_command,
+            
+            // Modelfile generation command
+            api::huggingface_commands::generate_modelfile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

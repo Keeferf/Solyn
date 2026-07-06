@@ -15,7 +15,6 @@ export const DownloadStatusDisplay = ({
   modelId,
   filename,
   progress,
-  message,
   status,
   onCancel,
 }: DownloadStatusDisplayProps) => {
@@ -77,15 +76,6 @@ export const DownloadStatusDisplay = ({
     return null;
   };
 
-  // Get status text color
-  const statusColor = isError
-    ? "text-red-400"
-    : isComplete
-      ? "text-green-400"
-      : isCancelled
-        ? "text-yellow-400"
-        : "text-white/40";
-
   return (
     <div className="bg-black/50 rounded-lg border border-white/10 p-4">
       <div className="flex items-center justify-between mb-2">
@@ -99,11 +89,7 @@ export const DownloadStatusDisplay = ({
               <span className="text-white text-sm font-mono truncate">
                 {displayName}
               </span>
-              <span className="text-white/40 text-xs ml-2 truncate">
-                {modelId.split("/").pop()}
-              </span>
             </div>
-            <span className={`text-xs ${statusColor}`}>{message}</span>
           </div>
         </div>
         <div className="flex items-center gap-3 ml-4 shrink-0">

@@ -1,4 +1,5 @@
 use tauri;
+use tauri::Manager;
 use crate::core::huggingface::{
     fetch_hugging_face_models_page, 
     get_total_model_count_for_filter, 
@@ -9,6 +10,10 @@ use crate::core::huggingface::{
     cancel_download,
     get_installed_models,
     delete_installed_model,
+    write_modelfile,
+    ModelFileConfig,
+    extract_parameter_count,
+    extract_quantization,
 };
 use crate::core::huggingface::fetch_model_details as client_fetch_model_details;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter, SearchModelsResponse};
@@ -128,4 +133,45 @@ pub async fn delete_installed_model_command(
     model_id: String,
 ) -> Result<(), String> {
     delete_installed_model(&app_handle, &model_id).await
+}
+
+// --- New Command for Generating Modelfile ---
+
+#[tauri::command]
+pub async fn generate_modelfile(
+    model_id: String,
+    filename: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+    
+    let model_folder_name = model_id.replace("/", "_");
+    let model_dir = app_dir.join("models").join(&model_folder_name);
+    
+    if !model_dir.exists() {
+        return Err("Model directory not found".to_string());
+    }
+    
+    let parts: Vec<&str> = model_id.split('/').collect();
+    let author = parts.get(0).unwrap_or(&"").to_string();
+    let model_name = parts.get(1).unwrap_or(&"").to_string();
+    
+    // Clone filename before using it
+    let filename_clone = filename.clone();
+    let quantization = extract_quantization(&filename);
+    let parameter_count = extract_parameter_count(&filename_clone);
+    
+    let config = ModelFileConfig {
+        model_name: format!("{}/{}", author, model_name),
+        model_id: model_id.clone(),
+        gguf_filename: filename,  // Move occurs here
+        quantization,
+        parameter_count,
+    };
+    
+    let modelfile_path = write_modelfile(&model_dir, &config).await?;
+    Ok(modelfile_path.to_str().unwrap_or("").to_string())
 }

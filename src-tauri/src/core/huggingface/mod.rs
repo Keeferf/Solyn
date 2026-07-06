@@ -4,6 +4,7 @@ mod download;
 mod parsing;
 mod utils;
 mod installed;
+mod modelfile;
 
 pub use client::{
     fetch_model_details,
@@ -16,3 +17,5 @@ pub use download::{download_model_file, cancel_download};
 pub use parsing::extract_gguf_files;
 pub use cache::clear_model_cache;
 pub use installed::{get_installed_models, delete_installed_model, InstalledModel, InstalledModelFile};
+pub use modelfile::{generate_modelfile_content, write_modelfile, ModelFileConfig};
+pub use utils::{extract_parameter_count, extract_quantization};
