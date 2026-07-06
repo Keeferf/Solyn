@@ -100,7 +100,7 @@ export const ChatControls = ({
         <button
           onClick={onSubmit}
           disabled={isSubmitDisabled}
-          className="p-2 bg-(--color-purple-accent) hover:bg-(--color-purple-accent)/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors text-white cursor-pointer"
+          className="p-2 bg-purple-500 hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors text-white cursor-pointer"
         >
           <FiArrowUp size={18} />
         </button>
