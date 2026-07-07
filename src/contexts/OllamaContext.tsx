@@ -8,38 +8,63 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+interface OllamaStatus {
+  installed: boolean;
+  running: boolean;
+  version: string | null;
+}
+
 interface OllamaContextType {
-  isOllamaInstalled: boolean | null;
-  ollamaVersion: string | null;
+  status: OllamaStatus | null;
   loading: boolean;
+  refreshing: boolean;
   refreshOllamaStatus: () => Promise<void>;
+  startOllama: () => Promise<void>;
+  isReady: boolean; // Changed from `boolean | undefined` to just `boolean`
 }
 
 const OllamaContext = createContext<OllamaContextType | undefined>(undefined);
 
 export const OllamaProvider = ({ children }: { children: ReactNode }) => {
-  const [isOllamaInstalled, setIsOllamaInstalled] = useState<boolean | null>(
-    null,
-  );
-  const [ollamaVersion, setOllamaVersion] = useState<string | null>(null);
+  const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const refreshOllamaStatus = async () => {
-    setLoading(true);
+    setRefreshing(true);
     try {
-      const installed = await invoke<boolean>("check_ollama_installed");
-      setIsOllamaInstalled(installed);
-
-      if (installed) {
-        const version = await invoke<string>("get_ollama_version");
-        setOllamaVersion(version);
-      } else {
-        setOllamaVersion(null);
-      }
+      const result = await invoke<OllamaStatus>("get_ollama_status");
+      setStatus(result);
     } catch (error) {
       console.error("Failed to check Ollama status:", error);
-      setIsOllamaInstalled(false);
-      setOllamaVersion(null);
+      setStatus({
+        installed: false,
+        running: false,
+        version: null,
+      });
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+    }
+  };
+
+  const startOllama = async () => {
+    if (!status?.installed) {
+      throw new Error("Ollama is not installed");
+    }
+
+    if (status.running) {
+      return; // Already running
+    }
+
+    setLoading(true);
+    try {
+      await invoke<string>("start_ollama_service");
+      // Refresh status after starting
+      await refreshOllamaStatus();
+    } catch (error) {
+      console.error("Failed to start Ollama:", error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -48,11 +73,26 @@ export const OllamaProvider = ({ children }: { children: ReactNode }) => {
   // Check Ollama status when the app launches
   useEffect(() => {
     refreshOllamaStatus();
+
+    // Check status every 30 seconds
+    const interval = setInterval(refreshOllamaStatus, 30000);
+
+    return () => clearInterval(interval);
   }, []);
+
+  // Calculate isReady - ensure it's always a boolean
+  const isReady = (status?.installed && status?.running) ?? false;
 
   return (
     <OllamaContext.Provider
-      value={{ isOllamaInstalled, ollamaVersion, loading, refreshOllamaStatus }}
+      value={{
+        status,
+        loading,
+        refreshing,
+        refreshOllamaStatus,
+        startOllama,
+        isReady, // Now this is always a boolean
+      }}
     >
       {children}
     </OllamaContext.Provider>

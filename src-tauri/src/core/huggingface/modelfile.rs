@@ -9,9 +9,10 @@ pub struct ModelFileConfig {
     pub gguf_filename: String,
     pub quantization: Option<String>,
     pub parameter_count: Option<String>,
+    pub model_dir: PathBuf,
 }
 
-/// Generate a Modelfile for Ollama
+/// Generate a Modelfile for Ollama with absolute paths
 pub fn generate_modelfile_content(config: &ModelFileConfig) -> String {
     let mut content = String::new();
     
@@ -26,8 +27,16 @@ pub fn generate_modelfile_content(config: &ModelFileConfig) -> String {
     }
     content.push_str("\n");
     
-    // The actual Modelfile content
-    content.push_str(&format!("FROM ./{}\n", config.gguf_filename));
+    // Use absolute path for the GGUF file
+    let gguf_path = config.model_dir.join(&config.gguf_filename);
+    // FIXED: Removed unnecessary `mut`
+    let gguf_path_str = gguf_path.to_str().unwrap_or(&config.gguf_filename).to_string();
+    
+    // On Windows, convert backslashes to forward slashes for Ollama
+    #[cfg(target_os = "windows")]
+    let gguf_path_str = gguf_path_str.replace('\\', "/");
+    
+    content.push_str(&format!("FROM {}\n", gguf_path_str));
     content.push_str("\n");
     
     // Add parameter recommendations based on quantization
@@ -52,12 +61,10 @@ pub fn generate_modelfile_content(config: &ModelFileConfig) -> String {
 fn get_recommended_params(quantization: &str) -> (String, String, String) {
     let quant_lower = quantization.to_lowercase();
     
-    // Default parameters
     let mut num_ctx = "4096".to_string();
     let mut num_keep = "32".to_string();
     let num_threads = "8".to_string();
     
-    // Adjust based on quantization (these are just examples)
     if quant_lower.contains("q2") || quant_lower.contains("q3") {
         num_ctx = "2048".to_string();
         num_keep = "16".to_string();
@@ -87,6 +94,9 @@ pub async fn write_modelfile(
     let modelfile_content = generate_modelfile_content(config);
     let modelfile_name = get_modelfile_name(config.quantization.as_ref());
     let modelfile_path = model_dir.join(&modelfile_name);
+    
+    println!("📝 Writing Modelfile to: {:?}", modelfile_path);
+    println!("📝 Modelfile content:\n{}", modelfile_content);
     
     fs::write(&modelfile_path, modelfile_content)
         .await

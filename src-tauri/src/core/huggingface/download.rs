@@ -153,6 +153,7 @@ pub async fn download_model_file(
         gguf_filename: filename.to_string(),
         quantization: quantization.clone(),
         parameter_count,
+        model_dir: model_dir.clone(), // FIXED: Added missing field
     };
     
     match write_modelfile(&model_dir, &config).await {
