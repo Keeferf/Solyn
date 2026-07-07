@@ -3,7 +3,7 @@ import { ChatInput } from "./ChatInput";
 import { ChatControls } from "./ChatControls";
 import { useChatInput } from "./hooks/useChatInput";
 import { useFileAttachment } from "./hooks/useFileAttachment";
-import { useModelSelection, ModelType } from "./hooks/useModelSelection";
+import { useModelSelection } from "./hooks/useModelSelection";
 
 export type ModeType = "chat" | "agent";
 
@@ -67,7 +67,7 @@ export const ChatInterface = () => {
 
   return (
     <div className="w-full">
-      <div className="relative bg-white/5 rounded-2xl border border-white/10 hover:border-white/20 transition-colors">
+      <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
         <ChatInput
           ref={textareaRef}
           value={input}
