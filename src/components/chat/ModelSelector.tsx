@@ -22,8 +22,6 @@ export const ModelSelector = ({
 }: ModelSelectorProps) => {
   const selectedLabel =
     models.find((m) => m.value === selectedModel)?.label || "Select model";
-
-  // Group models by model_id for better display
   const groupedModels = models.reduce(
     (acc, model) => {
       if (!acc[model.model_id]) {
@@ -71,7 +69,6 @@ export const ModelSelector = ({
                 );
               }
 
-              // For models with multiple quantizations, show them grouped
               if (modelVariants.length > 1) {
                 return (
                   <div key={modelId}>
@@ -106,7 +103,6 @@ export const ModelSelector = ({
                   </div>
                 );
               } else {
-                // Single quantization model
                 const model = modelVariants[0];
                 const isSelected = selectedModel === model.value;
                 return (

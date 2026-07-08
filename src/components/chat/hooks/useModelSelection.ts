@@ -2,18 +2,17 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-// Model type is now a string to support dynamic model IDs
 export type ModelType = string;
 
 export interface ChatModel {
-  value: string; // Now includes filename to make it unique: "model_id:filename"
+  value: string;
   label: string;
   model_id: string;
   author: string;
   name?: string;
   quantization?: string;
   parameter_count?: string;
-  filename: string; // Added to track which file to use
+  filename: string;
   path: string;
   has_modelfile: boolean;
   size?: number;
@@ -31,7 +30,6 @@ export const useModelSelection = () => {
       const installedModels = await invoke<ChatModel[]>("get_chat_models");
 
       if (installedModels.length === 0) {
-        // If no models installed, show a placeholder
         setModels([
           {
             value: "no-models",
@@ -46,7 +44,6 @@ export const useModelSelection = () => {
         setSelectedModel("no-models");
       } else {
         setModels(installedModels);
-        // Only update selection if current selection is not in the new list
         const currentModelExists = installedModels.some(
           (m) => m.value === selectedModel,
         );
@@ -60,7 +57,6 @@ export const useModelSelection = () => {
       }
     } catch (error) {
       console.error("Failed to load installed models:", error);
-      // Fallback to placeholder
       setModels([
         {
           value: "error",
@@ -78,12 +74,10 @@ export const useModelSelection = () => {
     }
   };
 
-  // Load installed models on mount
   useEffect(() => {
     loadModels();
   }, []);
 
-  // Listen for model download completion events to refresh the list
   useEffect(() => {
     let unlistenFn: (() => void) | undefined;
 
@@ -121,7 +115,6 @@ export const useModelSelection = () => {
     setIsModelDropdownOpen(false);
   };
 
-  // Get the selected model's full data
   const getSelectedModelData = (): ChatModel | undefined => {
     return models.find((m) => m.value === selectedModel);
   };

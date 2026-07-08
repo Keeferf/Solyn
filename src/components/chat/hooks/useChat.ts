@@ -1,4 +1,3 @@
-// src/components/chat/hooks/useChat.ts (updated)
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -19,8 +18,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messageBufferRef = useRef<string>("");
-
-  // Use Ollama context instead of checking health directly
   const { isReady, status } = useOllama();
   const isOllamaReady = isReady;
 
@@ -35,26 +32,21 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     setIsLoading(true);
     messageBufferRef.current = "";
 
-    // Add user message to UI
     setMessages((prev) => [...prev, { role: "user", content: content.trim() }]);
 
-    // Add placeholder for assistant response
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     try {
-      // Prepare the message history for the backend
       const chatHistory = [
         ...messages,
         { role: "user", content: content.trim() },
       ];
 
-      // First, ensure the model is created in Ollama
       await invoke("create_ollama_model", {
         modelId: modelData.model_id,
         filename: modelData.filename,
       });
 
-      // Send the message with streaming
       await invoke("send_chat_stream", {
         request: {
           model_id: modelData.model_id,
@@ -67,7 +59,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
       setIsLoading(false);
       messageBufferRef.current = "";
 
-      // Remove the placeholder if there was an error
       setMessages((prev) => {
         const updated = [...prev];
         if (
@@ -87,7 +78,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     messageBufferRef.current = "";
   };
 
-  // Setup streaming listeners
   useEffect(() => {
     let unlistenChunk: (() => void) | undefined;
     let unlistenDone: (() => void) | undefined;

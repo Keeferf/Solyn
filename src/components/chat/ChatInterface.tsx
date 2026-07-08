@@ -1,4 +1,3 @@
-// src/components/chat/ChatInterface.tsx
 import { useState } from "react";
 import { ChatInput } from "./ChatInput";
 import { ChatControls } from "./ChatControls";
@@ -14,8 +13,6 @@ export const ChatInterface = () => {
   const [isSearchEnabled, setIsSearchEnabled] = useState(false);
   const [isCodeEnabled, setIsCodeEnabled] = useState(false);
   const [mode, setMode] = useState<ModeType>("chat");
-
-  // Custom hooks
   const { input, setInput, textareaRef, resetInput } = useChatInput();
   const {
     isAttachmentEnabled,
@@ -36,10 +33,8 @@ export const ChatInterface = () => {
     getSelectedModelData,
   } = useModelSelection();
 
-  // Get the selected model data
   const selectedModelData = getSelectedModelData();
 
-  // Chat hook
   const {
     messages,
     isLoading: isChatLoading,
@@ -112,7 +107,7 @@ export const ChatInterface = () => {
         <div className="flex-1 flex flex-col items-center justify-center">
           {/* Welcome message */}
           <div className="text-center mb-8">
-            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-(--color-purple-accent) to-white bg-clip-text text-transparent">
+            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white bg-clip-text text-transparent">
               Solyn
             </h1>
             <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
@@ -170,7 +165,7 @@ export const ChatInterface = () => {
 
       {/* Input area - fixed at bottom when there are messages */}
       {hasMessages && (
-        <div className="flex-shrink-0 w-full">
+        <div className="shrink-0 w-full">
           {/* Attachment indicator */}
           {attachmentCount > 0 && (
             <div className="px-4 py-2 text-xs text-white/60 bg-white/5 border-t border-white/5">

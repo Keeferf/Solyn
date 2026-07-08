@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useState } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ChatInterface } from "@/components/chat/ChatInterface";

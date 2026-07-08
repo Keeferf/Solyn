@@ -6,16 +6,12 @@ import { ModelType, ChatModel } from "./hooks/useModelSelection";
 import { ModeType } from "./ChatInterface";
 
 interface ChatControlsProps {
-  // Search
   isSearchEnabled: boolean;
   onSearchToggle: () => void;
-  // Code
   isCodeEnabled: boolean;
   onCodeToggle: () => void;
-  // Attachment
   isAttachmentEnabled: boolean;
   onAttachmentClick: () => void;
-  // Model
   selectedModel: ModelType;
   models: ChatModel[];
   isModelDropdownOpen: boolean;
@@ -23,13 +19,10 @@ interface ChatControlsProps {
   onModelToggle: () => void;
   onModelSelect: (model: ModelType) => void;
   onModelClose: () => void;
-  // Mode
   mode: ModeType;
   onModeToggle: () => void;
-  // Submit
   onSubmit: () => void;
   isSubmitDisabled: boolean;
-  // File input - allow null
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
@@ -100,7 +93,7 @@ export const ChatControls = ({
         <button
           onClick={onSubmit}
           disabled={isSubmitDisabled}
-          className="p-2 bg-(--color-purple-accent) hover:bg-(--color-purple-accent)/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors text-white cursor-pointer"
+          className="p-2 bg-purple-accent hover:bg-purple-accent/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors text-white cursor-pointer"
         >
           <FiArrowUp size={18} />
         </button>
