@@ -1,4 +1,3 @@
-// src/components/chat/ChatMessages.tsx
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./hooks/useChat";
 
