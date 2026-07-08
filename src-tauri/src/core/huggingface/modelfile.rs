@@ -29,12 +29,33 @@ pub fn generate_modelfile_content(config: &ModelFileConfig) -> String {
     
     // Use absolute path for the GGUF file
     let gguf_path = config.model_dir.join(&config.gguf_filename);
-    // FIXED: Removed unnecessary `mut`
-    let gguf_path_str = gguf_path.to_str().unwrap_or(&config.gguf_filename).to_string();
     
-    // On Windows, convert backslashes to forward slashes for Ollama
-    #[cfg(target_os = "windows")]
-    let gguf_path_str = gguf_path_str.replace('\\', "/");
+    // Canonicalize to ensure it's truly absolute and exists
+    let gguf_path_str = match gguf_path.canonicalize() {
+        Ok(canonical) => {
+            let path_str = canonical.to_string_lossy().to_string();
+            // On Windows, convert backslashes to forward slashes for Ollama
+            #[cfg(target_os = "windows")]
+            let path_str = path_str.replace('\\', "/");
+            path_str
+        }
+        Err(_) => {
+            // Fallback: use absolute path even if file doesn't exist yet
+            let path_str = std::fs::canonicalize(&config.model_dir)
+                .ok()
+                .and_then(|dir| {
+                    let full = dir.join(&config.gguf_filename);
+                    Some(full.to_string_lossy().to_string())
+                })
+                .unwrap_or_else(|| gguf_path.to_string_lossy().to_string());
+            
+            #[cfg(target_os = "windows")]
+            let path_str = path_str.replace('\\', "/");
+            path_str
+        }
+    };
+    
+    println!("📁 Absolute GGUF path: {}", gguf_path_str);
     
     content.push_str(&format!("FROM {}\n", gguf_path_str));
     content.push_str("\n");
