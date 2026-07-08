@@ -52,7 +52,7 @@ export const ModelSelector = ({
       {isOpen && !isLoading && (
         <>
           <div className="fixed inset-0 z-10" onClick={onClose} />
-          <div className="absolute bottom-full mb-2 right-0 z-20 bg-black border border-white/10 rounded-lg shadow-lg py-1 min-w-[240px] max-h-[350px] overflow-y-auto">
+          <div className="absolute bottom-full mb-2 right-0 z-20 bg-black border border-white/10 rounded-lg shadow-lg py-1 min-w-60 max-h-87.5 overflow-y-auto">
             {Object.entries(groupedModels).map(([modelId, modelVariants]) => {
               const isPlaceholder =
                 modelId === "no-models" || modelId === "error";

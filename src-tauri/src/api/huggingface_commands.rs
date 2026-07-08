@@ -187,6 +187,7 @@ pub async fn generate_modelfile(
         gguf_filename: filename,
         quantization,
         parameter_count,
+        model_dir: model_dir.clone(), // Pass the model directory
     };
     
     let modelfile_path = write_modelfile(&model_dir, &config).await?;

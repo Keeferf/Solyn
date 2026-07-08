@@ -9,9 +9,10 @@ pub struct ModelFileConfig {
     pub gguf_filename: String,
     pub quantization: Option<String>,
     pub parameter_count: Option<String>,
+    pub model_dir: PathBuf,
 }
 
-/// Generate a Modelfile for Ollama
+/// Generate a Modelfile for Ollama with absolute paths
 pub fn generate_modelfile_content(config: &ModelFileConfig) -> String {
     let mut content = String::new();
     
@@ -26,8 +27,37 @@ pub fn generate_modelfile_content(config: &ModelFileConfig) -> String {
     }
     content.push_str("\n");
     
-    // The actual Modelfile content
-    content.push_str(&format!("FROM ./{}\n", config.gguf_filename));
+    // Use absolute path for the GGUF file
+    let gguf_path = config.model_dir.join(&config.gguf_filename);
+    
+    // Canonicalize to ensure it's truly absolute and exists
+    let gguf_path_str = match gguf_path.canonicalize() {
+        Ok(canonical) => {
+            let path_str = canonical.to_string_lossy().to_string();
+            // On Windows, convert backslashes to forward slashes for Ollama
+            #[cfg(target_os = "windows")]
+            let path_str = path_str.replace('\\', "/");
+            path_str
+        }
+        Err(_) => {
+            // Fallback: use absolute path even if file doesn't exist yet
+            let path_str = std::fs::canonicalize(&config.model_dir)
+                .ok()
+                .and_then(|dir| {
+                    let full = dir.join(&config.gguf_filename);
+                    Some(full.to_string_lossy().to_string())
+                })
+                .unwrap_or_else(|| gguf_path.to_string_lossy().to_string());
+            
+            #[cfg(target_os = "windows")]
+            let path_str = path_str.replace('\\', "/");
+            path_str
+        }
+    };
+    
+    println!("📁 Absolute GGUF path: {}", gguf_path_str);
+    
+    content.push_str(&format!("FROM {}\n", gguf_path_str));
     content.push_str("\n");
     
     // Add parameter recommendations based on quantization
@@ -52,12 +82,10 @@ pub fn generate_modelfile_content(config: &ModelFileConfig) -> String {
 fn get_recommended_params(quantization: &str) -> (String, String, String) {
     let quant_lower = quantization.to_lowercase();
     
-    // Default parameters
     let mut num_ctx = "4096".to_string();
     let mut num_keep = "32".to_string();
     let num_threads = "8".to_string();
     
-    // Adjust based on quantization (these are just examples)
     if quant_lower.contains("q2") || quant_lower.contains("q3") {
         num_ctx = "2048".to_string();
         num_keep = "16".to_string();
@@ -87,6 +115,9 @@ pub async fn write_modelfile(
     let modelfile_content = generate_modelfile_content(config);
     let modelfile_name = get_modelfile_name(config.quantization.as_ref());
     let modelfile_path = model_dir.join(&modelfile_name);
+    
+    println!("📝 Writing Modelfile to: {:?}", modelfile_path);
+    println!("📝 Modelfile content:\n{}", modelfile_content);
     
     fs::write(&modelfile_path, modelfile_content)
         .await

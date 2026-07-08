@@ -1,3 +1,4 @@
+// src/api/ollama_commands.rs
 use tauri;
 use tauri::Manager;
 use crate::core::ollama_client::*;
@@ -5,10 +6,47 @@ use crate::core::installation_executor::execute_ollama_installation;
 use crate::helpers::platform_detector::detect_operating_system;
 use crate::events::progress_broadcaster::broadcast_download_progress;
 use crate::data::download_state::{DownloadStatus, InstallationInformation};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OllamaStatus {
+    pub installed: bool,
+    pub running: bool,
+    pub version: Option<String>,
+}
 
 #[tauri::command]
 pub async fn check_ollama_installed() -> Result<bool, String> {
     is_ollama_installed().await
+}
+
+#[tauri::command]
+pub async fn check_ollama_running() -> Result<bool, String> {
+    is_ollama_running().await
+}
+
+#[tauri::command]
+pub async fn get_ollama_status() -> Result<OllamaStatus, String> {
+    let installed = is_ollama_installed().await?;
+    let (running, version) = if installed {
+        match fetch_ollama_version().await {
+            Ok(v) => (true, Some(v)),
+            Err(_) => (false, None),
+        }
+    } else {
+        (false, None)
+    };
+    
+    Ok(OllamaStatus {
+        installed,
+        running,
+        version,
+    })
+}
+
+#[tauri::command]
+pub async fn start_ollama_service(app_handle: tauri::AppHandle) -> Result<String, String> {
+    start_ollama(&app_handle).await
 }
 
 #[tauri::command]
@@ -51,7 +89,7 @@ pub async fn download_ollama(app_handle: tauri::AppHandle) -> Result<String, Str
 
     broadcast_download_progress(
         &window,
-        DownloadStatus::Complete,  // Changed from Completed to Complete
+        DownloadStatus::Complete,
         100,
         "Ollama installed successfully!".to_string(),
         None,
