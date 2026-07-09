@@ -1,5 +1,4 @@
-// src/components/OllamaStatusChecker.tsx
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useOllama } from "../contexts/OllamaContext";
 
 interface OllamaStatusCheckerProps {
@@ -8,18 +7,31 @@ interface OllamaStatusCheckerProps {
 
 export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
   const { status, loading, startOllama, isReady } = useOllama();
+  const startAttempted = useRef(false);
 
   useEffect(() => {
-    // If Ollama is installed but not running, try to start it
-    if (status?.installed && !status?.running && !loading) {
+    if (
+      status?.installed &&
+      !status?.running &&
+      !loading &&
+      !startAttempted.current
+    ) {
+      startAttempted.current = true;
       console.log(
         "Ollama is installed but not running. Attempting to start...",
       );
       startOllama().catch((error) => {
         console.error("Failed to start Ollama automatically:", error);
+        startAttempted.current = false;
       });
     }
   }, [status, loading, startOllama]);
+
+  useEffect(() => {
+    if (status?.running) {
+      startAttempted.current = false;
+    }
+  }, [status?.running]);
 
   if (loading) {
     return (
@@ -44,7 +56,6 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
           </p>
           <button
             onClick={() => {
-              // Navigate to download page or open Ollama website
               window.open("https://ollama.com/download", "_blank");
             }}
             className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"

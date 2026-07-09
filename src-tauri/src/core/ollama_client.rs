@@ -6,21 +6,99 @@ use crate::helpers::platform_detector::detect_operating_system;
 use tauri::AppHandle;
 
 pub async fn is_ollama_installed() -> Result<bool, String> {
-    // Simple check - try to find the ollama binary
     #[cfg(target_os = "windows")]
-    let check_cmd = "where ollama";
-    #[cfg(not(target_os = "windows"))]
-    let check_cmd = "command -v ollama";
-    
-    // Use the check_cmd variable to suppress warning
-    let _ = check_cmd;
-    
-    match std::process::Command::new(if cfg!(target_os = "windows") { "where" } else { "which" })
-        .arg("ollama")
-        .output() 
     {
-        Ok(output) => Ok(output.status.success()),
-        Err(_) => Ok(false),
+        // Try multiple methods to find Ollama without showing console windows
+        use std::path::Path;
+        use std::env;
+        
+        // Method 1: Check common installation paths
+        let common_paths = [
+            r"C:\Program Files\Ollama\ollama.exe",
+            r"C:\Program Files (x86)\Ollama\ollama.exe",
+            r"%LOCALAPPDATA%\Programs\Ollama\ollama.exe",
+            r"%USERPROFILE%\AppData\Local\Programs\Ollama\ollama.exe",
+        ];
+        
+        for path in common_paths.iter() {
+            let expanded_path = if path.starts_with('%') {
+                // Simple environment variable expansion
+                let path_str = path.to_string();
+                if path_str.contains("%LOCALAPPDATA%") {
+                    if let Ok(localappdata) = env::var("LOCALAPPDATA") {
+                        path_str.replace("%LOCALAPPDATA%", &localappdata)
+                    } else {
+                        continue;
+                    }
+                } else if path_str.contains("%USERPROFILE%") {
+                    if let Ok(userprofile) = env::var("USERPROFILE") {
+                        path_str.replace("%USERPROFILE%", &userprofile)
+                    } else {
+                        continue;
+                    }
+                } else {
+                    path_str
+                }
+            } else {
+                path.to_string()
+            };
+            
+            if Path::new(&expanded_path).exists() {
+                return Ok(true);
+            }
+        }
+        
+        // Method 2: Try using where command with CREATE_NO_WINDOW
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        
+        let output = std::process::Command::new("where")
+            .arg("ollama")
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .stdin(std::process::Stdio::null())
+            .output();
+            
+        match output {
+            Ok(output) => {
+                if output.status.success() {
+                    return Ok(true);
+                }
+            }
+            Err(_) => {}
+        }
+        
+        // Method 3: Check Windows Registry
+        // Try to find Ollama in the registry
+        let registry_check = std::process::Command::new("reg")
+            .args(&["query", r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\ollama.exe"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .stdin(std::process::Stdio::null())
+            .output();
+            
+        if let Ok(output) = registry_check {
+            if output.status.success() {
+                return Ok(true);
+            }
+        }
+        
+        Ok(false)
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        match std::process::Command::new("which")
+            .arg("ollama")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .output() 
+        {
+            Ok(output) => Ok(output.status.success()),
+            Err(_) => Ok(false),
+        }
     }
 }
 
@@ -65,13 +143,68 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
         // Combine flags for maximum stealth
         let flags = CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
         
-        std::process::Command::new("ollama")
-            .arg("serve")
-            .creation_flags(flags)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .map_err(|e| format!("Failed to start Ollama: {}", e))?;
+        // Try to start via full path first
+        let ollama_paths = [
+            r"C:\Program Files\Ollama\ollama.exe",
+            r"C:\Program Files (x86)\Ollama\ollama.exe",
+            r"%LOCALAPPDATA%\Programs\Ollama\ollama.exe",
+            r"%USERPROFILE%\AppData\Local\Programs\Ollama\ollama.exe",
+        ];
+        
+        let mut started = false;
+        for path in ollama_paths.iter() {
+            let expanded_path = if path.starts_with('%') {
+                use std::env;
+                let path_str = path.to_string();
+                if path_str.contains("%LOCALAPPDATA%") {
+                    if let Ok(localappdata) = env::var("LOCALAPPDATA") {
+                        path_str.replace("%LOCALAPPDATA%", &localappdata)
+                    } else {
+                        continue;
+                    }
+                } else if path_str.contains("%USERPROFILE%") {
+                    if let Ok(userprofile) = env::var("USERPROFILE") {
+                        path_str.replace("%USERPROFILE%", &userprofile)
+                    } else {
+                        continue;
+                    }
+                } else {
+                    path_str
+                }
+            } else {
+                path.to_string()
+            };
+            
+            if std::path::Path::new(&expanded_path).exists() {
+                let child = std::process::Command::new(&expanded_path)
+                    .arg("serve")
+                    .creation_flags(flags)
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .stdin(std::process::Stdio::null())
+                    .spawn();
+                    
+                if child.is_ok() {
+                    started = true;
+                    break;
+                }
+            }
+        }
+        
+        // Method 2: Fallback to using "ollama" from PATH
+        if !started {
+            let child = std::process::Command::new("ollama")
+                .arg("serve")
+                .creation_flags(flags)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .stdin(std::process::Stdio::null())
+                .spawn();
+                
+            if child.is_err() {
+                return Err("Failed to start Ollama".to_string());
+            }
+        }
         
         // Wait a moment for Ollama to start
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
@@ -89,6 +222,8 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
         // On macOS, use open with background flag
         let output = std::process::Command::new("open")
             .args(&["-a", "Ollama", "--background"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .output()
             .map_err(|e| format!("Failed to start Ollama: {}", e))?;
         
@@ -112,6 +247,8 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
         // Try systemctl first
         let output = std::process::Command::new("systemctl")
             .args(&["--user", "start", "ollama.service"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .output();
         
         if let Ok(output) = output {

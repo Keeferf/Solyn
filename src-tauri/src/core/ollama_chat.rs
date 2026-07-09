@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::sync::mpsc;
+use std::path::Path;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -74,7 +77,7 @@ impl OllamaChatClient {
     }
 
     /// Create a new model using the Modelfile content
-    pub async fn create_model_from_content(&self, model_name: &str, modelfile_content: &str) -> Result<String, String> {
+    pub async fn create_model_from_content(&self, model_name: &str, modelfile_content: &str, gguf_path: Option<&str>) -> Result<String, String> {
         let url = format!("{}/api/create", self.base_url);
         
         // Verify the Modelfile has a valid FROM path
@@ -82,46 +85,44 @@ impl OllamaChatClient {
             return Err("Modelfile does not contain a FROM instruction".to_string());
         }
         
-        // Extract the GGUF path from the Modelfile for debugging
-        for line in modelfile_content.lines() {
-            if line.trim().starts_with("FROM") {
-                let path = line.trim().trim_start_matches("FROM").trim();
-                println!("📁 GGUF file path in Modelfile: {}", path);
-                
-                // Check if the file exists (if it's an absolute path)
-                if path.contains(':') || path.starts_with('/') || path.starts_with('\\') {
-                    let file_path = std::path::Path::new(path);
-                    if file_path.exists() {
-                        println!("✅ GGUF file exists at: {}", path);
-                    } else {
-                        println!("⚠️ GGUF file not found at: {}", path);
-                        // Try to find it in the current directory
-                        if let Some(parent) = file_path.parent() {
-                            if parent.exists() {
-                                println!("📁 Directory exists: {:?}", parent);
-                                // List files in the directory
-                                if let Ok(entries) = std::fs::read_dir(parent) {
-                                    println!("📄 Files in directory:");
-                                    for entry in entries.flatten() {
-                                        println!("  - {}", entry.file_name().to_string_lossy());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-        }
-        
-        let payload = json!({
+        // Log the Modelfile content for debugging
+        println!("📝 Modelfile content:\n{}", modelfile_content);
+
+        // Use the approach that works best with Ollama's API
+        // Option 1: Use the files parameter with the GGUF file
+        // Option 2: Use the modelfile parameter with absolute paths
+        let mut payload = json!({
             "name": model_name,
-            "modelfile": modelfile_content,
             "stream": false,
         });
 
-        println!("📤 Creating model with Modelfile content");
-        println!("📝 Modelfile:\n{}", modelfile_content);
+        // If we have a GGUF path, try using the files approach (more reliable)
+        if let Some(path) = gguf_path {
+            // Read the GGUF file as bytes
+            let gguf_path_obj = Path::new(path);
+            if gguf_path_obj.exists() {
+                match std::fs::read(gguf_path_obj) {
+                    Ok(gguf_data) => {
+                        // Encode as base64 using the recommended Engine API
+                        let base64_data = BASE64_STANDARD.encode(&gguf_data);
+                        payload["files"] = json!({
+                            "gguf_file": base64_data
+                        });
+                        println!("📤 Using files parameter with GGUF file (size: {} bytes)", gguf_data.len());
+                    }
+                    Err(e) => {
+                        println!("⚠️ Failed to read GGUF file: {}, falling back to modelfile", e);
+                        payload["modelfile"] = json!(modelfile_content);
+                    }
+                }
+            } else {
+                println!("⚠️ GGUF file not found at: {}, falling back to modelfile", path);
+                payload["modelfile"] = json!(modelfile_content);
+            }
+        } else {
+            // Fallback to modelfile approach
+            payload["modelfile"] = json!(modelfile_content);
+        }
 
         let response = self.client
             .post(&url)
@@ -131,13 +132,11 @@ impl OllamaChatClient {
             .await
             .map_err(|e| format!("Failed to create model: {}", e))?;
 
-        // FIXED: Check status before consuming response
         let status = response.status();
         let response_text = response.text().await.unwrap_or_default();
         println!("📥 Ollama response: {}", response_text);
 
         if status.is_success() {
-            // Parse the response to check for success
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response_text) {
                 if let Some(error) = json.get("error") {
                     return Err(format!("Ollama error: {}", error));
@@ -164,7 +163,8 @@ impl OllamaChatClient {
             .map_err(|e| format!("Failed to list models: {}", e))?;
 
         if response.status().is_success() {
-            let data: Value = response.json().await
+            let data: Value = response.json()
+                .await
                 .map_err(|e| format!("Failed to parse response: {}", e))?;
             
             let models = data["models"]
@@ -202,7 +202,7 @@ impl OllamaChatClient {
         }
     }
 
-    /// Send a chat message (streaming) - FIXED: Simplified approach
+    /// Send a chat message (streaming)
     pub async fn chat_stream(
         &self,
         model_name: &str,
@@ -236,7 +236,6 @@ impl OllamaChatClient {
                         return;
                     }
 
-                    // FIXED: Use simpler text approach instead of StreamReader
                     match resp.text().await {
                         Ok(text) => {
                             for line in text.lines() {
