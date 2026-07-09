@@ -42,6 +42,47 @@ fn get_ollama_model_name(model_id: &str, filename: &str) -> String {
     format!("{}_{}", clean_model_id, clean_filename)
 }
 
+// Helper to find the GGUF file in the model directory
+fn find_gguf_file(model_dir: &std::path::Path, filename: &str) -> Result<String, String> {
+    // First try the exact filename
+    let gguf_path = model_dir.join(filename);
+    if gguf_path.exists() {
+        if let Some(abs_path) = gguf_path.to_str() {
+            return Ok(abs_path.replace('\\', "/"));
+        }
+    }
+    
+    // Try to find any .gguf file in the directory
+    if let Ok(entries) = std::fs::read_dir(model_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(ext) = path.extension() {
+                if ext == "gguf" {
+                    if let Some(abs_path) = path.to_str() {
+                        return Ok(abs_path.replace('\\', "/"));
+                    }
+                }
+            }
+        }
+    }
+    
+    Err(format!("No .gguf file found in {:?}", model_dir))
+}
+
+// Helper to replace the FROM path in Modelfile with absolute path
+fn replace_from_path(modelfile_content: &str, new_path: &str) -> String {
+    let mut result = String::new();
+    for line in modelfile_content.lines() {
+        if line.trim().starts_with("FROM") {
+            result.push_str(&format!("FROM {}", new_path));
+        } else {
+            result.push_str(line);
+        }
+        result.push('\n');
+    }
+    result
+}
+
 #[tauri::command]
 pub async fn check_ollama_health(app_handle: AppHandle) -> Result<bool, String> {
     let state = app_handle.state::<Arc<Mutex<ChatState>>>();
@@ -55,7 +96,7 @@ pub async fn create_ollama_model(
     model_id: String,
     filename: String,
 ) -> Result<String, String> {
-    // Get the model directory
+    // Get the app data directory
     let app_dir = app_handle
         .path()
         .app_data_dir()
@@ -67,6 +108,10 @@ pub async fn create_ollama_model(
     if !model_dir.exists() {
         return Err(format!("Model directory not found: {:?}", model_dir));
     }
+    
+    // Find the GGUF file first
+    let gguf_abs_path = find_gguf_file(&model_dir, &filename)?;
+    println!("📁 Found GGUF file at: {}", gguf_abs_path);
     
     // Find the Modelfile
     let modelfile_path = if let Some(quant) = crate::core::huggingface::extract_quantization(&filename) {
@@ -98,15 +143,20 @@ pub async fn create_ollama_model(
     let modelfile_content = std::fs::read_to_string(&modelfile_path)
         .map_err(|e| format!("Failed to read Modelfile: {}", e))?;
     
-    println!("📝 Modelfile content:\n{}", modelfile_content);
+    println!("📝 Original Modelfile content:\n{}", modelfile_content);
     
-    // Create model in Ollama using the content with absolute paths
+    // Replace the FROM path with absolute path
+    let updated_modelfile_content = replace_from_path(&modelfile_content, &gguf_abs_path);
+    
+    println!("📝 Updated Modelfile content:\n{}", updated_modelfile_content);
+    
+    // Create model in Ollama - pass the GGUF path separately
     let state = app_handle.state::<Arc<Mutex<ChatState>>>();
     let state = state.lock().await;
     let model_name = get_ollama_model_name(&model_id, &filename);
     
-    // Use the content-based approach with the Modelfile content
-    state.client.create_model_from_content(&model_name, &modelfile_content).await?;
+    // Pass both the modelfile content and the GGUF path
+    state.client.create_model_from_content(&model_name, &updated_modelfile_content, Some(&gguf_abs_path)).await?;
     
     Ok(model_name)
 }
