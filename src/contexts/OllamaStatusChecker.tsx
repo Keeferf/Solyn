@@ -37,7 +37,7 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-accent mx-auto"></div>
           <p className="mt-4 text-white/60">Checking Ollama status...</p>
         </div>
       </div>
@@ -58,7 +58,7 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
             onClick={() => {
               window.open("https://ollama.com/download", "_blank");
             }}
-            className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+            className="px-6 py-2 bg-purple-accent text-white rounded-lg hover:bg-purple-accent/85 active:bg-purple-accent/75 transition-colors focus:ring-2 focus:ring-purple-accent focus:ring-offset-2 focus:ring-offset-black"
           >
             Download Ollama
           </button>
@@ -71,7 +71,7 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-accent mx-auto"></div>
           <p className="mt-4 text-white/60">Starting Ollama...</p>
         </div>
       </div>
