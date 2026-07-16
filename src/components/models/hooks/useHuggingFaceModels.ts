@@ -40,29 +40,20 @@ export const useHuggingFaceModels = (
 ) => {
   const [models, setModels] = useState<HFModelSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [isSwitchingFilter, setIsSwitchingFilter] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
   const [totalModels, setTotalModels] = useState(0);
   const [currentFilter, setCurrentFilter] =
     useState<ModelFilter>(initialFilter);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isSearching, setIsSearching] = useState(false);
 
-  const currentPageRef = useRef(1);
-  const modelsPerPage = 20;
   const maxModels = 100;
   const initialLoadDone = useRef(false);
-  const hasLoadedAllRef = useRef(false);
   const loadedIdsRef = useRef<Set<string>>(new Set());
   const isChangingFilterRef = useRef(false);
-  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const switchFilterStartTimeRef = useRef<number | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const MIN_LOADING_TIME = 300;
 
-  // Load initial models (with optional search query)
+  // Load all models at once (up to maxModels)
   const loadInitialModels = useCallback(
     async (
       filter: ModelFilter,
@@ -81,8 +72,6 @@ export const useHuggingFaceModels = (
 
       if (!keepExistingModels) {
         setLoading(true);
-      } else {
-        setIsSwitchingFilter(true);
       }
       setError(null);
 
@@ -111,7 +100,7 @@ export const useHuggingFaceModels = (
 
         let response: HFModelSummary[] = [];
 
-        // Fetch models (with or without search)
+        // Fetch ALL models at once (up to maxModels)
         if (query.trim()) {
           const searchResult = await invoke<{
             models: HFModelSummary[];
@@ -120,197 +109,61 @@ export const useHuggingFaceModels = (
           }>("search_huggingface_models", {
             query: query.trim(),
             page: 1,
-            limit: modelsPerPage,
+            limit: maxModels,
             filter: filter,
           });
 
           response = searchResult.models || [];
-          setHasMore(searchResult.has_more);
         } else {
           response = await invoke<HFModelSummary[]>(
             "fetch_huggingface_models_page",
             {
               page: 1,
-              limit: modelsPerPage,
+              limit: maxModels,
               filter: filter,
             },
           );
-
-          const hasMoreModels =
-            response.length === modelsPerPage && response.length < maxModels;
-          setHasMore(hasMoreModels);
         }
 
-        // Track loaded model IDs to prevent duplicates
+        // Track loaded model IDs
         const ids = new Set<string>();
         response.forEach((m) => ids.add(m.model_id));
         loadedIdsRef.current = ids;
 
         setModels(response);
-        currentPageRef.current = 1;
         setCurrentFilter(filter);
         setSearchQuery(query);
-
-        if (!hasMore) {
-          hasLoadedAllRef.current = true;
-        }
 
         initialLoadDone.current = true;
       } catch (err) {
         setError(String(err));
       } finally {
         setLoading(false);
-        // Don't set isSwitchingFilter to false here - let changeFilter handle it
       }
     },
-    [modelsPerPage, maxModels, currentFilter, searchQuery, hasMore],
+    [maxModels, currentFilter, searchQuery],
   );
 
-  // Load more models (with search support)
-  const loadMoreModels = useCallback(async () => {
-    if (
-      loadingMore ||
-      !hasMore ||
-      loading ||
-      hasLoadedAllRef.current ||
-      isSwitchingFilter ||
-      isSearching
-    ) {
-      return;
-    }
-
-    setLoadingMore(true);
-    try {
-      const nextPage = currentPageRef.current + 1;
-      let response: HFModelSummary[] = [];
-      let hasMoreResults = false;
-
-      if (searchQuery.trim()) {
-        const searchResult = await invoke<{
-          models: HFModelSummary[];
-          total: number;
-          has_more: boolean;
-        }>("search_huggingface_models", {
-          query: searchQuery.trim(),
-          page: nextPage,
-          limit: modelsPerPage,
-          filter: currentFilter,
-        });
-
-        response = searchResult.models || [];
-        hasMoreResults = searchResult.has_more;
-      } else {
-        response = await invoke<HFModelSummary[]>(
-          "fetch_huggingface_models_page",
-          {
-            page: nextPage,
-            limit: modelsPerPage,
-            filter: currentFilter,
-          },
-        );
-
-        hasMoreResults =
-          response.length === modelsPerPage &&
-          models.length + response.length < maxModels;
-      }
-
-      if (response.length === 0) {
-        setHasMore(false);
-        hasLoadedAllRef.current = true;
-        return;
-      }
-
-      // Filter out duplicates
-      const existingIds = loadedIdsRef.current;
-      const newModels = response.filter((m) => !existingIds.has(m.model_id));
-
-      if (newModels.length === 0) {
-        setHasMore(false);
-        hasLoadedAllRef.current = true;
-        return;
-      }
-
-      // Track new IDs
-      newModels.forEach((m) => existingIds.add(m.model_id));
-
-      setModels((prev) => [...prev, ...newModels]);
-      currentPageRef.current = nextPage;
-      setHasMore(hasMoreResults);
-
-      if (!hasMoreResults) {
-        hasLoadedAllRef.current = true;
-      }
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [
-    loadingMore,
-    hasMore,
-    loading,
-    modelsPerPage,
-    maxModels,
-    currentFilter,
-    searchQuery,
-    models.length,
-    isSwitchingFilter,
-    isSearching,
-  ]);
-
-  // Change filter (with search preservation)
+  // Change filter - DON'T clear models, just update
   const changeFilter = useCallback(
     async (newFilter: ModelFilter) => {
       if (newFilter === currentFilter) return;
 
-      // Clear any existing timeout
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = null;
-      }
-
-      // Reset state
-      setModels([]);
-      setHasMore(true);
-      setTotalModels(0);
-      currentPageRef.current = 0;
-      hasLoadedAllRef.current = false;
+      // Don't reset models - keep showing current models
+      // Only reset the loaded state
       loadedIdsRef.current = new Set();
-
       isChangingFilterRef.current = true;
       initialLoadDone.current = false;
 
-      // Start timing for minimum loading display
-      switchFilterStartTimeRef.current = Date.now();
-
-      // Debounce the loading state - only show if operation takes > 150ms
-      const showLoading = setTimeout(() => {
-        setIsSwitchingFilter(true);
-      }, 150);
-      loadingTimeoutRef.current = showLoading;
-
-      // Load with current search query
-      await loadInitialModels(newFilter, searchQuery, true);
-
-      // Clear the debounce timeout since we're done
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = null;
+      try {
+        // Load all models with current search query
+        await loadInitialModels(newFilter, searchQuery, true);
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        isChangingFilterRef.current = false;
+        setLoading(false);
       }
-
-      // Ensure minimum loading time for visual consistency
-      if (switchFilterStartTimeRef.current) {
-        const elapsed = Date.now() - switchFilterStartTimeRef.current;
-        if (elapsed < MIN_LOADING_TIME) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, MIN_LOADING_TIME - elapsed),
-          );
-        }
-        switchFilterStartTimeRef.current = null;
-      }
-
-      setIsSwitchingFilter(false);
-      isChangingFilterRef.current = false;
     },
     [currentFilter, loadInitialModels, searchQuery],
   );
@@ -334,17 +187,14 @@ export const useHuggingFaceModels = (
         try {
           // Only reset if we have a non-empty query or the query changed
           if (query.trim() !== "" || query !== searchQuery) {
-            // Reset state for new search
+            // For search, we DO want to clear models since results will be different
             setModels([]);
-            setHasMore(true);
             setTotalModels(0);
-            currentPageRef.current = 0;
-            hasLoadedAllRef.current = false;
             loadedIdsRef.current = new Set();
             initialLoadDone.current = false;
             setSearchQuery(query);
 
-            // Load models with search query
+            // Load all models with search query
             await loadInitialModels(currentFilter, query, false);
           }
         } catch (err) {
@@ -358,15 +208,12 @@ export const useHuggingFaceModels = (
     [currentFilter, loadInitialModels, searchQuery],
   );
 
-  // Refresh models (clear cache and reload)
+  // Refresh models (clear cache and reload all)
   const refreshModels = useCallback(async () => {
     initialLoadDone.current = false;
-    hasLoadedAllRef.current = false;
     loadedIdsRef.current = new Set();
     setModels([]);
-    setHasMore(true);
     setTotalModels(0);
-    currentPageRef.current = 0;
 
     // Clear cache
     try {
@@ -393,10 +240,7 @@ export const useHuggingFaceModels = (
 
     // Reset and reload without search
     setModels([]);
-    setHasMore(true);
     setTotalModels(0);
-    currentPageRef.current = 0;
-    hasLoadedAllRef.current = false;
     loadedIdsRef.current = new Set();
     initialLoadDone.current = false;
 
@@ -407,9 +251,6 @@ export const useHuggingFaceModels = (
   // Clean up timeouts on unmount
   useEffect(() => {
     return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
@@ -426,10 +267,7 @@ export const useHuggingFaceModels = (
     // State
     models,
     loading,
-    loadingMore,
-    isSwitchingFilter,
     error,
-    hasMore,
     totalModels,
     maxModels,
     currentFilter,
@@ -438,7 +276,6 @@ export const useHuggingFaceModels = (
 
     // Actions
     changeFilter,
-    loadMoreModels,
     refreshModels,
     searchModels,
     clearSearch,

@@ -30,17 +30,13 @@ export const ModelInterface = () => {
   const {
     models,
     loading,
-    loadingMore,
-    isSwitchingFilter,
     error,
-    hasMore,
     totalModels,
     maxModels,
     currentFilter,
     searchQuery,
     isSearching,
     changeFilter,
-    loadMoreModels,
     refreshModels,
     searchModels,
     clearSearch,
@@ -262,7 +258,7 @@ export const ModelInterface = () => {
         {activeTab === "browse" && (
           <button
             onClick={refreshModels}
-            disabled={loading || isSwitchingFilter || isSearching}
+            disabled={loading || isSearching}
             className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
           >
             Refresh
@@ -296,22 +292,17 @@ export const ModelInterface = () => {
               currentFilter={currentFilter}
               onFilterChange={handleFilterChange}
               loading={loading || isSearching}
-              disabled={isSwitchingFilter}
             />
 
             {/* Models Grid */}
             <BrowseModels
               models={models}
               loading={loading}
-              loadingMore={loadingMore}
-              isSwitchingFilter={isSwitchingFilter}
               isSearching={isSearching}
-              hasMore={hasMore}
               totalModels={totalModels}
               maxModels={maxModels}
               downloadingModels={downloadingModels}
               onModelClick={handleModelClick}
-              onLoadMore={loadMoreModels}
               onRefresh={refreshModels}
               error={error}
               searchQuery={searchQuery}
