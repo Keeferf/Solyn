@@ -40,7 +40,6 @@ export const useHuggingFaceModels = (
 ) => {
   const [models, setModels] = useState<HFModelSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isSwitchingFilter, setIsSwitchingFilter] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalModels, setTotalModels] = useState(0);
   const [currentFilter, setCurrentFilter] =
@@ -52,10 +51,7 @@ export const useHuggingFaceModels = (
   const initialLoadDone = useRef(false);
   const loadedIdsRef = useRef<Set<string>>(new Set());
   const isChangingFilterRef = useRef(false);
-  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const switchFilterStartTimeRef = useRef<number | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const MIN_LOADING_TIME = 300;
 
   // Load all models at once (up to maxModels)
   const loadInitialModels = useCallback(
@@ -76,8 +72,6 @@ export const useHuggingFaceModels = (
 
       if (!keepExistingModels) {
         setLoading(true);
-      } else {
-        setIsSwitchingFilter(true);
       }
       setError(null);
 
@@ -145,55 +139,28 @@ export const useHuggingFaceModels = (
         setError(String(err));
       } finally {
         setLoading(false);
-        setIsSwitchingFilter(false);
       }
     },
     [maxModels, currentFilter, searchQuery],
   );
 
-  // Change filter - loads all models at once
+  // Change filter - DON'T clear models, just update
   const changeFilter = useCallback(
     async (newFilter: ModelFilter) => {
       if (newFilter === currentFilter) return;
 
-      // Clear any existing timeout
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = null;
-      }
-
-      // Reset state
-      setModels([]);
-      setTotalModels(0);
+      // Don't reset models - keep showing current models
+      // Only reset the loaded state
       loadedIdsRef.current = new Set();
-
       isChangingFilterRef.current = true;
       initialLoadDone.current = false;
-
-      // Start timing for minimum loading display
-      switchFilterStartTimeRef.current = Date.now();
-
-      // Show loading state immediately for filter switch
-      setIsSwitchingFilter(true);
 
       try {
         // Load all models with current search query
         await loadInitialModels(newFilter, searchQuery, true);
-
-        // Ensure minimum loading time for visual consistency
-        if (switchFilterStartTimeRef.current) {
-          const elapsed = Date.now() - switchFilterStartTimeRef.current;
-          if (elapsed < MIN_LOADING_TIME) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, MIN_LOADING_TIME - elapsed),
-            );
-          }
-          switchFilterStartTimeRef.current = null;
-        }
       } catch (err) {
         setError(String(err));
       } finally {
-        setIsSwitchingFilter(false);
         isChangingFilterRef.current = false;
         setLoading(false);
       }
@@ -201,7 +168,7 @@ export const useHuggingFaceModels = (
     [currentFilter, loadInitialModels, searchQuery],
   );
 
-  // Search models with debounce - loads all models at once
+  // Search models with debounce
   const searchModels = useCallback(
     async (query: string) => {
       // Clear existing search timeout
@@ -220,7 +187,7 @@ export const useHuggingFaceModels = (
         try {
           // Only reset if we have a non-empty query or the query changed
           if (query.trim() !== "" || query !== searchQuery) {
-            // Reset state for new search
+            // For search, we DO want to clear models since results will be different
             setModels([]);
             setTotalModels(0);
             loadedIdsRef.current = new Set();
@@ -284,9 +251,6 @@ export const useHuggingFaceModels = (
   // Clean up timeouts on unmount
   useEffect(() => {
     return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
@@ -303,7 +267,6 @@ export const useHuggingFaceModels = (
     // State
     models,
     loading,
-    isSwitchingFilter,
     error,
     totalModels,
     maxModels,

@@ -1,3 +1,4 @@
+// src/components/models/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -29,7 +30,6 @@ export const ModelInterface = () => {
   const {
     models,
     loading,
-    isSwitchingFilter,
     error,
     totalModels,
     maxModels,
@@ -258,7 +258,7 @@ export const ModelInterface = () => {
         {activeTab === "browse" && (
           <button
             onClick={refreshModels}
-            disabled={loading || isSwitchingFilter || isSearching}
+            disabled={loading || isSearching}
             className="px-4 py-2 bg-black hover:bg-white/10 rounded-lg text-white transition-all disabled:opacity-50 cursor-pointer"
           >
             Refresh
@@ -292,14 +292,12 @@ export const ModelInterface = () => {
               currentFilter={currentFilter}
               onFilterChange={handleFilterChange}
               loading={loading || isSearching}
-              disabled={isSwitchingFilter}
             />
 
             {/* Models Grid */}
             <BrowseModels
               models={models}
               loading={loading}
-              isSwitchingFilter={isSwitchingFilter}
               isSearching={isSearching}
               totalModels={totalModels}
               maxModels={maxModels}
