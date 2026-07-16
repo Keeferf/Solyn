@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   FiLoader,
   FiServer,
@@ -9,19 +8,15 @@ import {
   FiChevronRight,
 } from "react-icons/fi";
 import { HFModelSummary } from "./hooks/useHuggingFaceModels";
-import { useIntersectionObserver } from "./hooks/useIntersectionObserver";
 
 interface BrowseModelsProps {
   models: HFModelSummary[];
   loading: boolean;
-  loadingMore: boolean;
   isSwitchingFilter: boolean;
-  hasMore: boolean;
   totalModels: number;
   maxModels: number;
   downloadingModels: Set<string>;
   onModelClick: (model: HFModelSummary) => void;
-  onLoadMore: () => void;
   onRefresh?: () => void;
   error?: string | null;
   searchQuery?: string;
@@ -59,46 +54,18 @@ const formatLikes = (likes?: number): string => {
 export const BrowseModels = ({
   models,
   loading,
-  loadingMore,
   isSwitchingFilter,
-  hasMore,
   totalModels,
   maxModels,
   downloadingModels,
   onModelClick,
-  onLoadMore,
   onRefresh,
   error,
   searchQuery = "",
   isSearching = false,
   onClearSearch,
 }: BrowseModelsProps) => {
-  const { targetRef, isIntersecting } = useIntersectionObserver({
-    threshold: 0.1,
-    rootMargin: "100px",
-  });
-
-  useEffect(() => {
-    if (
-      isIntersecting &&
-      hasMore &&
-      !loadingMore &&
-      !loading &&
-      !isSwitchingFilter &&
-      !isSearching
-    ) {
-      onLoadMore();
-    }
-  }, [
-    isIntersecting,
-    hasMore,
-    loadingMore,
-    loading,
-    isSwitchingFilter,
-    isSearching,
-    onLoadMore,
-  ]);
-
+  // Show loading state when initially loading and no models exist yet
   if (loading && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -115,6 +82,7 @@ export const BrowseModels = ({
     );
   }
 
+  // Show error state
   if (error && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -152,7 +120,6 @@ export const BrowseModels = ({
         }`}
       >
         {/* Loading overlay - doesn't block interactions */}
-        {/* Show during filter switching OR during initial search load (when models are empty) */}
         {(isSwitchingFilter || (isSearching && models.length === 0)) && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl z-10 pointer-events-none">
             <div className="flex items-center gap-3 bg-black/80 px-6 py-3 rounded-lg">
@@ -164,11 +131,6 @@ export const BrowseModels = ({
           </div>
         )}
 
-        {/* 
-          Content stays in DOM at all times. During filter switching, the parent's
-          opacity transition (via transition-all on the container above) handles the
-          visual feedback. Keeping the DOM stable prevents the input from losing focus.
-        */}
         {models.length === 0 ? (
           <div className="text-center py-16">
             {searchQuery ? (
@@ -266,18 +228,28 @@ export const BrowseModels = ({
               })}
             </div>
 
-            {hasMore && <div ref={targetRef} className="py-8" />}
-
-            {!hasMore && models.length > 0 && (
-              <div className="py-8 text-center text-white/30 text-sm border-t border-white/5">
-                All {models.length} top models loaded
-                {totalModels > 0 && totalModels < maxModels && (
-                  <span className="block text-xs text-white/20 mt-2">
-                    ({totalModels} available from Hugging Face)
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Footer showing total models loaded */}
+            <div className="py-8 text-center text-white/30 text-sm border-t border-white/5">
+              {models.length === totalModels && totalModels > 0 ? (
+                <>
+                  Showing {models.length} models
+                  {totalModels < maxModels && (
+                    <span className="block text-xs text-white/20 mt-2">
+                      ({totalModels} available from Hugging Face)
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  Showing {models.length} of {totalModels} models
+                  {totalModels < maxModels && (
+                    <span className="block text-xs text-white/20 mt-2">
+                      ({totalModels} available from Hugging Face)
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
           </>
         )}
       </div>

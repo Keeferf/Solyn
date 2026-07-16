@@ -1,4 +1,3 @@
-// src/components/models/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -30,17 +29,14 @@ export const ModelInterface = () => {
   const {
     models,
     loading,
-    loadingMore,
     isSwitchingFilter,
     error,
-    hasMore,
     totalModels,
     maxModels,
     currentFilter,
     searchQuery,
     isSearching,
     changeFilter,
-    loadMoreModels,
     refreshModels,
     searchModels,
     clearSearch,
@@ -303,15 +299,12 @@ export const ModelInterface = () => {
             <BrowseModels
               models={models}
               loading={loading}
-              loadingMore={loadingMore}
               isSwitchingFilter={isSwitchingFilter}
               isSearching={isSearching}
-              hasMore={hasMore}
               totalModels={totalModels}
               maxModels={maxModels}
               downloadingModels={downloadingModels}
               onModelClick={handleModelClick}
-              onLoadMore={loadMoreModels}
               onRefresh={refreshModels}
               error={error}
               searchQuery={searchQuery}
