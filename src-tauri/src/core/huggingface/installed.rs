@@ -5,7 +5,6 @@ use tokio::fs;
 use tauri::{AppHandle, Manager};
 
 use super::utils::{extract_parameter_count, extract_quantization};
-use super::modelfile::get_modelfile_name;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstalledModelFile {
@@ -112,8 +111,8 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
         if path.is_file() {
             let filename = path.file_name()?.to_str()?.to_string();
             
-            // Check for Modelfiles (both Modelfile and Modelfile_*)
-            if filename.starts_with("Modelfile") {
+            // Check for Modelfiles - now we only have "Modelfile"
+            if filename == "Modelfile" {
                 has_modelfile = true;
                 modelfiles.push(filename);
                 continue;
@@ -126,23 +125,11 @@ async fn scan_model_directory(dir_path: &PathBuf) -> Option<InstalledModel> {
                 let parameter_count = extract_parameter_count(&filename);
                 let quantization = extract_quantization(&filename);
                 
-                // Determine which Modelfile belongs to this file
-                let modelfile_name = if let Some(quant) = &quantization {
-                    let expected_name = get_modelfile_name(Some(quant));
-                    if modelfiles.contains(&expected_name) {
-                        Some(expected_name)
-                    } else if modelfiles.contains(&"Modelfile".to_string()) {
-                        // Fallback to generic Modelfile
-                        Some("Modelfile".to_string())
-                    } else {
-                        None
-                    }
+                // Since we only generate "Modelfile" now, check if it exists
+                let modelfile_name = if modelfiles.contains(&"Modelfile".to_string()) {
+                    Some("Modelfile".to_string())
                 } else {
-                    if modelfiles.contains(&"Modelfile".to_string()) {
-                        Some("Modelfile".to_string())
-                    } else {
-                        None
-                    }
+                    None
                 };
                 
                 let file_info = InstalledModelFile {
@@ -215,7 +202,7 @@ pub async fn delete_model_file(
     }
     
     // Don't allow deleting Modelfiles directly
-    if filename.starts_with("Modelfile") {
+    if filename == "Modelfile" {
         return Err("Cannot delete Modelfile directly. Delete the GGUF file instead.".to_string());
     }
     
@@ -224,13 +211,11 @@ pub async fn delete_model_file(
         .await
         .map_err(|e| format!("Failed to delete file: {}", e))?;
     
-    // Also delete associated Modelfile if it exists
-    if let Some(quantization) = extract_quantization(filename) {
-        let modelfile_name = get_modelfile_name(Some(&quantization));
-        let modelfile_path = file_path.parent().unwrap().join(&modelfile_name);
-        if modelfile_path.exists() {
-            let _ = fs::remove_file(&modelfile_path).await;
-        }
+    // Also delete associated Modelfile if it exists (always "Modelfile" now)
+    let modelfile_name = "Modelfile".to_string();
+    let modelfile_path = file_path.parent().unwrap().join(&modelfile_name);
+    if modelfile_path.exists() {
+        let _ = fs::remove_file(&modelfile_path).await;
     }
     
     // Check if directory is empty after deletion
@@ -286,7 +271,7 @@ pub async fn delete_model_quantization(
                 .unwrap_or("");
             
             // Skip Modelfiles directly
-            if filename.starts_with("Modelfile") {
+            if filename == "Modelfile" {
                 continue;
             }
             
@@ -298,8 +283,8 @@ pub async fn delete_model_quantization(
                         .await
                         .map_err(|e| format!("Failed to delete file {}: {}", filename, e))?;
                     
-                    // Delete associated Modelfile
-                    let modelfile_name = get_modelfile_name(Some(&quantization.to_string()));
+                    // Delete associated Modelfile (always "Modelfile" now)
+                    let modelfile_name = "Modelfile".to_string();
                     let modelfile_path = model_dir.join(&modelfile_name);
                     if modelfile_path.exists() {
                         let _ = fs::remove_file(&modelfile_path).await;

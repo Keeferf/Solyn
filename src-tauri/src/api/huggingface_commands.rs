@@ -14,8 +14,6 @@ use crate::core::huggingface::{
     delete_model_quantization,
     write_modelfile,
     ModelFileConfig,
-    extract_parameter_count,
-    extract_quantization,
 };
 use crate::core::huggingface::fetch_model_details as client_fetch_model_details;
 use crate::data::huggingface_model_types::{HFModelSummary, HFModelDetails, ModelFilter, SearchModelsResponse};
@@ -173,21 +171,11 @@ pub async fn generate_modelfile(
         return Err("Model directory not found".to_string());
     }
     
-    let parts: Vec<&str> = model_id.split('/').collect();
-    let author = parts.get(0).unwrap_or(&"").to_string();
-    let model_name = parts.get(1).unwrap_or(&"").to_string();
-    
-    let filename_clone = filename.clone();
-    let quantization = extract_quantization(&filename);
-    let parameter_count = extract_parameter_count(&filename_clone);
-    
+    // Simplified config - only needs model_id, gguf_filename, and model_dir
     let config = ModelFileConfig {
-        model_name: format!("{}/{}", author, model_name),
         model_id: model_id.clone(),
         gguf_filename: filename,
-        quantization,
-        parameter_count,
-        model_dir: model_dir.clone(), // Pass the model directory
+        model_dir: model_dir.clone(),
     };
     
     let modelfile_path = write_modelfile(&model_dir, &config).await?;
