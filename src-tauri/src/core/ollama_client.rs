@@ -22,7 +22,6 @@ pub async fn is_ollama_installed() -> Result<bool, String> {
         
         for path in common_paths.iter() {
             let expanded_path = if path.starts_with('%') {
-                // Simple environment variable expansion
                 let path_str = path.to_string();
                 if path_str.contains("%LOCALAPPDATA%") {
                     if let Ok(localappdata) = env::var("LOCALAPPDATA") {
@@ -70,7 +69,6 @@ pub async fn is_ollama_installed() -> Result<bool, String> {
         }
         
         // Method 3: Check Windows Registry
-        // Try to find Ollama in the registry
         let registry_check = std::process::Command::new("reg")
             .args(&["query", r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\ollama.exe"])
             .creation_flags(CREATE_NO_WINDOW)
@@ -140,10 +138,8 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
         const DETACHED_PROCESS: u32 = 0x00000008;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         
-        // Combine flags for maximum stealth
         let flags = CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
         
-        // Try to start via full path first
         let ollama_paths = [
             r"C:\Program Files\Ollama\ollama.exe",
             r"C:\Program Files (x86)\Ollama\ollama.exe",
@@ -191,7 +187,6 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
             }
         }
         
-        // Method 2: Fallback to using "ollama" from PATH
         if !started {
             let child = std::process::Command::new("ollama")
                 .arg("serve")
@@ -206,10 +201,8 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
             }
         }
         
-        // Wait a moment for Ollama to start
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         
-        // Check if it's running
         if is_ollama_running().await? {
             Ok("Ollama started successfully".to_string())
         } else {
@@ -219,7 +212,6 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
     
     #[cfg(target_os = "macos")]
     {
-        // On macOS, use open with background flag
         let output = std::process::Command::new("open")
             .args(&["-a", "Ollama", "--background"])
             .stdout(std::process::Stdio::null())
@@ -231,10 +223,8 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
             return Err("Failed to start Ollama".to_string());
         }
         
-        // Wait for Ollama to start
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         
-        // Check if it's running
         if is_ollama_running().await? {
             Ok("Ollama started successfully".to_string())
         } else {
@@ -244,7 +234,6 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
     
     #[cfg(target_os = "linux")]
     {
-        // Try systemctl first
         let output = std::process::Command::new("systemctl")
             .args(&["--user", "start", "ollama.service"])
             .stdout(std::process::Stdio::null())
@@ -260,7 +249,6 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
             }
         }
         
-        // Fallback to direct command with nohup
         std::process::Command::new("nohup")
             .args(&["ollama", "serve", "&"])
             .stdout(std::process::Stdio::null())
@@ -270,7 +258,6 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
         
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         
-        // Check if it's running
         if is_ollama_running().await? {
             Ok("Ollama started successfully".to_string())
         } else {

@@ -57,13 +57,15 @@ pub fn run() {
             // Chat models command
             api::huggingface_commands::get_chat_models,
             
+            // Model management commands (now in model_commands)
+            api::model_commands::create_ollama_model,
+            api::model_commands::list_ollama_models,
+            api::model_commands::delete_ollama_model,
+            api::model_commands::check_ollama_health,
+            
             // Chat commands
-            api::chat_commands::create_ollama_model,
-            api::chat_commands::list_ollama_models,
-            api::chat_commands::delete_ollama_model,
             api::chat_commands::send_chat_message,
             api::chat_commands::send_chat_stream,
-            api::chat_commands::check_ollama_health,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
