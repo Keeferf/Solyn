@@ -12,7 +12,7 @@ export const ChatMessages = ({
   messages,
   isLoading,
   error,
-  isOllamaReady,
+  isOllamaReady: _isOllamaReady, // Prefix with underscore to mark as intentionally unused
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +36,7 @@ export const ChatMessages = ({
           <div
             className={`max-w-[80%] rounded-lg px-4 py-2 ${
               message.role === "user"
-                ? "bg-(--color-purple-accent) text-white"
+                ? "bg-purple-accent text-white"
                 : "bg-white/5 text-white/90"
             }`}
           >

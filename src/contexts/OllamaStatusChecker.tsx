@@ -12,7 +12,8 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     useOllama();
   const startAttempted = useRef(false);
   const [showDownloadPage, setShowDownloadPage] = useState(false);
-  const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
+  // Remove unused showDownloadPrompt state
+  // const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
 
   // Handle automatic start when installed but not running
   useEffect(() => {

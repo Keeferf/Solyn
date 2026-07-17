@@ -18,7 +18,7 @@ export const useChat = (modelData: ChatModelData | undefined) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messageBufferRef = useRef<string>("");
-  const { isReady, status } = useOllama();
+  const { isReady, status: _status } = useOllama(); // Prefix with underscore to mark as intentionally unused
   const isOllamaReady = isReady;
 
   const sendMessage = async (content: string) => {

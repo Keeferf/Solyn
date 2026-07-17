@@ -1,4 +1,3 @@
-// src/components/ModelToolbar.tsx
 import { useState, useRef, useEffect } from "react";
 import {
   FiSearch,
@@ -80,7 +79,8 @@ export const ModelToolbar = ({
       };
 
       // Listen for focusout events to catch focus loss
-      const handleFocusOut = (e: FocusEvent) => {
+      const handleFocusOut = (_e: FocusEvent) => {
+        // Prefix with underscore
         // If focus is moving to something else and we're still loading
         if (loading && input && document.activeElement !== input) {
           // Schedule focus restoration

@@ -41,7 +41,7 @@ export const ChatInterface = () => {
     error,
     isOllamaReady,
     sendMessage,
-    clearMessages,
+    clearMessages: _clearMessages, // Prefix with underscore to mark as intentionally unused
   } = useChat(
     selectedModelData
       ? {

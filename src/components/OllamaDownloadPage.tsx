@@ -3,6 +3,14 @@ import { FiDownload, FiExternalLink, FiXCircle } from "react-icons/fi";
 import { TerminalDisplay } from "./models/TerminalDisplay";
 import { useOllamaInstallation } from "./models/hooks/useOllamaInstallation";
 
+// Define the DownloadStatus enum to match the Rust version
+export enum DownloadStatus {
+  Idle = "Idle",
+  Downloading = "Downloading",
+  Complete = "Complete",
+  Error = "Error",
+}
+
 interface OllamaDownloadPageProps {
   onBack?: () => void;
   refreshOllamaStatus: () => Promise<void>;
@@ -26,18 +34,28 @@ export const OllamaDownloadPage = ({
     setIsTerminalExpanded,
   } = useOllamaInstallation(refreshOllamaStatus);
 
+  // Type guard to check if status is Complete
+  const isComplete = downloadProgress.status === ("Complete" as DownloadStatus);
+  const isError = downloadProgress.status === ("Error" as DownloadStatus);
+
   // Auto-start download when page loads
   useEffect(() => {
-    if (installInfo && !isDownloading && downloadProgress.status === "Idle") {
+    if (
+      installInfo &&
+      !isDownloading &&
+      downloadProgress.status === ("Idle" as DownloadStatus)
+    ) {
       const timer = setTimeout(() => {
         handleDownloadOllama();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [installInfo]);
-
-  const isComplete = downloadProgress.status === "Complete";
-  const isError = downloadProgress.status === "Error";
+  }, [
+    installInfo,
+    isDownloading,
+    downloadProgress.status,
+    handleDownloadOllama,
+  ]);
 
   // When installation is complete, auto-continue
   useEffect(() => {
