@@ -1,36 +1,16 @@
 use tauri::{AppHandle, Manager, Emitter};
-use crate::core::ollama_chat::{OllamaChatClient, ChatMessage, ChatOptions, ChatEvent};
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatRequestData {
-    pub model: String,  // Now uses the Ollama model name directly
-    pub message: String,
-    pub temperature: Option<f32>,
-    pub top_p: Option<f32>,
-    pub top_k: Option<i32>,
-    pub num_ctx: Option<i32>,
-    pub num_predict: Option<i32>,
-}
+use super::contracts::*;
+use crate::core::ollama::chat::{OllamaChatClient, ChatMessage, ChatOptions, ChatEvent};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatStreamData {
-    pub model: String,
-    pub messages: Vec<ChatMessageData>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatMessageData {
-    pub role: String,
-    pub content: String,
-}
-
-// Store Ollama chat client in app state
-pub struct OllamaState {
-    pub chat: Arc<OllamaChatClient>,
+pub fn init_chat_state(app: &tauri::App) {
+    let ollama_state = OllamaState {
+        chat: Arc::new(OllamaChatClient::new()),
+    };
+    app.manage(Arc::new(Mutex::new(ollama_state)));
 }
 
 #[tauri::command]
@@ -101,12 +81,4 @@ pub async fn send_chat_stream(
     });
     
     Ok(())
-}
-
-// Initialize the chat state
-pub fn init_chat_state(app: &tauri::App) {
-    let ollama_state = OllamaState {
-        chat: Arc::new(OllamaChatClient::new()),
-    };
-    app.manage(Arc::new(Mutex::new(ollama_state)));
 }

@@ -1,3 +1,4 @@
+// src/core/ollama/client.rs
 use reqwest;
 use serde_json;
 use std::time::Duration;
@@ -5,6 +6,67 @@ use crate::data::download_state::InstallationInformation;
 use crate::helpers::platform_detector::detect_operating_system;
 use tauri::AppHandle;
 
+/// Main client for interacting with Ollama
+pub struct OllamaClient {
+    client: reqwest::Client,
+    base_url: String,
+}
+
+impl OllamaClient {
+    pub fn new() -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            base_url: "http://localhost:11434".to_string(),
+        }
+    }
+
+    /// Check if Ollama is running
+    pub async fn check_health(&self) -> Result<bool, String> {
+        let response = self.client
+            .get(&format!("{}/api/version", self.base_url))
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) if resp.status().is_success() => Ok(true),
+            _ => Ok(false),
+        }
+    }
+
+    /// Get Ollama version
+    pub async fn get_version(&self) -> Result<String, String> {
+        let response = self.client
+            .get(&format!("{}/api/version", self.base_url))
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to connect to Ollama: {}", e))?;
+
+        if response.status().is_success() {
+            let version_info: serde_json::Value = response
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse version: {}", e))?;
+            Ok(version_info["version"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string())
+        } else {
+            Err("Ollama is not running".to_string())
+        }
+    }
+}
+
+impl Default for OllamaClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ===== Standalone Functions =====
+
+/// Check if Ollama is installed on the system
 pub async fn is_ollama_installed() -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
@@ -100,6 +162,7 @@ pub async fn is_ollama_installed() -> Result<bool, String> {
     }
 }
 
+/// Check if Ollama is running (server is responsive)
 pub async fn is_ollama_running() -> Result<bool, String> {
     match fetch_ollama_version().await {
         Ok(_) => Ok(true),
@@ -107,6 +170,7 @@ pub async fn is_ollama_running() -> Result<bool, String> {
     }
 }
 
+/// Fetch the Ollama version
 pub async fn fetch_ollama_version() -> Result<String, String> {
     let client = reqwest::Client::new();
     let response = client
@@ -130,6 +194,7 @@ pub async fn fetch_ollama_version() -> Result<String, String> {
     }
 }
 
+/// Start Ollama service
 pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
@@ -271,6 +336,7 @@ pub async fn start_ollama(_app_handle: &AppHandle) -> Result<String, String> {
     }
 }
 
+/// Get installation instructions for the current platform
 pub async fn get_installation_instructions() -> Result<InstallationInformation, String> {
     let platform = detect_operating_system();
     
