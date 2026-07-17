@@ -1,9 +1,9 @@
 use tauri;
 use tauri::Manager;
 
-use crate::core::ollama_client::*;
-use crate::core::installation_executor::execute_ollama_installation;
-use crate::helpers::platform_detector::detect_operating_system;
+use crate::core::ollama::client::*;
+use crate::core::installation::executor::execute_ollama_installation;
+use crate::core::platform::detector::detect_operating_system;
 use crate::events::progress_broadcaster::broadcast_download_progress;
 use crate::data::download_state::DownloadStatus;
 

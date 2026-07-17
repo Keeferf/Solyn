@@ -1,3 +1,4 @@
+// src/core/ollama/chat.rs
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -45,6 +46,7 @@ pub enum ChatEvent {
     Error(String),
 }
 
+/// Client for Ollama chat functionality
 pub struct OllamaChatClient {
     client: reqwest::Client,
     base_url: String,

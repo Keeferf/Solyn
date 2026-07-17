@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use crate::core::ollama_chat::OllamaChatClient;
+use crate::core::ollama::chat::OllamaChatClient;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRequestData {

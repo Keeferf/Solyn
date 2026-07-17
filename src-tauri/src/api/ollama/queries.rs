@@ -1,5 +1,5 @@
 use super::contracts::OllamaStatus;
-use crate::core::ollama_client::*;
+use crate::core::ollama::client::*;
 use crate::data::download_state::InstallationInformation;
 
 #[tauri::command]

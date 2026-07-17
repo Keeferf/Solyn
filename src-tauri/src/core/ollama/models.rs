@@ -1,3 +1,4 @@
+// src/core/ollama/models.rs
 use reqwest;
 use serde_json::json;
 use std::time::Duration;
@@ -15,6 +16,7 @@ pub struct OllamaModelList {
     pub models: Vec<OllamaModel>,
 }
 
+/// Client for Ollama model management
 pub struct OllamaModelClient {
     client: reqwest::Client,
     base_url: String,
@@ -116,6 +118,51 @@ impl OllamaModelClient {
         } else {
             Err("Failed to delete model".to_string())
         }
+    }
+
+    /// Get model details by name
+    pub async fn get_model_details(&self, model_name: &str) -> Result<OllamaModel, String> {
+        let _models = self.list_models().await?;
+        
+        // Try to find the model in the list
+        // Note: This is a workaround since Ollama doesn't have a direct API for single model details
+        let all_models = self.get_all_models().await?;
+        
+        for model in all_models {
+            if model.name == model_name {
+                return Ok(model);
+            }
+        }
+        
+        Err(format!("Model '{}' not found", model_name))
+    }
+
+    /// Get all models with full details
+    pub async fn get_all_models(&self) -> Result<Vec<OllamaModel>, String> {
+        let url = format!("{}/api/tags", self.base_url);
+        
+        let response = self.client
+            .get(&url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to list models: {}", e))?;
+
+        if response.status().is_success() {
+            let data: OllamaModelList = response.json()
+                .await
+                .map_err(|e| format!("Failed to parse response: {}", e))?;
+            
+            Ok(data.models)
+        } else {
+            Err("Failed to list models".to_string())
+        }
+    }
+
+    /// Check if a model exists
+    pub async fn model_exists(&self, model_name: &str) -> Result<bool, String> {
+        let models = self.list_models().await?;
+        Ok(models.iter().any(|m| m == model_name))
     }
 }
 

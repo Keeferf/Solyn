@@ -4,9 +4,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use super::contracts::*;
-use crate::core::ollama_chat::{OllamaChatClient, ChatMessage, ChatOptions, ChatEvent};
+use crate::core::ollama::chat::{OllamaChatClient, ChatMessage, ChatOptions, ChatEvent};
 
-// Initialize the chat state
 pub fn init_chat_state(app: &tauri::App) {
     let ollama_state = OllamaState {
         chat: Arc::new(OllamaChatClient::new()),

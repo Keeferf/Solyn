@@ -10,7 +10,7 @@ use crate::core::huggingface::{
     write_modelfile,
     ModelFileConfig,
 };
-use crate::core::ollama_models::OllamaModelClient;
+use crate::core::ollama::models::OllamaModelClient;
 
 #[tauri::command]
 pub async fn clear_models_cache(

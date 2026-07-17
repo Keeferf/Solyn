@@ -10,7 +10,7 @@ use crate::core::huggingface::{
     get_installed_models,
     fetch_model_details as client_fetch_model_details,
 };
-use crate::core::ollama_models::OllamaModelClient;
+use crate::core::ollama::models::OllamaModelClient;
 
 #[tauri::command]
 pub async fn fetch_huggingface_models_page(
