@@ -9,7 +9,7 @@ use log;
 
 use crate::data::download_state::ModelAcquisitionProgress;
 use super::cache::{generate_download_id, insert_cancellation_token, remove_cancellation_token, get_cancellation_token};
-use super::modelfile::{write_modelfile, ModelFileConfig, get_modelfile_name};
+use super::modelfile::{write_modelfile, ModelFileConfig, write_metadata};
 use super::utils::{extract_parameter_count, extract_quantization};
 
 pub async fn download_model_file(
@@ -140,28 +140,21 @@ pub async fn download_model_file(
     send_progress(app_handle, model_id, filename, "generating_modelfile", 100.0, "Generating Modelfile...");
     
     // Extract model info
-    let parts: Vec<&str> = model_id.split('/').collect();
-    let author = parts.get(0).unwrap_or(&"").to_string();
-    let model_name = parts.get(1).unwrap_or(&"").to_string();
     let quantization = extract_quantization(filename);
     let parameter_count = extract_parameter_count(filename);
     
-    // Create Modelfile config with quantization-specific settings
+    // Create Modelfile config - simplified
     let config = ModelFileConfig {
-        model_name: format!("{}/{}", author, model_name),
         model_id: model_id.to_string(),
         gguf_filename: filename.to_string(),
-        quantization: quantization.clone(),
-        parameter_count,
-        model_dir: model_dir.clone(), // FIXED: Added missing field
+        model_dir: model_dir.clone(),
     };
     
     match write_modelfile(&model_dir, &config).await {
         Ok(modelfile_path) => {
             log::info!("Modelfile created at: {:?}", modelfile_path);
-            let modelfile_name = get_modelfile_name(quantization.as_ref());
             send_progress(app_handle, model_id, filename, "modelfile_created", 100.0, 
-                &format!("Modelfile created: {}", modelfile_name));
+                "Modelfile created");
         }
         Err(e) => {
             log::warn!("Failed to create Modelfile: {}", e);
@@ -169,16 +162,27 @@ pub async fn download_model_file(
         }
     }
     
+    // --- Generate metadata.json ---
+    if let Err(e) = write_metadata(
+        &model_dir, 
+        model_id, 
+        filename, 
+        quantization.clone(), 
+        parameter_count
+    ).await {
+        log::warn!("Failed to create metadata.json: {}", e);
+        // Don't fail the whole download if metadata creation fails
+    }
+    
     // Send completion
     send_progress(app_handle, model_id, filename, "complete", 100.0, "Download complete!");
     
     // Send separate completion event with Modelfile info
-    let modelfile_name = get_modelfile_name(quantization.as_ref());
     let _ = app_handle.emit("model-download-complete", &serde_json::json!({
         "model_id": model_id,
         "filename": filename,
         "path": file_path.to_str().unwrap_or(""),
-        "modelfile_path": model_dir.join(&modelfile_name).to_str().unwrap_or(""),
+        "modelfile_path": model_dir.join("Modelfile").to_str().unwrap_or(""),
         "quantization": quantization,
     }));
     

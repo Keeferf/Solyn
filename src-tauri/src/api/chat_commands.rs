@@ -7,8 +7,7 @@ use serde_json::json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRequestData {
-    pub model_id: String,
-    pub filename: String,
+    pub model: String,  // Now uses the Ollama model name directly
     pub message: String,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -19,8 +18,7 @@ pub struct ChatRequestData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatStreamData {
-    pub model_id: String,
-    pub filename: String,
+    pub model: String,
     pub messages: Vec<ChatMessageData>,
 }
 
@@ -30,152 +28,9 @@ pub struct ChatMessageData {
     pub content: String,
 }
 
-// Store Ollama client in app state
-pub struct ChatState {
-    pub client: Arc<OllamaChatClient>,
-}
-
-// Helper to get or create model name
-fn get_ollama_model_name(model_id: &str, filename: &str) -> String {
-    let clean_model_id = model_id.replace("/", "_");
-    let clean_filename = filename.replace(".gguf", "");
-    format!("{}_{}", clean_model_id, clean_filename)
-}
-
-// Helper to find the GGUF file in the model directory
-fn find_gguf_file(model_dir: &std::path::Path, filename: &str) -> Result<String, String> {
-    // First try the exact filename
-    let gguf_path = model_dir.join(filename);
-    if gguf_path.exists() {
-        if let Some(abs_path) = gguf_path.to_str() {
-            return Ok(abs_path.replace('\\', "/"));
-        }
-    }
-    
-    // Try to find any .gguf file in the directory
-    if let Ok(entries) = std::fs::read_dir(model_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Some(ext) = path.extension() {
-                if ext == "gguf" {
-                    if let Some(abs_path) = path.to_str() {
-                        return Ok(abs_path.replace('\\', "/"));
-                    }
-                }
-            }
-        }
-    }
-    
-    Err(format!("No .gguf file found in {:?}", model_dir))
-}
-
-// Helper to replace the FROM path in Modelfile with absolute path
-fn replace_from_path(modelfile_content: &str, new_path: &str) -> String {
-    let mut result = String::new();
-    for line in modelfile_content.lines() {
-        if line.trim().starts_with("FROM") {
-            result.push_str(&format!("FROM {}", new_path));
-        } else {
-            result.push_str(line);
-        }
-        result.push('\n');
-    }
-    result
-}
-
-#[tauri::command]
-pub async fn check_ollama_health(app_handle: AppHandle) -> Result<bool, String> {
-    let state = app_handle.state::<Arc<Mutex<ChatState>>>();
-    let state = state.lock().await;
-    state.client.check_health().await
-}
-
-#[tauri::command]
-pub async fn create_ollama_model(
-    app_handle: AppHandle,
-    model_id: String,
-    filename: String,
-) -> Result<String, String> {
-    // Get the app data directory
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
-    
-    let model_folder_name = model_id.replace("/", "_");
-    let model_dir = app_dir.join("models").join(&model_folder_name);
-    
-    if !model_dir.exists() {
-        return Err(format!("Model directory not found: {:?}", model_dir));
-    }
-    
-    // Find the GGUF file first
-    let gguf_abs_path = find_gguf_file(&model_dir, &filename)?;
-    println!("📁 Found GGUF file at: {}", gguf_abs_path);
-    
-    // Find the Modelfile
-    let modelfile_path = if let Some(quant) = crate::core::huggingface::extract_quantization(&filename) {
-        let modelfile_name = format!("Modelfile_{}", quant.to_uppercase());
-        let path = model_dir.join(&modelfile_name);
-        if path.exists() {
-            Some(path)
-        } else {
-            let fallback = model_dir.join("Modelfile");
-            if fallback.exists() {
-                Some(fallback)
-            } else {
-                None
-            }
-        }
-    } else {
-        let path = model_dir.join("Modelfile");
-        if path.exists() {
-            Some(path)
-        } else {
-            None
-        }
-    };
-    
-    let modelfile_path = modelfile_path
-        .ok_or_else(|| format!("Modelfile not found for model: {} and file: {}", model_id, filename))?;
-    
-    // Read the Modelfile content
-    let modelfile_content = std::fs::read_to_string(&modelfile_path)
-        .map_err(|e| format!("Failed to read Modelfile: {}", e))?;
-    
-    println!("📝 Original Modelfile content:\n{}", modelfile_content);
-    
-    // Replace the FROM path with absolute path
-    let updated_modelfile_content = replace_from_path(&modelfile_content, &gguf_abs_path);
-    
-    println!("📝 Updated Modelfile content:\n{}", updated_modelfile_content);
-    
-    // Create model in Ollama - pass the GGUF path separately
-    let state = app_handle.state::<Arc<Mutex<ChatState>>>();
-    let state = state.lock().await;
-    let model_name = get_ollama_model_name(&model_id, &filename);
-    
-    // Pass both the modelfile content and the GGUF path
-    state.client.create_model_from_content(&model_name, &updated_modelfile_content, Some(&gguf_abs_path)).await?;
-    
-    Ok(model_name)
-}
-
-#[tauri::command]
-pub async fn list_ollama_models(app_handle: AppHandle) -> Result<Vec<String>, String> {
-    let state = app_handle.state::<Arc<Mutex<ChatState>>>();
-    let state = state.lock().await;
-    state.client.list_models().await
-}
-
-#[tauri::command]
-pub async fn delete_ollama_model(
-    app_handle: AppHandle,
-    model_name: String,
-) -> Result<(), String> {
-    let state = app_handle.state::<Arc<Mutex<ChatState>>>();
-    let state = state.lock().await;
-    state.client.delete_model(&model_name).await
+// Store Ollama chat client in app state
+pub struct OllamaState {
+    pub chat: Arc<OllamaChatClient>,
 }
 
 #[tauri::command]
@@ -183,10 +38,8 @@ pub async fn send_chat_message(
     app_handle: AppHandle,
     request: ChatRequestData,
 ) -> Result<String, String> {
-    let state = app_handle.state::<Arc<Mutex<ChatState>>>();
+    let state = app_handle.state::<Arc<Mutex<OllamaState>>>();
     let state = state.lock().await;
-    
-    let model_name = get_ollama_model_name(&request.model_id, &request.filename);
     
     let messages = vec![
         ChatMessage {
@@ -203,7 +56,7 @@ pub async fn send_chat_message(
         num_predict: request.num_predict,
     };
     
-    let response = state.client.chat_sync(&model_name, messages, Some(options)).await?;
+    let response = state.chat.chat_sync(&request.model, messages, Some(options)).await?;
     
     Ok(response.message.content)
 }
@@ -217,10 +70,8 @@ pub async fn send_chat_stream(
         .get_webview_window("main")
         .ok_or("Main window not found")?;
     
-    let state = app_handle.state::<Arc<Mutex<ChatState>>>();
+    let state = app_handle.state::<Arc<Mutex<OllamaState>>>();
     let state = state.lock().await;
-    
-    let model_name = get_ollama_model_name(&request.model_id, &request.filename);
     
     let messages: Vec<ChatMessage> = request.messages
         .iter()
@@ -230,7 +81,7 @@ pub async fn send_chat_stream(
         })
         .collect();
     
-    let mut receiver = state.client.chat_stream(&model_name, messages, None).await?;
+    let mut receiver = state.chat.chat_stream(&request.model, messages, None).await?;
     
     // Process streaming responses and emit events to frontend
     tokio::spawn(async move {
@@ -254,8 +105,8 @@ pub async fn send_chat_stream(
 
 // Initialize the chat state
 pub fn init_chat_state(app: &tauri::App) {
-    let chat_state = ChatState {
-        client: Arc::new(OllamaChatClient::new()),
+    let ollama_state = OllamaState {
+        chat: Arc::new(OllamaChatClient::new()),
     };
-    app.manage(Arc::new(Mutex::new(chat_state)));
+    app.manage(Arc::new(Mutex::new(ollama_state)));
 }
