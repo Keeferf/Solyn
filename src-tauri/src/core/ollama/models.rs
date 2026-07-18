@@ -3,6 +3,13 @@ use reqwest;
 use serde_json::json;
 use std::time::Duration;
 use serde::Deserialize;
+use std::path::PathBuf;
+
+#[cfg(target_os = "windows")]
+use tokio::fs; // Only import on Windows
+
+#[cfg(not(target_os = "windows"))]
+use tokio::fs;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct OllamaModel {
@@ -30,44 +37,83 @@ impl OllamaModelClient {
         }
     }
 
-    /// Create a new model using the Modelfile content
-    pub async fn create_model(&self, model_name: &str, modelfile_content: &str) -> Result<String, String> {
-        let url = format!("{}/api/create", self.base_url);
-        
-        // Verify the Modelfile has a valid FROM instruction
-        if !modelfile_content.contains("FROM") {
-            return Err("Modelfile does not contain a FROM instruction".to_string());
-        }
-
-        let payload = json!({
-            "name": model_name,
-            "modelfile": modelfile_content,
-            "stream": false,
-        });
-
-        let response = self.client
-            .post(&url)
-            .json(&payload)
-            .timeout(Duration::from_secs(300))
-            .send()
-            .await
-            .map_err(|e| format!("Failed to create model: {}", e))?;
-
-        let status = response.status();
-        let response_text = response.text().await.unwrap_or_default();
-        
-        if status.is_success() {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response_text) {
-                if let Some(error) = json.get("error") {
-                    return Err(format!("Ollama error: {}", error));
+    /// Create a new model using the Modelfile path
+    /// This uses the Ollama CLI to properly register the model
+    pub async fn create_model(&self, model_name: &str, modelfile_path: &PathBuf) -> Result<String, String> {
+        // Method 1: Try using the Ollama CLI (more reliable for Windows)
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            
+            // Find ollama executable
+            let ollama_path = find_ollama_executable()?;
+            
+            // Use ollama create command
+            let output = tokio::process::Command::new(&ollama_path)
+                .args(&["create", model_name, "-f"])
+                .arg(modelfile_path)
+                .creation_flags(CREATE_NO_WINDOW)
+                .output()
+                .await
+                .map_err(|e| format!("Failed to execute ollama create: {}", e))?;
+            
+            if output.status.success() {
+                let _stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                
+                // Check if there was any error output
+                if stderr.contains("error") || stderr.contains("Error") {
+                    return Err(format!("Ollama error: {}", stderr));
                 }
-                if let Some(status_msg) = json.get("status") {
-                    println!("✅ Model creation status: {}", status_msg);
-                }
+                
+                Ok(format!("Model '{}' created successfully", model_name))
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                Err(format!("Failed to create model: {}", stderr))
             }
-            Ok("Model created successfully".to_string())
-        } else {
-            Err(format!("Failed to create model: {}", response_text))
+        }
+        
+        // Method 2: Use API endpoint (for non-Windows or as fallback)
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Read the modelfile content
+            let modelfile_content = fs::read_to_string(modelfile_path)
+                .await
+                .map_err(|e| format!("Failed to read Modelfile: {}", e))?;
+            
+            let url = format!("{}/api/create", self.base_url);
+            
+            let payload = json!({
+                "name": model_name,
+                "modelfile": modelfile_content,
+                "stream": false,
+            });
+            
+            let response = self.client
+                .post(&url)
+                .json(&payload)
+                .timeout(Duration::from_secs(300))
+                .send()
+                .await
+                .map_err(|e| format!("Failed to create model: {}", e))?;
+            
+            let status = response.status();
+            let response_text = response.text().await.unwrap_or_default();
+            
+            if status.is_success() {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response_text) {
+                    if let Some(error) = json.get("error") {
+                        return Err(format!("Ollama error: {}", error));
+                    }
+                    if let Some(status_msg) = json.get("status") {
+                        println!("✅ Model creation status: {}", status_msg);
+                    }
+                }
+                Ok(format!("Model '{}' created successfully", model_name))
+            } else {
+                Err(format!("Failed to create model: {}", response_text))
+            }
         }
     }
 
@@ -122,10 +168,6 @@ impl OllamaModelClient {
 
     /// Get model details by name
     pub async fn get_model_details(&self, model_name: &str) -> Result<OllamaModel, String> {
-        let _models = self.list_models().await?;
-        
-        // Try to find the model in the list
-        // Note: This is a workaround since Ollama doesn't have a direct API for single model details
         let all_models = self.get_all_models().await?;
         
         for model in all_models {
@@ -170,4 +212,70 @@ impl Default for OllamaModelClient {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// Helper function to find ollama executable on Windows
+#[cfg(target_os = "windows")]
+fn find_ollama_executable() -> Result<String, String> {
+    use std::env;
+    use std::path::Path;
+    
+    let common_paths = [
+        r"C:\Program Files\Ollama\ollama.exe",
+        r"C:\Program Files (x86)\Ollama\ollama.exe",
+        r"%LOCALAPPDATA%\Programs\Ollama\ollama.exe",
+        r"%USERPROFILE%\AppData\Local\Programs\Ollama\ollama.exe",
+    ];
+    
+    for path in common_paths.iter() {
+        let expanded_path = if path.starts_with('%') {
+            let path_str = path.to_string();
+            if path_str.contains("%LOCALAPPDATA%") {
+                if let Ok(localappdata) = env::var("LOCALAPPDATA") {
+                    path_str.replace("%LOCALAPPDATA%", &localappdata)
+                } else {
+                    continue;
+                }
+            } else if path_str.contains("%USERPROFILE%") {
+                if let Ok(userprofile) = env::var("USERPROFILE") {
+                    path_str.replace("%USERPROFILE%", &userprofile)
+                } else {
+                    continue;
+                }
+            } else {
+                path_str
+            }
+        } else {
+            path.to_string()
+        };
+        
+        if Path::new(&expanded_path).exists() {
+            return Ok(expanded_path);
+        }
+    }
+    
+    // Try using 'where' command
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    
+    let output = std::process::Command::new("where")
+        .arg("ollama")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| format!("Failed to find ollama: {}", e))?;
+    
+    if output.status.success() {
+        let path = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .next()
+            .ok_or_else(|| "No ollama found".to_string())?
+            .trim()
+            .to_string();
+        
+        if !path.is_empty() {
+            return Ok(path);
+        }
+    }
+    
+    Err("Could not find ollama executable. Please ensure Ollama is installed.".to_string())
 }

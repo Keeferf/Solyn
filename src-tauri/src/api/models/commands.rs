@@ -1,3 +1,4 @@
+// src/api/models/commands.rs
 use tauri::{AppHandle, Manager};
 use super::contracts::*;
 use crate::core::huggingface::{
@@ -11,6 +12,7 @@ use crate::core::huggingface::{
     ModelFileConfig,
 };
 use crate::core::ollama::models::OllamaModelClient;
+use std::path::PathBuf;
 
 #[tauri::command]
 pub async fn clear_models_cache(
@@ -103,7 +105,8 @@ pub async fn create_ollama_model(
     request: ModelImportRequest,
 ) -> Result<String, String> {
     let model_client = OllamaModelClient::new();
-    model_client.create_model(&request.model_name, &request.modelfile_content).await?;
+    let modelfile_path = PathBuf::from(&request.modelfile_path);
+    model_client.create_model(&request.model_name, &modelfile_path).await?;
     Ok(request.model_name)
 }
 
