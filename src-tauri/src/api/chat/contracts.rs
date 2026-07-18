@@ -1,10 +1,11 @@
+// src/api/chat/contracts.rs
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use crate::core::ollama::chat::OllamaChatClient;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRequestData {
-    pub model: String,
+    pub model: String,  // This should be the Ollama model name
     pub message: String,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -15,7 +16,7 @@ pub struct ChatRequestData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatStreamData {
-    pub model: String,
+    pub model: String,  
     pub messages: Vec<ChatMessageData>,
 }
 

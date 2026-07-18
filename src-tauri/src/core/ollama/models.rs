@@ -5,9 +5,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-#[cfg(target_os = "windows")]
-use tokio::fs; // Only import on Windows
-
+// Only import tokio::fs on non-Windows platforms
 #[cfg(not(target_os = "windows"))]
 use tokio::fs;
 
@@ -43,7 +41,6 @@ impl OllamaModelClient {
         // Method 1: Try using the Ollama CLI (more reliable for Windows)
         #[cfg(target_os = "windows")]
         {
-            use std::os::windows::process::CommandExt;
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             
             // Find ollama executable

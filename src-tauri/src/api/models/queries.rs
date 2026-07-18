@@ -1,3 +1,4 @@
+// src/api/models/queries.rs
 use tauri::AppHandle;
 use serde_json;
 
@@ -92,10 +93,26 @@ pub async fn get_chat_models(
 ) -> Result<Vec<serde_json::Value>, String> {
     let installed = get_installed_models(&app_handle).await?;
     
+    // Get list of Ollama models
+    let ollama_client = OllamaModelClient::new();
+    let ollama_models = match ollama_client.list_models().await {
+        Ok(models) => models,
+        Err(_) => Vec::new(), // Ollama might not be running
+    };
+    
     let mut chat_models = Vec::new();
     
     for model in installed {
         for file in &model.files {
+            // Generate the expected Ollama model name
+            let ollama_model_name = format!("{}_{}", 
+                model.model_id.replace("/", "_"), 
+                file.quantization.as_deref().unwrap_or("default")
+            );
+            
+            // Check if this model exists in Ollama
+            let is_registered = ollama_models.contains(&ollama_model_name);
+            
             let model_value = serde_json::json!({
                 "value": format!("{}:{}", model.model_id, file.filename),
                 "label": format!("{} ({})", model.name, file.quantization.as_deref().unwrap_or("default")),
@@ -108,6 +125,8 @@ pub async fn get_chat_models(
                 "path": file.path,
                 "has_modelfile": file.has_modelfile,
                 "size": file.size,
+                "ollama_model_name": ollama_model_name, // Always provide this
+                "is_registered": is_registered,
             });
             chat_models.push(model_value);
         }
