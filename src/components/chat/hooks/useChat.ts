@@ -11,6 +11,7 @@ export interface ChatMessage {
 export interface ChatModelData {
   model_id: string;
   filename: string;
+  ollama_model_name: string; // Add this
 }
 
 export const useChat = (modelData: ChatModelData | undefined) => {
@@ -18,7 +19,7 @@ export const useChat = (modelData: ChatModelData | undefined) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messageBufferRef = useRef<string>("");
-  const { isReady, status: _status } = useOllama(); // Prefix with underscore to mark as intentionally unused
+  const { isReady, status: _status } = useOllama();
   const isOllamaReady = isReady;
 
   const sendMessage = async (content: string) => {
@@ -42,15 +43,10 @@ export const useChat = (modelData: ChatModelData | undefined) => {
         { role: "user", content: content.trim() },
       ];
 
-      await invoke("create_ollama_model", {
-        modelId: modelData.model_id,
-        filename: modelData.filename,
-      });
-
+      // Use the Ollama model name directly - no need to create it again
       await invoke("send_chat_stream", {
         request: {
-          model_id: modelData.model_id,
-          filename: modelData.filename,
+          model: modelData.ollama_model_name, // Use the Ollama model name
           messages: chatHistory,
         },
       });

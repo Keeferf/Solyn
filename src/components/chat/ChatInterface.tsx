@@ -41,12 +41,13 @@ export const ChatInterface = () => {
     error,
     isOllamaReady,
     sendMessage,
-    clearMessages: _clearMessages, // Prefix with underscore to mark as intentionally unused
+    clearMessages: _clearMessages,
   } = useChat(
-    selectedModelData
+    selectedModelData && selectedModelData.ollama_model_name
       ? {
           model_id: selectedModelData.model_id,
           filename: selectedModelData.filename,
+          ollama_model_name: selectedModelData.ollama_model_name,
         }
       : undefined,
   );
@@ -90,7 +91,6 @@ export const ChatInterface = () => {
 
   return (
     <div className="flex flex-col h-full w-full relative">
-      {/* Messages area - only show when there are messages */}
       {hasMessages && (
         <div className="flex-1 min-h-0">
           <ChatMessages
@@ -102,10 +102,8 @@ export const ChatInterface = () => {
         </div>
       )}
 
-      {/* Centered container - shows when no messages, hides when messages exist */}
       {!hasMessages && (
         <div className="flex-1 flex flex-col items-center justify-center">
-          {/* Welcome message */}
           <div className="text-center mb-8">
             <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white bg-clip-text text-transparent">
               Solyn
@@ -116,7 +114,6 @@ export const ChatInterface = () => {
             </p>
           </div>
 
-          {/* Input area - centered with the welcome message */}
           <div className="w-full max-w-3xl">
             <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
               <ChatInput
@@ -163,10 +160,8 @@ export const ChatInterface = () => {
         </div>
       )}
 
-      {/* Input area - fixed at bottom when there are messages */}
       {hasMessages && (
         <div className="shrink-0 w-full">
-          {/* Attachment indicator */}
           {attachmentCount > 0 && (
             <div className="px-4 py-2 text-xs text-white/60 bg-white/5 border-t border-white/5">
               {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached

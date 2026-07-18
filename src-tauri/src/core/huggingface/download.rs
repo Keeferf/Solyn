@@ -8,6 +8,7 @@ use futures_util::StreamExt;
 use log;
 
 use crate::data::download_state::ModelAcquisitionProgress;
+use crate::core::ollama::models::OllamaModelClient;
 use super::cache::{generate_download_id, insert_cancellation_token, remove_cancellation_token, get_cancellation_token};
 use super::modelfile::{write_modelfile, ModelFileConfig, write_metadata};
 use super::utils::{extract_parameter_count, extract_quantization};
@@ -150,17 +151,18 @@ pub async fn download_model_file(
         model_dir: model_dir.clone(),
     };
     
-    match write_modelfile(&model_dir, &config).await {
-        Ok(modelfile_path) => {
-            log::info!("Modelfile created at: {:?}", modelfile_path);
+    let modelfile_path = match write_modelfile(&model_dir, &config).await {
+        Ok(path) => {
+            log::info!("Modelfile created at: {:?}", path);
             send_progress(app_handle, model_id, filename, "modelfile_created", 100.0, 
                 "Modelfile created");
+            path
         }
         Err(e) => {
             log::warn!("Failed to create Modelfile: {}", e);
-            // Don't fail the whole download if Modelfile creation fails
+            return Err(format!("Failed to create Modelfile: {}", e));
         }
-    }
+    };
     
     // --- Generate metadata.json ---
     if let Err(e) = write_metadata(
@@ -174,6 +176,94 @@ pub async fn download_model_file(
         // Don't fail the whole download if metadata creation fails
     }
     
+    // --- Create Ollama Model with retry logic ---
+    send_progress(app_handle, model_id, filename, "creating_ollama_model", 100.0, 
+        "Creating Ollama model...");
+    
+    let model_name = format!("{}_{}", 
+        model_id.replace("/", "_"), 
+        quantization.as_deref().unwrap_or("default")
+    );
+    
+    let ollama_client = OllamaModelClient::new();
+    let max_retries = 3;
+    let mut current_retry = 0;
+    let mut ollama_created = false;
+    let mut last_error = String::new();
+    
+    while current_retry < max_retries && !ollama_created {
+        current_retry += 1;
+        
+        if current_retry > 1 {
+            let wait_seconds = 2u64.pow(current_retry as u32 - 1); // Exponential backoff: 2, 4, 8 seconds
+            send_progress(app_handle, model_id, filename, "retrying_ollama_creation", 100.0, 
+                &format!("Retrying Ollama model creation (attempt {}/{})...", current_retry, max_retries));
+            
+            tokio::time::sleep(tokio::time::Duration::from_secs(wait_seconds)).await;
+        }
+        
+        match ollama_client.create_model(&model_name, &modelfile_path).await {
+            Ok(message) => {
+                ollama_created = true;
+                log::info!("Ollama model created: {} - {}", model_name, message);
+                
+                send_progress(app_handle, model_id, filename, "ollama_model_created", 100.0, 
+                    &format!("Ollama model '{}' created successfully", model_name));
+                
+                // Emit event for Ollama model created
+                let _ = app_handle.emit("ollama-model-created", &serde_json::json!({
+                    "model_name": model_name,
+                    "model_id": model_id,
+                    "quantization": quantization,
+                    "attempt": current_retry,
+                }));
+            }
+            Err(e) => {
+                last_error = e.clone();
+                log::warn!("Failed to create Ollama model (attempt {}/{}): {}", 
+                    current_retry, max_retries, e);
+                
+                if current_retry < max_retries {
+                    // Continue to next retry
+                    continue;
+                } else {
+                    // All retries exhausted
+                    log::error!("Failed to create Ollama model after {} attempts: {}", 
+                        max_retries, last_error);
+                    
+                    send_progress(app_handle, model_id, filename, "ollama_model_failed", 100.0, 
+                        &format!("Failed to create Ollama model: {}", last_error));
+                    
+                    // Emit event for Ollama model creation failure
+                    let _ = app_handle.emit("ollama-model-creation-failed", &serde_json::json!({
+                        "model_name": model_name,
+                        "model_id": model_id,
+                        "error": last_error,
+                        "attempts": max_retries,
+                    }));
+                }
+            }
+        }
+    }
+    
+    // --- Check if Ollama is running and warn user if not ---
+    if !ollama_created {
+        // Check if Ollama is running
+        let ollama_running = match crate::core::ollama::client::is_ollama_running().await {
+            Ok(running) => running,
+            Err(_) => false,
+        };
+        
+        if !ollama_running {
+            send_progress(app_handle, model_id, filename, "ollama_not_running", 100.0, 
+                "Ollama is not running. Model file downloaded but cannot create Ollama model. Please start Ollama and try importing manually.");
+        } else {
+            send_progress(app_handle, model_id, filename, "ollama_creation_failed", 100.0, 
+                &format!("Failed to create Ollama model after {} attempts: {}. Please try importing manually.", 
+                    max_retries, last_error));
+        }
+    }
+    
     // Send completion
     send_progress(app_handle, model_id, filename, "complete", 100.0, "Download complete!");
     
@@ -182,11 +272,15 @@ pub async fn download_model_file(
         "model_id": model_id,
         "filename": filename,
         "path": file_path.to_str().unwrap_or(""),
-        "modelfile_path": model_dir.join("Modelfile").to_str().unwrap_or(""),
+        "modelfile_path": modelfile_path.to_str().unwrap_or(""),
         "quantization": quantization,
+        "ollama_model_name": model_name,
+        "ollama_created": ollama_created,
     }));
     
     remove_cancellation_token(&download_id);
+    
+    // Return success even if Ollama creation failed (model files are still available)
     Ok(())
 }
 
