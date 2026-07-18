@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useOllama } from "../contexts/OllamaContext";
 import { OllamaDownloadPage } from "@/components/OllamaDownloadPage";
-import { FiDownload, FiExternalLink, FiServer } from "react-icons/fi";
+import {
+  FiDownload,
+  FiExternalLink,
+  FiServer,
+  FiAlertCircle,
+} from "react-icons/fi";
 
 interface OllamaStatusCheckerProps {
   children: React.ReactNode;
@@ -10,38 +15,67 @@ interface OllamaStatusCheckerProps {
 export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
   const { status, loading, startOllama, isReady, refreshOllamaStatus } =
     useOllama();
-  const startAttempted = useRef(false);
-  const [showDownloadPage, setShowDownloadPage] = useState(false);
-  // Remove unused showDownloadPrompt state
-  // const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
 
-  // Handle automatic start when installed but not running
+  // Track retry attempts (replaced boolean startAttempted with counter)
+  const startAttemptCount = useRef(0);
+  const [showDownloadPage, setShowDownloadPage] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [attemptingStart, setAttemptingStart] = useState(false);
+
+  // Auto-start logic with RETRY + EXPONENTIAL BACKOFF
   useEffect(() => {
     if (
       status?.installed &&
       !status?.running &&
       !loading &&
-      !startAttempted.current
+      !attemptingStart &&
+      startAttemptCount.current < 3 // Allow up to 3 retries
     ) {
-      startAttempted.current = true;
-      console.log(
-        "Ollama is installed but not running. Attempting to start...",
-      );
-      startOllama().catch((error) => {
-        console.error("Failed to start Ollama automatically:", error);
-        startAttempted.current = false;
-      });
-    }
-  }, [status, loading, startOllama]);
+      const attemptNumber = startAttemptCount.current + 1;
+      setAttemptingStart(true);
+      setStartError(null);
 
-  // Reset start attempt when running
+      console.log(`Attempt ${attemptNumber}/3: Starting Ollama...`);
+
+      startOllama()
+        .then(() => {
+          console.log("Ollama started successfully");
+          startAttemptCount.current = 0; // Reset on success
+          setAttemptingStart(false);
+        })
+        .catch((error) => {
+          console.error(`Attempt ${attemptNumber} failed:`, error);
+          startAttemptCount.current += 1;
+
+          // Exponential backoff: 500ms → 1s → 2s
+          const backoffMs = 500 * Math.pow(2, startAttemptCount.current - 1);
+
+          if (startAttemptCount.current < 3) {
+            setStartError(
+              `Failed to start. Retrying in ${(backoffMs / 1000).toFixed(1)}s...`,
+            );
+            // Wait before retrying
+            setTimeout(() => setAttemptingStart(false), backoffMs);
+          } else {
+            setStartError(
+              "Could not start Ollama after 3 attempts. Please start it manually.",
+            );
+            setAttemptingStart(false);
+          }
+        });
+    }
+  }, [status, loading, startOllama, attemptingStart]);
+
+  // Reset retry count when running
   useEffect(() => {
     if (status?.running) {
-      startAttempted.current = false;
+      startAttemptCount.current = 0;
+      setStartError(null);
+      setAttemptingStart(false);
     }
   }, [status?.running]);
 
-  // If Ollama is not installed, show download prompt
+  // Not installed → show download page
   if (!loading && status?.installed === false && !showDownloadPage) {
     return (
       <div className="flex items-center justify-center h-screen bg-black">
@@ -90,25 +124,28 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     );
   }
 
-  // If user clicked download, show the download page
+  // Show download page after user clicked download
   if (showDownloadPage) {
     return (
       <OllamaDownloadPage
         onBack={() => {
           setShowDownloadPage(false);
           refreshOllamaStatus();
+          startAttemptCount.current = 0;
+          setStartError(null);
         }}
         refreshOllamaStatus={refreshOllamaStatus}
         isOllamaInstalled={false}
         onInstallComplete={() => {
-          // After installation, refresh status
           refreshOllamaStatus();
+          startAttemptCount.current = 0;
+          setStartError(null);
         }}
       />
     );
   }
 
-  // Show loading state while checking status
+  // Initial status check loading
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -120,23 +157,53 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     );
   }
 
-  // Show starting state (installed but not yet running)
+  // Starting state: installed but not yet running
   if (!isReady && status?.installed) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-accent mx-auto"></div>
           <p className="mt-4 text-white/60">Starting Ollama...</p>
-          <p className="text-white/40 text-sm mt-2">
-            {startAttempted.current
-              ? "Ollama is starting up. Please wait..."
-              : "Ollama is installed but not responding. Attempting to start..."}
-          </p>
+
+          {/* Show current attempt number */}
+          {attemptingStart ? (
+            <p className="text-white/40 text-sm mt-2">
+              Attempt {startAttemptCount.current + 1} of 3
+            </p>
+          ) : null}
+
+          {/* Show error or waiting message */}
+          {startError ? (
+            <div className="mt-4 p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg flex items-start gap-2">
+              <FiAlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-amber-500/80 text-xs text-left">
+                {startError}
+              </p>
+            </div>
+          ) : (
+            <p className="text-white/40 text-sm mt-2">
+              Ollama is installed but not responding. Attempting to start...
+            </p>
+          )}
+
+          {/* Show manual retry button if all attempts failed */}
+          {startAttemptCount.current >= 3 && !status?.running ? (
+            <button
+              onClick={() => {
+                startAttemptCount.current = 0;
+                setAttemptingStart(false);
+                setStartError(null);
+              }}
+              className="mt-4 px-4 py-2 bg-purple-accent/30 hover:bg-purple-accent/50 text-purple-accent text-sm rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
+          ) : null}
         </div>
       </div>
     );
   }
 
-  // Ollama is ready - render children
+  // Ollama is ready → render children
   return <>{children}</>;
 };
