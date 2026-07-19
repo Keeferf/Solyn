@@ -8,7 +8,7 @@ interface DownloadStatusDisplayProps {
   progress: number;
   message: string;
   status: string;
-  onCancel?: () => void; // Add optional cancel callback
+  onCancel?: () => void;
 }
 
 export const DownloadStatusDisplay = ({
@@ -16,6 +16,7 @@ export const DownloadStatusDisplay = ({
   filename,
   progress,
   status,
+  message,
   onCancel,
 }: DownloadStatusDisplayProps) => {
   // Format filename for display
@@ -27,6 +28,12 @@ export const DownloadStatusDisplay = ({
   const isCancelled = status === "cancelled";
   const isActive = status === "downloading" || status === "starting";
   const isStarting = status === "starting";
+  const isProcessing =
+    status === "processing" ||
+    status === "generating_modelfile" ||
+    status === "creating_ollama_model" ||
+    status === "finalizing";
+  const isOllamaCreation = status === "creating_ollama_model";
 
   const progressColor = isError
     ? "bg-red-500"
@@ -34,7 +41,10 @@ export const DownloadStatusDisplay = ({
       ? "bg-green-500"
       : isCancelled
         ? "bg-yellow-500"
-        : "bg-purple-accent";
+        : isProcessing
+          ? "bg-blue-500 animate-pulse"
+          : "bg-purple-accent";
+
   const progressValue = Math.min(Math.max(progress, 0), 100);
 
   const handleCancel = async () => {
@@ -59,6 +69,10 @@ export const DownloadStatusDisplay = ({
       return <FiAlertCircle className="text-red-500 shrink-0" size={16} />;
     if (isCancelled)
       return <FiAlertCircle className="text-yellow-500 shrink-0" size={16} />;
+    if (isProcessing)
+      return (
+        <FiLoader className="animate-spin text-blue-400 shrink-0" size={16} />
+      );
     if (isStarting)
       return (
         <FiLoader
@@ -76,33 +90,24 @@ export const DownloadStatusDisplay = ({
     return null;
   };
 
+  // Determine if cancel button should be shown
+  const showCancelButton = isActive && !isComplete && !isError && !isCancelled;
+
+  // Determine if progress bar should show indeterminate state
+  const isIndeterminate = isProcessing && !isOllamaCreation;
+
   return (
     <div className="bg-black/50 rounded-lg border border-white/10 p-4">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex-1 min-w-0 flex items-center gap-2">
           <StatusIcon />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-white/60 text-sm">
-                {isComplete ? "Downloaded:" : "Downloading:"}
-              </span>
-              <span className="text-white text-sm font-mono truncate">
-                {displayName}
-              </span>
-            </div>
-          </div>
+          {/* Filename with Inter font and larger size */}
+          <span className="font-inter text-white text-base truncate">
+            {displayName}
+          </span>
         </div>
         <div className="flex items-center gap-3 ml-4 shrink-0">
-          <span className="text-white/60 text-sm font-mono whitespace-nowrap">
-            {isComplete
-              ? "✓"
-              : isError
-                ? "✗"
-                : isCancelled
-                  ? "⊘"
-                  : `${progressValue.toFixed(1)}%`}
-          </span>
-          {isActive && !isComplete && !isError && !isCancelled && (
+          {showCancelButton && (
             <button
               onClick={handleCancel}
               className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs transition-all cursor-pointer border border-red-500/20 hover:border-red-500/40 flex items-center gap-1"
@@ -114,10 +119,17 @@ export const DownloadStatusDisplay = ({
         </div>
       </div>
 
+      {/* Message with Inter font and smaller size */}
+      {message && (
+        <div className="ml-6 mb-2">
+          <span className="font-inter text-white/40 text-xs">{message}</span>
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-300 ${progressColor}`}
+          className={`h-full transition-all duration-300 ${progressColor} ${isIndeterminate ? "w-full animate-pulse" : ""}`}
           style={{
             width: isComplete
               ? "100%"
@@ -125,7 +137,9 @@ export const DownloadStatusDisplay = ({
                 ? "100%"
                 : isCancelled
                   ? "100%"
-                  : `${progressValue}%`,
+                  : isIndeterminate
+                    ? "100%"
+                    : `${Math.min(progressValue, 100)}%`,
           }}
         />
       </div>

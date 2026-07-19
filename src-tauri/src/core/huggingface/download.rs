@@ -350,10 +350,10 @@ async fn attempt_download(
             filename, 
             "resuming", 
             initial_progress,
-            &format!("Resuming download from {} bytes", total_downloaded)
+            &format!("Resuming download... {:.1}%", initial_progress) // Show percentage only
         );
     } else {
-        send_progress(app_handle, model_id, filename, "starting", 0.0, "Starting parallel download...");
+        send_progress(app_handle, model_id, filename, "starting", 0.0, "Starting download...");
     }
     
     // Create chunk tasks
@@ -403,9 +403,11 @@ async fn attempt_download(
     while completed < handles.len() {
         // Check for cancellation
         if cancel_token.load(Ordering::SeqCst) {
+            let progress_percent = (get_total_downloaded_size(model_dir, filename, num_chunks).await as f64 / total_size as f64) * 100.0;
+            let progress_rounded = (progress_percent * 10.0).round() / 10.0;
             send_progress(app_handle, model_id, filename, "cancelled", 
-                (get_total_downloaded_size(model_dir, filename, num_chunks).await as f64 / total_size as f64) * 100.0, 
-                "Download cancelled");
+                progress_rounded, 
+                &format!("Download cancelled at {:.1}%", progress_rounded));
             remove_cancellation_token(download_id);
             return Err("Download cancelled".to_string());
         }
@@ -423,7 +425,7 @@ async fn attempt_download(
                 filename, 
                 "downloading", 
                 progress_rounded,
-                &format!("Downloading... {:.1}% ({}/{})", progress_rounded, total_downloaded, total_size)
+                &format!("Downloading... {:.1}%", progress_rounded) // Show percentage only
             );
             
             last_update = now;
