@@ -7,7 +7,6 @@ import {
   FiX,
   FiRefreshCw,
   FiAlertCircle,
-  FiCheckCircle,
 } from "react-icons/fi";
 import { useInstalledModels, InstalledModel } from "./hooks/useInstalledModels";
 
@@ -110,7 +109,7 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
       <div className="w-full space-y-6">
         <div className="flex items-center justify-between text-sm text-white/40 px-2 py-2 bg-black/50 rounded-lg border border-white/5">
           <div className="flex items-center gap-3">
-            <FiAlertCircle className="text-red-500" size={16} />
+            <FiAlertCircle className="text-error" size={16} />
             <span>Error loading installed models</span>
           </div>
         </div>
@@ -230,14 +229,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
                             <FiHardDrive size={12} />
                             {formatFileSize(model.total_size)}
                           </span>
-                          <span className="text-white/20 text-xs">•</span>
-                          <span className="text-white/30 text-xs flex items-center gap-1">
-                            <FiCheckCircle
-                              size={12}
-                              className="text-green-500"
-                            />
-                            {model.downloaded_at}
-                          </span>
                           {hasMultipleQuants && (
                             <>
                               <span className="text-white/20 text-xs">•</span>
@@ -290,7 +281,7 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
                                       handleDeleteQuant(model.model_id, quant);
                                     }}
                                     disabled={!!deletingQuant}
-                                    className="text-white/30 hover:text-red-400 transition-colors cursor-pointer disabled:opacity-30"
+                                    className="text-white/30 hover:text-error transition-colors cursor-pointer disabled:opacity-30"
                                     title={`Delete ${quant} quantization`}
                                   >
                                     {isDeleting ? (
@@ -321,7 +312,7 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
                         <button
                           onClick={() => handleDelete(model.model_id)}
                           disabled={deleting === model.model_id}
-                          className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs transition-all cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-error hover:bg-error/80 text-white rounded-lg text-xs transition-all cursor-pointer disabled:opacity-50"
                         >
                           {deleting === model.model_id ? "Deleting..." : "Yes"}
                         </button>
@@ -335,7 +326,7 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
                     ) : (
                       <button
                         onClick={() => setShowDeleteConfirm(model.model_id)}
-                        className="text-white/30 hover:text-red-400 transition-all p-2 rounded-lg hover:bg-red-500/10 cursor-pointer"
+                        className="text-white/30 hover:text-error transition-all p-2 rounded-lg hover:bg-error-bg cursor-pointer"
                         title="Delete entire model"
                       >
                         <FiTrash2 size={16} />

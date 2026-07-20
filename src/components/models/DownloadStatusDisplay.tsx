@@ -8,7 +8,7 @@ interface DownloadStatusDisplayProps {
   progress: number;
   message: string;
   status: string;
-  onCancel?: () => void; // Add optional cancel callback
+  onCancel?: () => void;
 }
 
 export const DownloadStatusDisplay = ({
@@ -16,6 +16,7 @@ export const DownloadStatusDisplay = ({
   filename,
   progress,
   status,
+  message,
   onCancel,
 }: DownloadStatusDisplayProps) => {
   // Format filename for display
@@ -27,14 +28,24 @@ export const DownloadStatusDisplay = ({
   const isCancelled = status === "cancelled";
   const isActive = status === "downloading" || status === "starting";
   const isStarting = status === "starting";
+  const isProcessing =
+    status === "processing" ||
+    status === "generating_modelfile" ||
+    status === "creating_ollama_model" ||
+    status === "finalizing";
+  const isOllamaCreation = status === "creating_ollama_model";
 
+  // Use color names directly
   const progressColor = isError
-    ? "bg-red-500"
+    ? "bg-error"
     : isComplete
-      ? "bg-green-500"
+      ? "bg-success"
       : isCancelled
-        ? "bg-yellow-500"
-        : "bg-purple-accent";
+        ? "bg-warning"
+        : isProcessing
+          ? "bg-info animate-pulse"
+          : "bg-purple-accent";
+
   const progressValue = Math.min(Math.max(progress, 0), 100);
 
   const handleCancel = async () => {
@@ -54,19 +65,14 @@ export const DownloadStatusDisplay = ({
   // Determine status icon
   const StatusIcon = () => {
     if (isComplete)
-      return <FiCheckCircle className="text-green-500 shrink-0" size={16} />;
+      return <FiCheckCircle className="text-success shrink-0" size={16} />;
     if (isError)
-      return <FiAlertCircle className="text-red-500 shrink-0" size={16} />;
+      return <FiAlertCircle className="text-error shrink-0" size={16} />;
     if (isCancelled)
-      return <FiAlertCircle className="text-yellow-500 shrink-0" size={16} />;
-    if (isStarting)
-      return (
-        <FiLoader
-          className="animate-spin text-purple-accent shrink-0"
-          size={16}
-        />
-      );
-    if (isActive)
+      return <FiAlertCircle className="text-warning shrink-0" size={16} />;
+    if (isProcessing)
+      return <FiLoader className="animate-spin text-info shrink-0" size={16} />;
+    if (isStarting || isActive)
       return (
         <FiLoader
           className="animate-spin text-purple-accent shrink-0"
@@ -76,36 +82,26 @@ export const DownloadStatusDisplay = ({
     return null;
   };
 
+  // Determine if cancel button should be shown
+  const showCancelButton = isActive && !isComplete && !isError && !isCancelled;
+
+  // Determine if progress bar should show indeterminate state
+  const isIndeterminate = isProcessing && !isOllamaCreation;
+
   return (
     <div className="bg-black/50 rounded-lg border border-white/10 p-4">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex-1 min-w-0 flex items-center gap-2">
           <StatusIcon />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-white/60 text-sm">
-                {isComplete ? "Downloaded:" : "Downloading:"}
-              </span>
-              <span className="text-white text-sm font-mono truncate">
-                {displayName}
-              </span>
-            </div>
-          </div>
+          <span className="font-inter text-white text-base truncate">
+            {displayName}
+          </span>
         </div>
         <div className="flex items-center gap-3 ml-4 shrink-0">
-          <span className="text-white/60 text-sm font-mono whitespace-nowrap">
-            {isComplete
-              ? "✓"
-              : isError
-                ? "✗"
-                : isCancelled
-                  ? "⊘"
-                  : `${progressValue.toFixed(1)}%`}
-          </span>
-          {isActive && !isComplete && !isError && !isCancelled && (
+          {showCancelButton && (
             <button
               onClick={handleCancel}
-              className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs transition-all cursor-pointer border border-red-500/20 hover:border-red-500/40 flex items-center gap-1"
+              className="px-3 py-1 bg-error-bg hover:bg-error-border text-error rounded-lg text-xs transition-all cursor-pointer border border-error-border hover:border-error-border flex items-center gap-1"
             >
               <FiX size={12} />
               Cancel
@@ -114,10 +110,17 @@ export const DownloadStatusDisplay = ({
         </div>
       </div>
 
+      {/* Message */}
+      {message && (
+        <div className="ml-6 mb-2">
+          <span className="font-inter text-white/40 text-xs">{message}</span>
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-300 ${progressColor}`}
+          className={`h-full transition-all duration-300 ${progressColor} ${isIndeterminate ? "w-full animate-pulse" : ""}`}
           style={{
             width: isComplete
               ? "100%"
@@ -125,7 +128,9 @@ export const DownloadStatusDisplay = ({
                 ? "100%"
                 : isCancelled
                   ? "100%"
-                  : `${progressValue}%`,
+                  : isIndeterminate
+                    ? "100%"
+                    : `${Math.min(progressValue, 100)}%`,
           }}
         />
       </div>

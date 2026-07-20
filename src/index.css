@@ -5,6 +5,26 @@
   --color-white: #d8d4cf;
   --color-black: #121212;
   --color-purple-accent: #7d7abc;
+  
+  /* Status Colors - Success (Green) */
+  --color-success: #22c55e;
+  --color-success-bg: #22c55e26; /* 15% opacity */
+  --color-success-border: #22c55e33; /* 20% opacity */
+  
+  /* Status Colors - Error (Red) */
+  --color-error: #ef4444;
+  --color-error-bg: #ef444426; /* 15% opacity */
+  --color-error-border: #ef444433; /* 20% opacity */
+  
+  /* Status Colors - Warning (Yellow) */
+  --color-warning: #eab308;
+  --color-warning-bg: #eab30826; /* 15% opacity */
+  --color-warning-border: #eab30833; /* 20% opacity */
+  
+  /* Status Colors - Info (Blue) */
+  --color-info: #3b82f6;
+  --color-info-bg: #3b82f626; /* 15% opacity */
+  --color-info-border: #3b82f633; /* 20% opacity */
 }
 
 @utility font-anton {
