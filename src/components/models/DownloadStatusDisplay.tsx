@@ -35,14 +35,15 @@ export const DownloadStatusDisplay = ({
     status === "finalizing";
   const isOllamaCreation = status === "creating_ollama_model";
 
+  // Use color names directly
   const progressColor = isError
-    ? "bg-red-500"
+    ? "bg-error"
     : isComplete
-      ? "bg-green-500"
+      ? "bg-success"
       : isCancelled
-        ? "bg-yellow-500"
+        ? "bg-warning"
         : isProcessing
-          ? "bg-blue-500 animate-pulse"
+          ? "bg-info animate-pulse"
           : "bg-purple-accent";
 
   const progressValue = Math.min(Math.max(progress, 0), 100);
@@ -64,23 +65,14 @@ export const DownloadStatusDisplay = ({
   // Determine status icon
   const StatusIcon = () => {
     if (isComplete)
-      return <FiCheckCircle className="text-green-500 shrink-0" size={16} />;
+      return <FiCheckCircle className="text-success shrink-0" size={16} />;
     if (isError)
-      return <FiAlertCircle className="text-red-500 shrink-0" size={16} />;
+      return <FiAlertCircle className="text-error shrink-0" size={16} />;
     if (isCancelled)
-      return <FiAlertCircle className="text-yellow-500 shrink-0" size={16} />;
+      return <FiAlertCircle className="text-warning shrink-0" size={16} />;
     if (isProcessing)
-      return (
-        <FiLoader className="animate-spin text-blue-400 shrink-0" size={16} />
-      );
-    if (isStarting)
-      return (
-        <FiLoader
-          className="animate-spin text-purple-accent shrink-0"
-          size={16}
-        />
-      );
-    if (isActive)
+      return <FiLoader className="animate-spin text-info shrink-0" size={16} />;
+    if (isStarting || isActive)
       return (
         <FiLoader
           className="animate-spin text-purple-accent shrink-0"
@@ -101,7 +93,6 @@ export const DownloadStatusDisplay = ({
       <div className="flex items-center justify-between mb-1">
         <div className="flex-1 min-w-0 flex items-center gap-2">
           <StatusIcon />
-          {/* Filename with Inter font and larger size */}
           <span className="font-inter text-white text-base truncate">
             {displayName}
           </span>
@@ -110,7 +101,7 @@ export const DownloadStatusDisplay = ({
           {showCancelButton && (
             <button
               onClick={handleCancel}
-              className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs transition-all cursor-pointer border border-red-500/20 hover:border-red-500/40 flex items-center gap-1"
+              className="px-3 py-1 bg-error-bg hover:bg-error-border text-error rounded-lg text-xs transition-all cursor-pointer border border-error-border hover:border-error-border flex items-center gap-1"
             >
               <FiX size={12} />
               Cancel
@@ -119,7 +110,7 @@ export const DownloadStatusDisplay = ({
         </div>
       </div>
 
-      {/* Message with Inter font and smaller size */}
+      {/* Message */}
       {message && (
         <div className="ml-6 mb-2">
           <span className="font-inter text-white/40 text-xs">{message}</span>

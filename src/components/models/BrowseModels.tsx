@@ -190,13 +190,13 @@ export const BrowseModels = ({
 
                 <div className="flex flex-wrap gap-2 mb-3">
                   {model.downloads !== undefined && model.downloads > 0 && (
-                    <span className="text-xs bg-green-500/15 text-green-400 px-2 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
+                    <span className="text-xs bg-success-bg text-success px-2 py-1 rounded-full border border-success-border flex items-center gap-1">
                       <FiDownloadCloud size={12} />
                       {formatDownloads(model.downloads)}
                     </span>
                   )}
                   {model.likes !== undefined && model.likes > 0 && (
-                    <span className="text-xs bg-red-500/15 text-red-400 px-2 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
+                    <span className="text-xs bg-error-bg text-error px-2 py-1 rounded-full border border-error-border flex items-center gap-1">
                       <FiHeart size={12} />
                       {formatLikes(model.likes)}
                     </span>
