@@ -16,3 +16,4 @@ minimumReleaseAgeExclude:
   - '@tailwindcss/vite@4.3.3'
   - tailwindcss@4.3.3
   - vite@8.1.5
+  - '@vitejs/plugin-react@6.0.4'
