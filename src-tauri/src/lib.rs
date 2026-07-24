@@ -1,4 +1,3 @@
-// src/lib.rs
 pub mod data;
 pub mod api;
 pub mod core;
@@ -24,6 +23,7 @@ pub fn run() {
             // Ollama commands
             api::ollama::commands::download_ollama,
             api::ollama::commands::start_ollama_service,
+            api::ollama::commands::update_ollama,  // New command
             api::ollama::queries::check_ollama_installed,
             api::ollama::queries::check_ollama_running,  
             api::ollama::queries::get_ollama_status,    
