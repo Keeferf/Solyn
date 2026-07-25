@@ -50,3 +50,44 @@ pub async fn download_ollama(app_handle: tauri::AppHandle) -> Result<String, Str
 
     Ok("Ollama installed successfully".to_string())
 }
+
+#[tauri::command]
+pub async fn update_ollama(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let window = app_handle
+        .get_webview_window("main")
+        .ok_or("Main window not found")?;
+    let platform = detect_operating_system();
+
+    broadcast_download_progress(
+        &window,
+        DownloadStatus::Downloading,
+        0,
+        "Starting Ollama update...".to_string(),
+        None,
+    );
+
+    // Use the same installation process for updates
+    let download_result = execute_ollama_installation(&app_handle, &window, &platform).await;
+
+    if let Err(e) = download_result {
+        broadcast_download_progress(
+            &window,
+            DownloadStatus::Error,
+            0,
+            format!("Update failed: {}", e),
+            None,
+        );
+        return Err(e);
+    }
+
+    broadcast_download_progress(
+        &window,
+        DownloadStatus::Complete,
+        100,
+        "Ollama updated successfully!".to_string(),
+        None,
+    );
+
+    // Refresh the status after update
+    Ok("Ollama updated successfully".to_string())
+}

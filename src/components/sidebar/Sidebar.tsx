@@ -1,6 +1,6 @@
-// src/components/sidebar/Sidebar.tsx
 import { SidebarItem } from "./SidebarItem";
 import { NAVIGATION_ITEMS, FOOTER_ITEMS } from "./SidebarNavigation";
+import { OllamaVersionIndicator } from "./OllamaVersionIndicator";
 
 interface SidebarProps {
   onNavigate?: (view: "chat" | "models") => void;
@@ -20,7 +20,7 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
     <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/10 flex flex-col p-4">
       {/* Logo area */}
       <div className="mb-8 px-3">
-        <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-(--color-purple-accent) to-white bg-clip-text text-transparent">
+        <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white bg-clip-text text-transparent">
           Solyn
         </h2>
       </div>
@@ -55,7 +55,10 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
 
       {/* Bottom section */}
       <div className="mt-auto pt-4 border-t border-white/10">
-        <div className="px-3 py-2 text-sm text-white/40">v0.1.0</div>
+        <div className="flex items-center justify-between px-3 py-2">
+          <span className="text-sm text-white/40">v0.1.0</span>
+          <OllamaVersionIndicator />
+        </div>
       </div>
     </aside>
   );
