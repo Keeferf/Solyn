@@ -42,7 +42,7 @@ export const ChatInterface = () => {
   const {
     messages,
     isLoading: isChatLoading,
-    isStreaming, // Add this
+    isStreaming,
     error,
     isOllamaReady,
     sendMessage,
@@ -117,13 +117,13 @@ export const ChatInterface = () => {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex flex-col h-full w-full relative">
+    <div className="w-full max-w-3xl mx-auto h-full flex flex-col">
       {hasMessages && (
         <div className="flex-1 min-h-0 overflow-y-auto pb-4">
           <ChatMessages
             messages={messages}
             isLoading={isChatLoading}
-            isStreaming={isStreaming} // Add this
+            isStreaming={isStreaming}
             error={error}
             isOllamaReady={isOllamaReady}
           />
@@ -142,7 +142,7 @@ export const ChatInterface = () => {
             </p>
           </div>
 
-          <div className="w-full max-w-3xl">
+          <div className="w-full">
             <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
               <ChatInput
                 ref={textareaRef}

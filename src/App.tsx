@@ -16,11 +16,7 @@ export const App = () => {
         return <ModelInterface />;
       case "chat":
       default:
-        return (
-          <div className="w-full max-w-3xl mx-auto h-full flex flex-col">
-            <ChatInterface />
-          </div>
-        );
+        return <ChatInterface />;
     }
   };
 
@@ -29,7 +25,7 @@ export const App = () => {
       <OllamaStatusChecker>
         <div className="flex min-h-screen bg-black">
           <Sidebar onNavigate={setCurrentView} currentView={currentView} />
-          <main className="flex-1 ml-64 min-h-screen flex flex-col items-center justify-center p-4">
+          <main className="flex-1 ml-64 min-h-screen flex items-center justify-center p-4">
             {renderContent()}
           </main>
         </div>
