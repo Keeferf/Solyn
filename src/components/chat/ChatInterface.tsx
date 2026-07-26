@@ -1,11 +1,12 @@
-import { useState } from "react";
+// src/components/chat/ChatInterface.tsx
+import { useState, useEffect } from "react";
 import { ChatInput } from "./ChatInput";
 import { ChatControls } from "./ChatControls";
 import { ChatMessages } from "./ChatMessages";
 import { useChatInput } from "./hooks/useChatInput";
 import { useFileAttachment } from "./hooks/useFileAttachment";
 import { useModelSelection } from "./hooks/useModelSelection";
-import { useChat } from "./hooks/useChat";
+import { useChat, ChatSession } from "./hooks/useChat";
 
 export type ModeType = "chat" | "agent";
 
@@ -13,6 +14,8 @@ export const ChatInterface = () => {
   const [isSearchEnabled, setIsSearchEnabled] = useState(false);
   const [isCodeEnabled, setIsCodeEnabled] = useState(false);
   const [mode, setMode] = useState<ModeType>("chat");
+  const [showHistory, setShowHistory] = useState(false);
+
   const { input, setInput, textareaRef, resetInput } = useChatInput();
   const {
     isAttachmentEnabled,
@@ -35,18 +38,22 @@ export const ChatInterface = () => {
 
   const selectedModelData = getSelectedModelData();
 
-  // Debug logging
-  console.log("Selected Model Data:", selectedModelData);
-  console.log("Ollama Model Name:", selectedModelData?.ollama_model_name);
-
   const {
     messages,
     isLoading: isChatLoading,
     isStreaming,
     error,
     isOllamaReady,
+    sessions,
+    isLoadingSessions,
+    currentSessionId,
     sendMessage,
-    clearMessages: _clearMessages,
+    clearMessages,
+    startNewChat,
+    loadSessions,
+    loadSession,
+    deleteSession,
+    updateSessionTitle,
   } = useChat(
     selectedModelData && selectedModelData.ollama_model_name
       ? {
@@ -56,6 +63,11 @@ export const ChatInterface = () => {
         }
       : undefined,
   );
+
+  // Load sessions when component mounts
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
 
   const handleSubmit = async () => {
     console.log("Submit triggered. Input:", input.trim());
@@ -101,6 +113,39 @@ export const ChatInterface = () => {
     setMode(mode === "chat" ? "agent" : "chat");
   };
 
+  const handleSelectSession = async (sessionId: number) => {
+    await loadSession(sessionId);
+    setShowHistory(false);
+  };
+
+  const handleDeleteSession = async (sessionId: number) => {
+    if (confirm("Delete this chat session?")) {
+      await deleteSession(sessionId);
+    }
+  };
+
+  const handleRenameSession = async (sessionId: number) => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+
+    const newTitle = prompt("Enter new title:", session.title);
+    if (newTitle && newTitle.trim()) {
+      await updateSessionTitle(sessionId, newTitle.trim());
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+
+    if (diff < 60000) return "Just now";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+    return date.toLocaleDateString();
+  };
+
   const hasValidModels =
     models.length > 0 &&
     models[0].value !== "no-models" &&
@@ -117,7 +162,92 @@ export const ChatInterface = () => {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="w-full max-w-3xl mx-auto h-full flex flex-col">
+    <div className="w-full max-w-3xl mx-auto h-full flex flex-col relative">
+      {/* Session History Sidebar */}
+      {showHistory && (
+        <div className="absolute left-0 top-0 bottom-0 w-72 bg-gray-900 border-r border-gray-700 rounded-l-2xl z-10 overflow-y-auto p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-white font-semibold">Chat History</h3>
+            <button
+              onClick={() => setShowHistory(false)}
+              className="text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+
+          {isLoadingSessions ? (
+            <div className="text-gray-400 text-sm">Loading...</div>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  startNewChat();
+                  setShowHistory(false);
+                }}
+                className="w-full text-left px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                + New Chat
+              </button>
+
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`p-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors ${
+                    currentSessionId === session.id ? "bg-gray-800" : ""
+                  }`}
+                >
+                  <div
+                    className="flex justify-between items-start"
+                    onClick={() => handleSelectSession(session.id)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-white text-sm font-medium truncate">
+                        {session.title}
+                      </div>
+                      <div className="text-gray-400 text-xs truncate">
+                        {session.model_name}
+                      </div>
+                      <div className="text-gray-500 text-xs">
+                        {formatDate(session.updated_at)}
+                      </div>
+                    </div>
+                    <div className="flex space-x-1 ml-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenameSession(session.id);
+                        }}
+                        className="text-gray-500 hover:text-gray-300 text-xs p-1"
+                        title="Rename"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSession(session.id);
+                        }}
+                        className="text-gray-500 hover:text-red-400 text-xs p-1"
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {sessions.length === 0 && (
+                <div className="text-gray-500 text-sm text-center mt-4">
+                  No chat sessions yet
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {hasMessages && (
         <div className="flex-1 min-h-0 overflow-y-auto pb-4">
           <ChatMessages
@@ -133,7 +263,7 @@ export const ChatInterface = () => {
       {!hasMessages && (
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center mb-8">
-            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white bg-clip-text text-transparent">
+            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-gradient-to-r from-purple-400 to-white bg-clip-text text-transparent">
               Solyn
             </h1>
             <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
@@ -236,8 +366,23 @@ export const ChatInterface = () => {
             />
           </div>
 
-          <div className="mt-3 text-xs text-white/30 text-center">
-            Press Enter to send, Shift+Enter for new line
+          <div className="flex justify-between items-center mt-3 px-1">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1"
+            >
+              <span>📋</span>
+              {showHistory ? "Hide History" : "Show History"}
+              {sessions.length > 0 && !showHistory && (
+                <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded-full text-[10px]">
+                  {sessions.length}
+                </span>
+              )}
+            </button>
+
+            <div className="text-xs text-white/30">
+              Press Enter to send, Shift+Enter for new line
+            </div>
           </div>
         </div>
       )}

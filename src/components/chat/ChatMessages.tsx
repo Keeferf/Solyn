@@ -1,3 +1,4 @@
+// src/components/chat/ChatMessages.tsx
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./hooks/useChat";
 
@@ -26,6 +27,10 @@ export const ChatMessages = ({
     scrollToBottom();
   }, [messages]);
 
+  if (messages.length === 0) {
+    return null;
+  }
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {messages.map((message, index) => {
@@ -43,10 +48,10 @@ export const ChatMessages = ({
             }`}
           >
             <div
-              className={`rounded-lg px-4 py-2 ${
+              className={`rounded-lg px-4 py-2 max-w-[80%] ${
                 message.role === "user"
-                  ? "bg-purple-accent text-white"
-                  : "bg-white/5 text-white/90"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-700 text-white/90"
               }`}
             >
               {isEmptyAssistant && isStreaming ? (
@@ -66,7 +71,7 @@ export const ChatMessages = ({
                   />
                 </div>
               ) : (
-                <div className="text-sm whitespace-pre-wrap">
+                <div className="text-sm whitespace-pre-wrap break-words">
                   {message.content}
                 </div>
               )}
@@ -75,9 +80,9 @@ export const ChatMessages = ({
         );
       })}
 
-      {isLoading && !isStreaming && (
+      {isLoading && !isStreaming && messages.length > 0 && (
         <div className="flex justify-start">
-          <div className="bg-white/5 rounded-lg px-4 py-2">
+          <div className="bg-gray-700 rounded-lg px-4 py-2">
             <div className="flex space-x-1">
               <div
                 className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
