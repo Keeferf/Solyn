@@ -17,8 +17,8 @@ export interface ChatModelData {
 export const useChat = (modelData: ChatModelData | undefined) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const messageBufferRef = useRef<string>("");
   const unlistenRefs = useRef<UnlistenFn[]>([]);
   const { isReady } = useOllama();
   const isOllamaReady = isReady;
@@ -49,7 +49,7 @@ export const useChat = (modelData: ChatModelData | undefined) => {
 
     setError(null);
     setIsLoading(true);
-    messageBufferRef.current = "";
+    setIsStreaming(true);
 
     // Add user message
     setMessages((prev) => [...prev, { role: "user", content: content.trim() }]);
@@ -73,7 +73,7 @@ export const useChat = (modelData: ChatModelData | undefined) => {
       console.error("Error sending message:", err);
       setError(err as string);
       setIsLoading(false);
-      messageBufferRef.current = "";
+      setIsStreaming(false);
 
       // Remove the empty assistant message on error
       setMessages((prev) => {
@@ -92,7 +92,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
   const clearMessages = useCallback(() => {
     setMessages([]);
     setError(null);
-    messageBufferRef.current = "";
   }, []);
 
   // Setup event listeners
@@ -111,26 +110,25 @@ export const useChat = (modelData: ChatModelData | undefined) => {
 
         console.log("Setting up chat event listeners...");
 
-        // Listen for chunk events
+        // Listen for the complete response (only one chunk with full content)
         const unlistenChunk = await listen<{ chunk: string }>(
           "chat-stream-chunk",
           (event) => {
-            const { chunk } = event.payload;
-            messageBufferRef.current += chunk;
+            const fullContent = event.payload.chunk;
+            console.log(
+              "Received complete response, length:",
+              fullContent.length,
+            );
 
+            // Update the last message with the complete content
             setMessages((prev) => {
               const updated = [...prev];
               const lastIndex = updated.length - 1;
               if (lastIndex >= 0 && updated[lastIndex].role === "assistant") {
                 updated[lastIndex] = {
                   ...updated[lastIndex],
-                  content: messageBufferRef.current,
+                  content: fullContent,
                 };
-              } else {
-                updated.push({
-                  role: "assistant",
-                  content: messageBufferRef.current,
-                });
               }
               return updated;
             });
@@ -142,7 +140,7 @@ export const useChat = (modelData: ChatModelData | undefined) => {
         const unlistenDone = await listen("chat-stream-done", () => {
           console.log("Chat stream completed");
           setIsLoading(false);
-          messageBufferRef.current = "";
+          setIsStreaming(false);
         });
         unlistenRefs.current.push(unlistenDone);
 
@@ -154,7 +152,7 @@ export const useChat = (modelData: ChatModelData | undefined) => {
             console.error("Chat stream error:", errorMsg);
             setError(errorMsg);
             setIsLoading(false);
-            messageBufferRef.current = "";
+            setIsStreaming(false);
           },
         );
         unlistenRefs.current.push(unlistenError);
@@ -179,11 +177,12 @@ export const useChat = (modelData: ChatModelData | undefined) => {
       });
       unlistenRefs.current = [];
     };
-  }, []); // Empty dependency array - setup once
+  }, []);
 
   return {
     messages,
     isLoading,
+    isStreaming,
     error,
     isOllamaReady,
     sendMessage,

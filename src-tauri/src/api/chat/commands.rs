@@ -82,6 +82,7 @@ pub async fn send_chat_stream(
         while let Some(event) = receiver.recv().await {
             match event {
                 ChatEvent::MessageChunk(chunk) => {
+                    // We now only get one chunk with the full response
                     let _ = window.emit("chat-stream-chunk", json!({ "chunk": chunk }));
                 }
                 ChatEvent::Done(response) => {

@@ -42,6 +42,7 @@ export const ChatInterface = () => {
   const {
     messages,
     isLoading: isChatLoading,
+    isStreaming, // Add this
     error,
     isOllamaReady,
     sendMessage,
@@ -118,10 +119,11 @@ export const ChatInterface = () => {
   return (
     <div className="flex flex-col h-full w-full relative">
       {hasMessages && (
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
           <ChatMessages
             messages={messages}
             isLoading={isChatLoading}
+            isStreaming={isStreaming} // Add this
             error={error}
             isOllamaReady={isOllamaReady}
           />
@@ -189,7 +191,7 @@ export const ChatInterface = () => {
       )}
 
       {hasMessages && (
-        <div className="shrink-0 w-full">
+        <div className="shrink-0 w-full sticky bottom-0 bg-black/80 backdrop-blur-sm">
           {attachmentCount > 0 && (
             <div className="px-4 py-2 text-xs text-white/60 bg-white/5 border-t border-white/5">
               {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached

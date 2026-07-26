@@ -4,6 +4,7 @@ import { ChatMessage } from "./hooks/useChat";
 interface ChatMessagesProps {
   messages: ChatMessage[];
   isLoading: boolean;
+  isStreaming: boolean;
   error: string | null;
   isOllamaReady: boolean;
 }
@@ -11,8 +12,9 @@ interface ChatMessagesProps {
 export const ChatMessages = ({
   messages,
   isLoading,
+  isStreaming,
   error,
-  isOllamaReady: _isOllamaReady, // Prefix with underscore to mark as intentionally unused
+  isOllamaReady: _isOllamaReady,
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -26,26 +28,45 @@ export const ChatMessages = ({
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {messages.map((message, index) => (
-        <div
-          key={index}
-          className={`flex ${
-            message.role === "user" ? "justify-end" : "justify-start"
-          }`}
-        >
+      {messages.map((message, index) => {
+        // Check if this is the last message and it's an empty assistant message
+        const isEmptyAssistant =
+          index === messages.length - 1 &&
+          message.role === "assistant" &&
+          message.content === "";
+
+        return (
           <div
-            className={`max-w-[80%] rounded-lg px-4 py-2 ${
-              message.role === "user"
-                ? "bg-purple-accent text-white"
-                : "bg-white/5 text-white/90"
+            key={index}
+            className={`flex ${
+              message.role === "user" ? "justify-end" : "justify-start"
             }`}
           >
-            <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+            <div
+              className={`rounded-lg px-4 py-2 ${
+                message.role === "user"
+                  ? "bg-purple-accent text-white"
+                  : "bg-white/5 text-white/90"
+              }`}
+            >
+              {isEmptyAssistant && isStreaming ? (
+                // Show loading animation while waiting for response
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce delay-100" />
+                  <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce delay-200" />
+                </div>
+              ) : (
+                <div className="text-sm whitespace-pre-wrap">
+                  {message.content}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
-      {isLoading && (
+      {isLoading && !isStreaming && (
         <div className="flex justify-start">
           <div className="bg-white/5 rounded-lg px-4 py-2">
             <div className="flex space-x-1">
