@@ -23,7 +23,7 @@ pub fn run() {
             // Ollama commands
             api::ollama::commands::download_ollama,
             api::ollama::commands::start_ollama_service,
-            api::ollama::commands::update_ollama,  // New command
+            api::ollama::commands::update_ollama,
             api::ollama::queries::check_ollama_installed,
             api::ollama::queries::check_ollama_running,  
             api::ollama::queries::get_ollama_status,    
@@ -64,6 +64,9 @@ pub fn run() {
             api::models::commands::generate_modelfile,
             api::models::commands::create_ollama_model,
             api::models::commands::delete_ollama_model,
+
+            api::models::commands::debug_ollama_models,
+            api::models::commands::test_chat_with_model,
             
             // Chat commands
             api::chat::commands::send_chat_message,

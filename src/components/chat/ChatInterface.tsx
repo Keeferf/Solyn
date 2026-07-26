@@ -35,6 +35,10 @@ export const ChatInterface = () => {
 
   const selectedModelData = getSelectedModelData();
 
+  // Debug logging
+  console.log("Selected Model Data:", selectedModelData);
+  console.log("Ollama Model Name:", selectedModelData?.ollama_model_name);
+
   const {
     messages,
     isLoading: isChatLoading,
@@ -53,7 +57,17 @@ export const ChatInterface = () => {
   );
 
   const handleSubmit = async () => {
-    if (input.trim() && !isChatLoading && models.length > 0) {
+    console.log("Submit triggered. Input:", input.trim());
+    console.log("Chat loading:", isChatLoading);
+    console.log("Models:", models.length);
+    console.log("Selected model data:", selectedModelData);
+
+    if (
+      input.trim() &&
+      !isChatLoading &&
+      models.length > 0 &&
+      selectedModelData
+    ) {
       let message = input.trim();
 
       if (attachments.length > 0) {
@@ -65,6 +79,13 @@ export const ChatInterface = () => {
 
       resetInput();
       await sendMessage(message);
+    } else {
+      console.log("Submit blocked:", {
+        hasInput: !!input.trim(),
+        isChatLoading,
+        hasModels: models.length > 0,
+        hasSelectedModelData: !!selectedModelData,
+      });
     }
   };
 
@@ -83,8 +104,13 @@ export const ChatInterface = () => {
     models.length > 0 &&
     models[0].value !== "no-models" &&
     models[0].value !== "error";
+
   const isSubmitDisabled =
-    !input.trim() || isChatLoading || !hasValidModels || !isOllamaReady;
+    !input.trim() ||
+    isChatLoading ||
+    !hasValidModels ||
+    !isOllamaReady ||
+    !selectedModelData?.ollama_model_name;
 
   const attachmentCount = attachments.length;
   const hasMessages = messages.length > 0;
@@ -154,7 +180,9 @@ export const ChatInterface = () => {
                   ? "No models installed. Please download a model from the Hugging Face page."
                   : isModelsLoading
                     ? "Loading models..."
-                    : "Press Enter to send, Shift+Enter for new line"}
+                    : !selectedModelData?.ollama_model_name
+                      ? "Selected model is not registered with Ollama. Please reinstall."
+                      : "Press Enter to send, Shift+Enter for new line"}
             </div>
           </div>
         </div>

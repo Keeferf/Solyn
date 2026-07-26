@@ -5,7 +5,6 @@ use std::time::Duration;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-// Only import tokio::fs on non-Windows platforms
 #[cfg(not(target_os = "windows"))]
 use tokio::fs;
 
@@ -114,7 +113,7 @@ impl OllamaModelClient {
         }
     }
 
-    /// List available models
+    /// List available models (returns just names)
     pub async fn list_models(&self) -> Result<Vec<String>, String> {
         let url = format!("{}/api/tags", self.base_url);
         
@@ -136,6 +135,28 @@ impl OllamaModelClient {
                 .collect();
             
             Ok(models)
+        } else {
+            Err("Failed to list models".to_string())
+        }
+    }
+
+    /// Get all models with full details
+    pub async fn get_all_models(&self) -> Result<Vec<OllamaModel>, String> {
+        let url = format!("{}/api/tags", self.base_url);
+        
+        let response = self.client
+            .get(&url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to list models: {}", e))?;
+
+        if response.status().is_success() {
+            let data: OllamaModelList = response.json()
+                .await
+                .map_err(|e| format!("Failed to parse response: {}", e))?;
+            
+            Ok(data.models)
         } else {
             Err("Failed to list models".to_string())
         }
@@ -176,32 +197,48 @@ impl OllamaModelClient {
         Err(format!("Model '{}' not found", model_name))
     }
 
-    /// Get all models with full details
-    pub async fn get_all_models(&self) -> Result<Vec<OllamaModel>, String> {
-        let url = format!("{}/api/tags", self.base_url);
-        
-        let response = self.client
-            .get(&url)
-            .timeout(Duration::from_secs(5))
-            .send()
-            .await
-            .map_err(|e| format!("Failed to list models: {}", e))?;
-
-        if response.status().is_success() {
-            let data: OllamaModelList = response.json()
-                .await
-                .map_err(|e| format!("Failed to parse response: {}", e))?;
-            
-            Ok(data.models)
-        } else {
-            Err("Failed to list models".to_string())
-        }
-    }
-
     /// Check if a model exists
     pub async fn model_exists(&self, model_name: &str) -> Result<bool, String> {
         let models = self.list_models().await?;
         Ok(models.iter().any(|m| m == model_name))
+    }
+
+    /// Check Ollama health/version
+    pub async fn check_health(&self) -> Result<bool, String> {
+        let response = self.client
+            .get(&format!("{}/api/version", self.base_url))
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) if resp.status().is_success() => Ok(true),
+            _ => Ok(false),
+        }
+    }
+
+    /// Get Ollama version
+    pub async fn get_version(&self) -> Result<String, String> {
+        let response = self.client
+            .get(&format!("{}/api/version", self.base_url))
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to get version: {}", e))?;
+
+        if response.status().is_success() {
+            let json: serde_json::Value = response.json()
+                .await
+                .map_err(|e| format!("Failed to parse response: {}", e))?;
+            
+            if let Some(version) = json.get("version").and_then(|v| v.as_str()) {
+                Ok(version.to_string())
+            } else {
+                Err("Version not found in response".to_string())
+            }
+        } else {
+            Err("Failed to get version".to_string())
+        }
     }
 }
 

@@ -96,42 +96,84 @@ pub async fn get_chat_models(
     // Get list of Ollama models
     let ollama_client = OllamaModelClient::new();
     let ollama_models = match ollama_client.list_models().await {
-        Ok(models) => models,
-        Err(_) => Vec::new(), // Ollama might not be running
+        Ok(models) => {
+            println!("📋 Ollama models found: {:?}", models);
+            models
+        },
+        Err(e) => {
+            println!("⚠️ Could not get Ollama models: {}", e);
+            Vec::new()
+        }
     };
     
     let mut chat_models = Vec::new();
     
     for model in installed {
         for file in &model.files {
-            // Generate the expected Ollama model name
-            let ollama_model_name = format!("{}_{}", 
-                model.model_id.replace("/", "_"), 
-                file.quantization.as_deref().unwrap_or("default")
-            );
+            // Extract quantization from filename if not already available
+            let quantization = file.quantization.clone().or_else(|| {
+                file.filename
+                    .split('_')
+                    .find(|part| part.starts_with('Q') || part.starts_with("IQ") || part.starts_with("F"))
+                    .map(|s| s.to_string())
+            }).unwrap_or_else(|| "default".to_string());
             
-            // Check if this model exists in Ollama
-            let is_registered = ollama_models.contains(&ollama_model_name);
+            // Generate the base Ollama model name (without :latest)
+            let base_ollama_name = if quantization != "default" {
+                format!("{}_{}", model.model_id.replace("/", "_"), quantization)
+            } else {
+                model.model_id.replace("/", "_")
+            };
+            
+            // Check if this model exists in Ollama (check both with and without :latest)
+            let is_registered = ollama_models.iter().any(|m| {
+                // Check exact match
+                if m == &base_ollama_name {
+                    return true;
+                }
+                // Check with :latest suffix (Ollama adds this automatically)
+                if m == &format!("{}:latest", base_ollama_name) {
+                    return true;
+                }
+                // Check if the model name is in the list (partial match)
+                m.starts_with(&base_ollama_name)
+            });
+            
+            // Determine the actual Ollama model name to use
+            // Prefer the one with :latest if it exists, otherwise use the base name
+            let actual_ollama_name = if ollama_models.iter().any(|m| m == &format!("{}:latest", base_ollama_name)) {
+                format!("{}:latest", base_ollama_name)
+            } else if ollama_models.iter().any(|m| m == &base_ollama_name) {
+                base_ollama_name.clone()
+            } else {
+                // If not found, use the base name and let the chat fail with a clear error
+                base_ollama_name.clone()
+            };
+            
+            println!("🔍 Model: {}, Base name: {}, Actual name: {}, Registered: {}", 
+                model.model_id, base_ollama_name, actual_ollama_name, is_registered);
             
             let model_value = serde_json::json!({
                 "value": format!("{}:{}", model.model_id, file.filename),
-                "label": format!("{} ({})", model.name, file.quantization.as_deref().unwrap_or("default")),
+                "label": format!("{} ({})", model.name, quantization),
                 "model_id": model.model_id,
                 "author": model.author,
                 "name": model.name,
-                "quantization": file.quantization,
+                "quantization": quantization,
                 "parameter_count": file.parameter_count,
                 "filename": file.filename,
                 "path": file.path,
                 "has_modelfile": file.has_modelfile,
                 "size": file.size,
-                "ollama_model_name": ollama_model_name, // Always provide this
+                // Use the actual ollama name (with :latest if it exists)
+                "ollama_model_name": if is_registered { actual_ollama_name } else { String::new() },
                 "is_registered": is_registered,
             });
             chat_models.push(model_value);
         }
     }
     
+    println!("✅ Returning {} chat models", chat_models.len());
     Ok(chat_models)
 }
 

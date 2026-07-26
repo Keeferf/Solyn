@@ -16,7 +16,7 @@ export interface ChatModel {
   path: string;
   has_modelfile: boolean;
   size?: number;
-  ollama_model_name: string; // Make this required (remove ?)
+  ollama_model_name: string;
 }
 
 export const useModelSelection = () => {
@@ -40,7 +40,7 @@ export const useModelSelection = () => {
             filename: "",
             path: "",
             has_modelfile: false,
-            ollama_model_name: "", // Add required field
+            ollama_model_name: "",
           },
         ]);
         setSelectedModel("no-models");
@@ -68,7 +68,7 @@ export const useModelSelection = () => {
           filename: "",
           path: "",
           has_modelfile: false,
-          ollama_model_name: "", // Add required field
+          ollama_model_name: "",
         },
       ]);
       setSelectedModel("error");
