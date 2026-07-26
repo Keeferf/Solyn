@@ -5,6 +5,7 @@ use tokio::sync::Mutex;
 
 use super::contracts::*;
 use crate::core::ollama::chat::{OllamaChatClient, ChatMessage, ChatOptions, ChatEvent};
+use crate::core::ollama::models::OllamaModelClient;
 
 pub fn init_chat_state(app: &tauri::App) {
     let ollama_state = OllamaState {
@@ -53,6 +54,19 @@ pub async fn send_chat_stream(
     let state = app_handle.state::<Arc<Mutex<OllamaState>>>();
     let state = state.lock().await;
     
+    // First, check if the model exists in Ollama
+    let model_client = OllamaModelClient::new();
+    let model_exists = model_client.model_exists(&request.model).await?;
+    
+    if !model_exists {
+        let error_msg = format!("Model '{}' not found in Ollama. Please ensure the model is properly installed.", request.model);
+        println!("❌ {}", error_msg);
+        let _ = window.emit("chat-stream-error", json!({ "error": error_msg }));
+        return Err(error_msg);
+    }
+    
+    println!("✅ Sending chat with model: {}", request.model);
+    
     let messages: Vec<ChatMessage> = request.messages
         .iter()
         .map(|m| ChatMessage {
@@ -68,12 +82,15 @@ pub async fn send_chat_stream(
         while let Some(event) = receiver.recv().await {
             match event {
                 ChatEvent::MessageChunk(chunk) => {
+                    // We now only get one chunk with the full response
                     let _ = window.emit("chat-stream-chunk", json!({ "chunk": chunk }));
                 }
                 ChatEvent::Done(response) => {
+                    println!("✅ Chat stream completed for model: {}", request.model);
                     let _ = window.emit("chat-stream-done", json!({ "response": response }));
                 }
                 ChatEvent::Error(error) => {
+                    println!("❌ Chat stream error: {}", error);
                     let _ = window.emit("chat-stream-error", json!({ "error": error }));
                 }
             }

@@ -3,6 +3,7 @@ use reqwest;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio_stream::StreamExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -74,7 +75,7 @@ impl OllamaChatClient {
         }
     }
 
-    /// Send a chat message (streaming)
+    /// Send a chat message (streaming) - Collects full response before sending
     pub async fn chat_stream(
         &self,
         model_name: &str,
@@ -93,7 +94,11 @@ impl OllamaChatClient {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let client = self.client.clone();
+        let model = model_name.to_string();
+        
         tokio::spawn(async move {
+            println!("📤 Starting chat stream for model: {}", model);
+            
             let response = client
                 .post(&url)
                 .json(&request)
@@ -104,34 +109,110 @@ impl OllamaChatClient {
             match response {
                 Ok(resp) => {
                     if !resp.status().is_success() {
-                        let _ = tx.send(ChatEvent::Error(format!("HTTP error: {}", resp.status())));
+                        let error_msg = format!("HTTP error: {}", resp.status());
+                        println!("❌ {}", error_msg);
+                        let _ = tx.send(ChatEvent::Error(error_msg));
                         return;
                     }
 
-                    match resp.text().await {
-                        Ok(text) => {
-                            for line in text.lines() {
-                                if line.is_empty() {
-                                    continue;
-                                }
-                                if let Ok(chunk) = serde_json::from_str::<ChatResponse>(line) {
-                                    if !chunk.message.content.is_empty() {
-                                        let _ = tx.send(ChatEvent::MessageChunk(chunk.message.content.clone()));
+                    // Get the stream
+                    let stream = resp.bytes_stream();
+                    let mut stream = Box::pin(stream);
+                    let mut buffer = String::new();
+                    let mut full_content = String::new(); // Collect full response
+                    let mut final_response: Option<ChatResponse> = None;
+                    
+                    while let Some(chunk_result) = stream.next().await {
+                        match chunk_result {
+                            Ok(bytes) => {
+                                if let Ok(text) = String::from_utf8(bytes.to_vec()) {
+                                    buffer.push_str(&text);
+                                    
+                                    // Process complete lines
+                                    let lines: Vec<String> = buffer
+                                        .lines()
+                                        .map(|s| s.to_string())
+                                        .collect();
+                                    
+                                    // Keep any incomplete line in buffer
+                                    if let Some(last_line) = lines.last() {
+                                        if !text.ends_with('\n') && !text.is_empty() {
+                                            buffer = last_line.clone();
+                                        } else {
+                                            buffer.clear();
+                                        }
                                     }
-                                    if chunk.done {
-                                        let _ = tx.send(ChatEvent::Done(chunk));
-                                        break;
+                                    
+                                    // Process complete lines
+                                    for line in lines.iter() {
+                                        if line.is_empty() {
+                                            continue;
+                                        }
+                                        if let Ok(chunk) = serde_json::from_str::<ChatResponse>(line) {
+                                            // Accumulate content
+                                            if !chunk.message.content.is_empty() {
+                                                full_content.push_str(&chunk.message.content);
+                                            }
+                                            
+                                            // Store the final response when done
+                                            if chunk.done {
+                                                final_response = Some(chunk);
+                                            }
+                                        } else {
+                                            // Try to parse as error response
+                                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                                                if let Some(error) = json.get("error").and_then(|e| e.as_str()) {
+                                                    println!("❌ Ollama error: {}", error);
+                                                    let _ = tx.send(ChatEvent::Error(error.to_string()));
+                                                    return;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
+                            Err(e) => {
+                                let error_msg = format!("Failed to read chunk: {}", e);
+                                println!("❌ {}", error_msg);
+                                let _ = tx.send(ChatEvent::Error(error_msg));
+                                return;
+                            }
                         }
-                        Err(e) => {
-                            let _ = tx.send(ChatEvent::Error(format!("Failed to read response: {}", e)));
-                        }
+                    }
+                    
+                    // After streaming is complete, send the full response
+                    if !full_content.is_empty() {
+                        println!("✅ Sending complete response for model: {}", model);
+                        let _ = tx.send(ChatEvent::MessageChunk(full_content.clone()));
+                    }
+                    
+                    // Send the done event with the complete response
+                    if let Some(mut chunk) = final_response {
+                        chunk.message.content = full_content;
+                        println!("✅ Chat stream completed for model: {}", model);
+                        let _ = tx.send(ChatEvent::Done(chunk));
+                    } else {
+                        // If we didn't get a proper done response, create one
+                        let done_response = ChatResponse {
+                            message: ChatMessage {
+                                role: "assistant".to_string(),
+                                content: full_content,
+                            },
+                            done: true,
+                            total_duration: None,
+                            load_duration: None,
+                            prompt_eval_count: None,
+                            prompt_eval_duration: None,
+                            eval_count: None,
+                            eval_duration: None,
+                        };
+                        let _ = tx.send(ChatEvent::Done(done_response));
                     }
                 }
                 Err(e) => {
-                    let _ = tx.send(ChatEvent::Error(format!("Request failed: {}", e)));
+                    let error_msg = format!("Request failed: {}", e);
+                    println!("❌ {}", error_msg);
+                    let _ = tx.send(ChatEvent::Error(error_msg));
                 }
             }
         });
@@ -155,6 +236,8 @@ impl OllamaChatClient {
             options,
         };
 
+        println!("📤 Sending sync chat request to model: {}", model_name);
+
         let response = self.client
             .post(&url)
             .json(&request)
@@ -167,6 +250,7 @@ impl OllamaChatClient {
             let chat_response: ChatResponse = response.json()
                 .await
                 .map_err(|e| format!("Failed to parse response: {}", e))?;
+            println!("✅ Sync chat completed for model: {}", model_name);
             Ok(chat_response)
         } else {
             let error_text = response.text().await.unwrap_or_default();

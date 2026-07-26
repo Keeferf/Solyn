@@ -35,9 +35,14 @@ export const ChatInterface = () => {
 
   const selectedModelData = getSelectedModelData();
 
+  // Debug logging
+  console.log("Selected Model Data:", selectedModelData);
+  console.log("Ollama Model Name:", selectedModelData?.ollama_model_name);
+
   const {
     messages,
     isLoading: isChatLoading,
+    isStreaming,
     error,
     isOllamaReady,
     sendMessage,
@@ -53,7 +58,17 @@ export const ChatInterface = () => {
   );
 
   const handleSubmit = async () => {
-    if (input.trim() && !isChatLoading && models.length > 0) {
+    console.log("Submit triggered. Input:", input.trim());
+    console.log("Chat loading:", isChatLoading);
+    console.log("Models:", models.length);
+    console.log("Selected model data:", selectedModelData);
+
+    if (
+      input.trim() &&
+      !isChatLoading &&
+      models.length > 0 &&
+      selectedModelData
+    ) {
       let message = input.trim();
 
       if (attachments.length > 0) {
@@ -65,6 +80,13 @@ export const ChatInterface = () => {
 
       resetInput();
       await sendMessage(message);
+    } else {
+      console.log("Submit blocked:", {
+        hasInput: !!input.trim(),
+        isChatLoading,
+        hasModels: models.length > 0,
+        hasSelectedModelData: !!selectedModelData,
+      });
     }
   };
 
@@ -83,19 +105,25 @@ export const ChatInterface = () => {
     models.length > 0 &&
     models[0].value !== "no-models" &&
     models[0].value !== "error";
+
   const isSubmitDisabled =
-    !input.trim() || isChatLoading || !hasValidModels || !isOllamaReady;
+    !input.trim() ||
+    isChatLoading ||
+    !hasValidModels ||
+    !isOllamaReady ||
+    !selectedModelData?.ollama_model_name;
 
   const attachmentCount = attachments.length;
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex flex-col h-full w-full relative">
+    <div className="w-full max-w-3xl mx-auto h-full flex flex-col">
       {hasMessages && (
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
           <ChatMessages
             messages={messages}
             isLoading={isChatLoading}
+            isStreaming={isStreaming}
             error={error}
             isOllamaReady={isOllamaReady}
           />
@@ -114,7 +142,7 @@ export const ChatInterface = () => {
             </p>
           </div>
 
-          <div className="w-full max-w-3xl">
+          <div className="w-full">
             <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
               <ChatInput
                 ref={textareaRef}
@@ -154,14 +182,16 @@ export const ChatInterface = () => {
                   ? "No models installed. Please download a model from the Hugging Face page."
                   : isModelsLoading
                     ? "Loading models..."
-                    : "Press Enter to send, Shift+Enter for new line"}
+                    : !selectedModelData?.ollama_model_name
+                      ? "Selected model is not registered with Ollama. Please reinstall."
+                      : "Press Enter to send, Shift+Enter for new line"}
             </div>
           </div>
         </div>
       )}
 
       {hasMessages && (
-        <div className="shrink-0 w-full">
+        <div className="shrink-0 w-full sticky bottom-0 bg-black/80 backdrop-blur-sm">
           {attachmentCount > 0 && (
             <div className="px-4 py-2 text-xs text-white/60 bg-white/5 border-t border-white/5">
               {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached
