@@ -52,9 +52,18 @@ export const ChatMessages = ({
               {isEmptyAssistant && isStreaming ? (
                 // Show loading animation while waiting for response
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce delay-100" />
-                  <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce delay-200" />
+                  <div
+                    className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  />
+                  <div
+                    className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                    style={{ animationDelay: "200ms" }}
+                  />
+                  <div
+                    className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                    style={{ animationDelay: "400ms" }}
+                  />
                 </div>
               ) : (
                 <div className="text-sm whitespace-pre-wrap">
@@ -70,9 +79,18 @@ export const ChatMessages = ({
         <div className="flex justify-start">
           <div className="bg-white/5 rounded-lg px-4 py-2">
             <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" />
-              <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce delay-100" />
-              <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce delay-200" />
+              <div
+                className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <div
+                className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                style={{ animationDelay: "200ms" }}
+              />
+              <div
+                className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
+                style={{ animationDelay: "400ms" }}
+              />
             </div>
           </div>
         </div>
