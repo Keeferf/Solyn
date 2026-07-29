@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ChatInterface } from "@/components/chat/ChatInterface";
+import { ChatHistoryInterface } from "@/components/chat/ChatHistoryInterface";
 import { ModelInterface } from "@/components/models/ModelInterface";
 import { OllamaProvider } from "@/contexts/OllamaContext";
 import { OllamaStatusChecker } from "@/contexts/OllamaStatusChecker";
 
-type View = "chat" | "models";
+type View = "chat" | "history" | "models";
 
 export const App = () => {
   const [currentView, setCurrentView] = useState<View>("chat");
@@ -14,6 +15,8 @@ export const App = () => {
     switch (currentView) {
       case "models":
         return <ModelInterface />;
+      case "history":
+        return <ChatHistoryInterface />;
       case "chat":
       default:
         return <ChatInterface />;

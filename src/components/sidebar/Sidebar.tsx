@@ -3,17 +3,34 @@ import { NAVIGATION_ITEMS, FOOTER_ITEMS } from "./SidebarNavigation";
 import { OllamaVersionIndicator } from "./OllamaVersionIndicator";
 
 interface SidebarProps {
-  onNavigate?: (view: "chat" | "models") => void;
-  currentView?: "chat" | "models";
+  onNavigate?: (view: "chat" | "history" | "models") => void;
+  currentView?: "chat" | "history" | "models";
 }
 
 export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
   const handleNavigation = (id: string) => {
     if (id === "models") {
       onNavigate?.("models");
-    } else if (id === "new-chat" || id === "chats" || id === "search") {
+    } else if (id === "chats") {
+      onNavigate?.("history");
+    } else if (id === "new-chat" || id === "search") {
       onNavigate?.("chat");
     }
+  };
+
+  // Determine which sidebar item should be active
+  const isItemActive = (itemId: string) => {
+    if (itemId === "models") {
+      return currentView === "models";
+    }
+    if (itemId === "chats") {
+      return currentView === "history";
+    }
+    // Only "new-chat" is active when in chat view
+    if (itemId === "new-chat") {
+      return currentView === "chat";
+    }
+    return false;
   };
 
   return (
@@ -32,12 +49,7 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
             key={item.id}
             icon={<item.icon size={20} />}
             label={item.label}
-            active={
-              (item.id === "models" && currentView === "models") ||
-              (item.id !== "models" &&
-                currentView === "chat" &&
-                item.id === "new-chat")
-            }
+            active={isItemActive(item.id)}
             onClick={() => handleNavigation(item.id)}
           />
         ))}

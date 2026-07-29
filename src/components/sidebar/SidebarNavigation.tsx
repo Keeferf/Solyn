@@ -1,4 +1,3 @@
-// src/components/sidebar/SidebarNavigation.tsx
 import {
   FiPlus,
   FiSearch,
