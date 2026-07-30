@@ -35,9 +35,9 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/10 flex flex-col p-4">
-      {/* Logo area */}
+      {/* Logo area - Updated gradient to use theme purple */}
       <div className="mb-8 px-3">
-        <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white bg-clip-text text-transparent">
+        <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
           Solyn
         </h2>
       </div>

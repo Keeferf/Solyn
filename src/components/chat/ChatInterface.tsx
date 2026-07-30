@@ -6,7 +6,7 @@ import { ChatMessages } from "./ChatMessages";
 import { useChatInput } from "./hooks/useChatInput";
 import { useFileAttachment } from "./hooks/useFileAttachment";
 import { useModelSelection } from "./hooks/useModelSelection";
-import { useChat, ChatSession } from "./hooks/useChat";
+import { useChat } from "./hooks/useChat";
 
 export type ModeType = "chat" | "agent";
 
@@ -48,7 +48,6 @@ export const ChatInterface = () => {
     isLoadingSessions,
     currentSessionId,
     sendMessage,
-    clearMessages,
     startNewChat,
     loadSessions,
     loadSession,
@@ -185,7 +184,7 @@ export const ChatInterface = () => {
                   startNewChat();
                   setShowHistory(false);
                 }}
-                className="w-full text-left px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                className="w-full text-left px-3 py-2 text-sm bg-purple-accent hover:bg-purple-accent/80 text-white rounded-lg transition-colors"
               >
                 + New Chat
               </button>
@@ -263,7 +262,8 @@ export const ChatInterface = () => {
       {!hasMessages && (
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center mb-8">
-            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-gradient-to-r from-purple-400 to-white bg-clip-text text-transparent">
+            {/* Updated to use theme gradient with consistent styling */}
+            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
               Solyn
             </h1>
             <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
