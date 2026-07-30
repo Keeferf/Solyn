@@ -64,9 +64,15 @@ pub fn run() {
             api::models::commands::generate_modelfile,
             api::models::commands::create_ollama_model,
             api::models::commands::delete_ollama_model,
-
             api::models::commands::debug_ollama_models,
             api::models::commands::test_chat_with_model,
+            
+            // Chat history commands
+            api::chat::commands::create_chat_session,
+            api::chat::commands::get_chat_sessions,
+            api::chat::commands::get_chat_session,
+            api::chat::commands::delete_chat_session,
+            api::chat::commands::update_chat_session_title,
             
             // Chat commands
             api::chat::commands::send_chat_message,

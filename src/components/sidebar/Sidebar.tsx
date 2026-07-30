@@ -3,24 +3,41 @@ import { NAVIGATION_ITEMS, FOOTER_ITEMS } from "./SidebarNavigation";
 import { OllamaVersionIndicator } from "./OllamaVersionIndicator";
 
 interface SidebarProps {
-  onNavigate?: (view: "chat" | "models") => void;
-  currentView?: "chat" | "models";
+  onNavigate?: (view: "chat" | "history" | "models") => void;
+  currentView?: "chat" | "history" | "models";
 }
 
 export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
   const handleNavigation = (id: string) => {
     if (id === "models") {
       onNavigate?.("models");
-    } else if (id === "new-chat" || id === "chats" || id === "search") {
+    } else if (id === "chats") {
+      onNavigate?.("history");
+    } else if (id === "new-chat" || id === "search") {
       onNavigate?.("chat");
     }
   };
 
+  // Determine which sidebar item should be active
+  const isItemActive = (itemId: string) => {
+    if (itemId === "models") {
+      return currentView === "models";
+    }
+    if (itemId === "chats") {
+      return currentView === "history";
+    }
+    // Only "new-chat" is active when in chat view
+    if (itemId === "new-chat") {
+      return currentView === "chat";
+    }
+    return false;
+  };
+
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/10 flex flex-col p-4">
-      {/* Logo area */}
+      {/* Logo area - Updated gradient to use theme purple */}
       <div className="mb-8 px-3">
-        <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white bg-clip-text text-transparent">
+        <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
           Solyn
         </h2>
       </div>
@@ -32,12 +49,7 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
             key={item.id}
             icon={<item.icon size={20} />}
             label={item.label}
-            active={
-              (item.id === "models" && currentView === "models") ||
-              (item.id !== "models" &&
-                currentView === "chat" &&
-                item.id === "new-chat")
-            }
+            active={isItemActive(item.id)}
             onClick={() => handleNavigation(item.id)}
           />
         ))}
