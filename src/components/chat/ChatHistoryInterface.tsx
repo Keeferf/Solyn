@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FiSearch, FiMessageSquare, FiClock } from "react-icons/fi";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 
 interface ChatSession {
   id: number;
@@ -126,7 +127,7 @@ const DropdownMenu = ({
           onPin();
           onClose();
         }}
-        className="w-full px-4 py-2 text-left text-white/80 hover:bg-white/10 transition-colors text-sm"
+        className="w-full px-4 py-2 text-left text-white/80 hover:bg-white/10 transition-colors text-sm cursor-pointer"
       >
         Pin Conversation
       </button>
@@ -135,7 +136,7 @@ const DropdownMenu = ({
           onRename();
           onClose();
         }}
-        className="w-full px-4 py-2 text-left text-white/80 hover:bg-white/10 transition-colors text-sm"
+        className="w-full px-4 py-2 text-left text-white/80 hover:bg-white/10 transition-colors text-sm cursor-pointer"
       >
         Rename
       </button>
@@ -144,7 +145,7 @@ const DropdownMenu = ({
           onDelete();
           onClose();
         }}
-        className="w-full px-4 py-2 text-left text-error hover:bg-error-bg transition-colors text-sm border-t border-white/5"
+        className="w-full px-4 py-2 text-left text-error hover:bg-error-bg transition-colors text-sm border-t border-white/5 cursor-pointer"
       >
         Delete
       </button>
@@ -203,7 +204,6 @@ const ChatItem = ({
 
   const handleDelete = () => {
     onDelete(chat.id);
-    console.log(`Delete chat ${chat.id}`);
   };
 
   return (
@@ -270,6 +270,17 @@ export const ChatHistoryInterface = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // State for confirmation modal
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    chatId: number | null;
+    chatTitle: string;
+  }>({
+    isOpen: false,
+    chatId: null,
+    chatTitle: "",
+  });
 
   useEffect(() => {
     loadChats();
@@ -341,18 +352,45 @@ export const ChatHistoryInterface = () => {
     console.log(`Renaming chat ${chatId}`);
   };
 
-  const handleDelete = async (chatId: number) => {
-    // TODO: Implement delete functionality with confirmation
-    console.log(`Deleting chat ${chatId}`);
-    // Remove from UI optimistically
-    setChats(chats.filter((chat) => chat.id !== chatId));
-    setChatPreviews((prev) => {
-      const newMap = new Map(prev);
-      newMap.delete(chatId);
-      return newMap;
+  // Show confirmation modal instead of native confirm
+  const handleDelete = (chatId: number) => {
+    const preview = chatPreviews.get(chatId) || "Untitled";
+    const chatTitle =
+      preview.length > 30 ? preview.slice(0, 30) + "..." : preview;
+
+    setConfirmModal({
+      isOpen: true,
+      chatId: chatId,
+      chatTitle: chatTitle,
     });
-    if (selectedChat === chatId) {
-      setSelectedChat(null);
+  };
+
+  // Actual deletion function
+  const performDelete = async () => {
+    const chatId = confirmModal.chatId;
+    if (chatId === null) return;
+
+    try {
+      await invoke("delete_chat_session", { sessionId: chatId });
+
+      // Remove from UI after successful deletion
+      setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId));
+      setChatPreviews((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(chatId);
+        return newMap;
+      });
+      if (selectedChat === chatId) {
+        setSelectedChat(null);
+      }
+
+      console.log(`✅ Chat ${chatId} deleted successfully`);
+    } catch (error) {
+      console.error("Failed to delete chat:", error);
+      // Show error to user
+      alert("Failed to delete conversation. Please try again.");
+    } finally {
+      setConfirmModal({ isOpen: false, chatId: null, chatTitle: "" });
     }
   };
 
@@ -387,74 +425,90 @@ export const ChatHistoryInterface = () => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full max-w-6xl mx-auto">
-      {/* Header with padding - Updated to use theme gradient */}
-      <div className="px-4 pt-8 pb-4">
-        <h1 className="text-4xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent mb-2">
-          Chat History
-        </h1>
+    <>
+      <div className="flex flex-col h-full w-full max-w-6xl mx-auto">
+        {/* Header with padding - Updated to use theme gradient */}
+        <div className="px-4 pt-8 pb-4">
+          <h1 className="text-4xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent mb-2">
+            Chat History
+          </h1>
+        </div>
+
+        {/* Search Bar with padding */}
+        <div className="px-4 pb-4">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-10 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-purple-accent/50 transition-colors"
+            />
+          </div>
+        </div>
+
+        {/* Chat List with proper spacing */}
+        {filteredChats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-white/40 px-4">
+            <FiMessageSquare className="w-12 h-12 mb-4 opacity-30" />
+            <p className="text-lg font-medium">No conversations found</p>
+            <p className="text-sm">
+              {searchTerm
+                ? "Try adjusting your search"
+                : "Start a new conversation to get started"}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col flex-1 overflow-y-auto pb-4">
+            {filteredChats.map((chat) => {
+              const preview = chatPreviews.get(chat.id) || "No messages yet";
+              return (
+                <ChatItem
+                  key={chat.id}
+                  chat={chat}
+                  preview={preview}
+                  isSelected={selectedChat === chat.id}
+                  onSelect={handleSelectChat}
+                  onPin={handlePin}
+                  onRename={handleRename}
+                  onDelete={handleDelete}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* Stats Footer with padding */}
+        {chats.length > 0 && (
+          <div className="px-4 pt-4 pb-8 border-t border-white/10 text-white/30 text-xs flex justify-between">
+            <span>Total: {chats.length} conversations</span>
+            <span>
+              Showing {filteredChats.length} of {chats.length}
+            </span>
+            <button
+              onClick={loadChats}
+              className="text-white/40 hover:text-white/70 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Search Bar with padding */}
-      <div className="px-4 pb-4">
-        <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4" />
-          <input
-            type="text"
-            placeholder="Search conversations..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-10 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-purple-accent/50 transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Chat List with proper spacing */}
-      {filteredChats.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-white/40 px-4">
-          <FiMessageSquare className="w-12 h-12 mb-4 opacity-30" />
-          <p className="text-lg font-medium">No conversations found</p>
-          <p className="text-sm">
-            {searchTerm
-              ? "Try adjusting your search"
-              : "Start a new conversation to get started"}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col flex-1 overflow-y-auto pb-4">
-          {filteredChats.map((chat) => {
-            const preview = chatPreviews.get(chat.id) || "No messages yet";
-            return (
-              <ChatItem
-                key={chat.id}
-                chat={chat}
-                preview={preview}
-                isSelected={selectedChat === chat.id}
-                onSelect={handleSelectChat}
-                onPin={handlePin}
-                onRename={handleRename}
-                onDelete={handleDelete}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Stats Footer with padding */}
-      {chats.length > 0 && (
-        <div className="px-4 pt-4 pb-8 border-t border-white/10 text-white/30 text-xs flex justify-between">
-          <span>Total: {chats.length} conversations</span>
-          <span>
-            Showing {filteredChats.length} of {chats.length}
-          </span>
-          <button
-            onClick={loadChats}
-            className="text-white/40 hover:text-white/70 transition-colors"
-          >
-            Refresh
-          </button>
-        </div>
-      )}
-    </div>
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() =>
+          setConfirmModal({ isOpen: false, chatId: null, chatTitle: "" })
+        }
+        onConfirm={performDelete}
+        title="Delete Conversation"
+        message="Are you sure you want to delete? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
+    </>
   );
 };
