@@ -32,14 +32,14 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/10 flex flex-col p-4">
-      <div className="mb-8 px-3">
+    <aside className="fixed left-0 top-10 h-[calc(100vh-40px)] w-64 bg-black border-r border-white/10 flex flex-col p-4 z-30">
+      <div className="mb-6 px-3">
         <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
           Solyn
         </h2>
       </div>
 
-      <nav className="flex-1 space-y-1">
+      <nav className="flex-1 space-y-1 overflow-y-auto">
         {NAVIGATION_ITEMS.map((item) => (
           <SidebarItem
             key={item.id}
@@ -49,6 +49,7 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
             onClick={() => handleNavigation(item.id)}
           />
         ))}
+
         <div className="pt-4 mt-4 border-t border-white/10">
           {FOOTER_ITEMS.map((item) => (
             <SidebarItem

@@ -5,6 +5,7 @@ import { ChatHistoryInterface } from "@/components/history/ChatHistoryInterface"
 import { ModelInterface } from "@/components/models/ModelInterface";
 import { OllamaProvider } from "@/contexts/OllamaContext";
 import { OllamaStatusChecker } from "@/contexts/OllamaStatusChecker";
+import { TitleBar } from "@/components/ui/TitleBar";
 
 type View = "chat" | "history" | "models";
 
@@ -26,10 +27,16 @@ export const App = () => {
   return (
     <OllamaProvider>
       <OllamaStatusChecker>
-        <div className="flex min-h-screen bg-black">
+        <div className="min-h-screen bg-black">
+          <TitleBar />
           <Sidebar onNavigate={setCurrentView} currentView={currentView} />
-          <main className="flex-1 ml-64 min-h-screen flex items-center justify-center p-4">
-            {renderContent()}
+          <main className="ml-64 pt-10 min-h-screen" data-tauri-drag-region>
+            <div
+              className="p-4 h-[calc(100vh-40px)] overflow-y-auto"
+              data-tauri-drag-region="false"
+            >
+              {renderContent()}
+            </div>
           </main>
         </div>
       </OllamaStatusChecker>
