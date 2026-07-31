@@ -89,7 +89,6 @@ export const MarkdownMessage = ({
             const lang = match ? match[1] : "";
             const codeContent = String(children).replace(/\n$/, "");
 
-            // Check if this is inline code by looking at the parent node
             // @ts-ignore - ReactMarkdown passes this internally
             const isInline = props.inline || false;
 
@@ -100,11 +99,13 @@ export const MarkdownMessage = ({
                   {children}
                 </code>
               ) : (
-                <pre className={className}>
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                </pre>
+                <div className="shiki-container shiki-container-fallback">
+                  <pre className={className}>
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                </div>
               );
             }
 
@@ -115,6 +116,7 @@ export const MarkdownMessage = ({
                 theme: "github-dark",
               });
 
+              // Return just the Shiki container without the outer pre wrapper
               return (
                 <div
                   className="shiki-container"
@@ -128,11 +130,13 @@ export const MarkdownMessage = ({
                 error,
               );
               return (
-                <pre className={className}>
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                </pre>
+                <div className="shiki-container shiki-container-fallback">
+                  <pre className={className}>
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                </div>
               );
             }
           },

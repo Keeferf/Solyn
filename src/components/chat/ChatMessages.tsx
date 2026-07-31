@@ -32,7 +32,7 @@ export const ChatMessages = ({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
       {messages.map((message, index) => {
         const isEmptyAssistant =
           index === messages.length - 1 &&
@@ -47,16 +47,18 @@ export const ChatMessages = ({
             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`rounded-lg px-4 py-2 ${
+              className={`${
                 isUser
-                  ? "max-w-[85%] bg-purple-accent text-white"
-                  : "w-full bg-white/10 text-white/90 border border-white/10"
+                  ? "max-w-[85%] rounded-2xl px-4 py-3 bg-purple-accent text-white"
+                  : "w-full max-w-4xl"
               }`}
             >
               {isUser ? (
-                <MarkdownMessage content={message.content} isUser={isUser} />
+                <div className="text-sm whitespace-pre-wrap">
+                  {message.content}
+                </div>
               ) : (
-                <div className="max-w-4xl mx-auto">
+                <div>
                   {isEmptyAssistant && isStreaming ? (
                     <div className="flex space-x-1">
                       <div
@@ -87,22 +89,20 @@ export const ChatMessages = ({
 
       {isLoading && !isStreaming && messages.length > 0 && (
         <div className="flex justify-start">
-          <div className="bg-white/10 rounded-lg px-4 py-2 border border-white/10 w-full">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex space-x-1">
-                <div
-                  className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <div
-                  className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                  style={{ animationDelay: "200ms" }}
-                />
-                <div
-                  className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                  style={{ animationDelay: "400ms" }}
-                />
-              </div>
+          <div className="w-full max-w-4xl">
+            <div className="flex space-x-1">
+              <div
+                className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <div
+                className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                style={{ animationDelay: "200ms" }}
+              />
+              <div
+                className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                style={{ animationDelay: "400ms" }}
+              />
             </div>
           </div>
         </div>

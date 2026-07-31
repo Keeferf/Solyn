@@ -112,19 +112,19 @@
   margin: 1em 0;
   border-radius: 0.75rem;
   overflow: hidden;
-  border: 1px solid #2a2a3a;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   position: relative;
+  background: #1e1e2e !important; /* Dark purple background */
 }
 
 .shiki-container pre {
-  background: #1e1e2e !important;
+  background: transparent !important; /* Remove duplicate background */
   padding: 1.25em !important;
   margin: 0 !important;
   overflow-x: auto;
   font-family: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
   font-size: 0.875em;
   line-height: 1.6;
+  border-radius: 0; /* Remove border-radius since parent has it */
 }
 
 /* Language label for Shiki code blocks */
@@ -145,17 +145,23 @@
   pointer-events: none;
 }
 
-/* Fallback code block styles (when Shiki fails) */
-.markdown-content pre:not(.shiki-container pre) {
-  background: #1f2937;
-  padding: 1em;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  margin: 0.5em 0;
-  border: 1px solid #374151;
+/* Fallback code block styles (when Shiki fails or hasn't loaded) */
+.shiki-container-fallback {
+  background: #1f2937 !important;
 }
 
-.markdown-content pre:not(.shiki-container pre) code {
+.shiki-container-fallback pre {
+  background: transparent !important;
+  padding: 1.25em !important;
+  margin: 0 !important;
+  overflow-x: auto;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 0.875em;
+  line-height: 1.6;
+  border-radius: 0;
+}
+
+.shiki-container-fallback pre code {
   background: transparent;
   padding: 0;
   border-radius: 0;
