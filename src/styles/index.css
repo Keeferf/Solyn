@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Import your other stylesheets */
+@import './markdown.css';
+@import './animations.css';
+
 @theme {
   /* Base Colors */
   --color-white: #d8d4cf;
@@ -42,14 +46,14 @@
   }
 }
 
-/* Transitions */
+/* ===== GLOBAL TRANSITIONS ===== */
 * {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
 
-/* Scrollbar */
+/* ===== SCROLLBAR STYLES ===== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -67,70 +71,4 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-purple-accent);
   opacity: 0.8;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px) scale(0.98);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes slideDown {
-  from {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(20px) scale(0.98);
-    opacity: 0;
-  }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-/* Animation Utilities */
-.animate-fadeIn {
-  animation: fadeIn 0.25s ease-out;
-}
-
-.animate-slideUp {
-  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.animate-slideDown {
-  animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.animate-pulse-slow {
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.05) 0%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.05) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./hooks/useChat";
+import { MarkdownMessage } from "./MarkdownMessage";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -31,45 +32,54 @@ export const ChatMessages = ({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
       {messages.map((message, index) => {
         const isEmptyAssistant =
           index === messages.length - 1 &&
           message.role === "assistant" &&
           message.content === "";
 
+        const isUser = message.role === "user";
+
         return (
           <div
             key={index}
-            className={`flex ${
-              message.role === "user" ? "justify-end" : "justify-start"
-            }`}
+            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                message.role === "user"
-                  ? "bg-purple-accent text-white"
-                  : "bg-white/10 text-white/90 border border-white/10"
+              className={`${
+                isUser
+                  ? "max-w-[85%] rounded-2xl px-4 py-3 bg-purple-accent text-white"
+                  : "w-full max-w-4xl"
               }`}
             >
-              {isEmptyAssistant && isStreaming ? (
-                <div className="flex space-x-1">
-                  <div
-                    className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <div
-                    className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                    style={{ animationDelay: "200ms" }}
-                  />
-                  <div
-                    className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                    style={{ animationDelay: "400ms" }}
-                  />
+              {isUser ? (
+                <div className="text-sm whitespace-pre-wrap">
+                  {message.content}
                 </div>
               ) : (
-                <div className="text-sm whitespace-pre-wrap wrap-break-word">
-                  {message.content}
+                <div>
+                  {isEmptyAssistant && isStreaming ? (
+                    <div className="flex space-x-1">
+                      <div
+                        className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "200ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "400ms" }}
+                      />
+                    </div>
+                  ) : (
+                    <MarkdownMessage
+                      content={message.content}
+                      isUser={isUser}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -79,7 +89,7 @@ export const ChatMessages = ({
 
       {isLoading && !isStreaming && messages.length > 0 && (
         <div className="flex justify-start">
-          <div className="bg-white/10 rounded-lg px-4 py-2 border border-white/10">
+          <div className="w-full max-w-4xl">
             <div className="flex space-x-1">
               <div
                 className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"

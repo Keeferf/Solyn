@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FiX, FiPlus, FiEdit2, FiTrash2, FiFolder } from "react-icons/fi";
+import { FiX, FiPlus, FiEdit2, FiTrash2 } from "react-icons/fi";
 import { ChatInput } from "./ChatInput";
 import { ChatControls } from "./ChatControls";
 import { ChatMessages } from "./ChatMessages";
@@ -349,20 +349,8 @@ export const ChatInterface = () => {
             />
           </div>
 
-          <div className="flex justify-between items-center mt-3 px-1">
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1.5"
-            >
-              <FiFolder size={14} />
-              {showHistory ? "Hide History" : "Show History"}
-              {sessions.length > 0 && !showHistory && (
-                <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded-full text-[10px]">
-                  {sessions.length}
-                </span>
-              )}
-            </button>
-
+          {/* Only show the keyboard shortcut hint, no history button */}
+          <div className="flex justify-center mt-3 px-1">
             <div className="text-xs text-white/30">
               Press Enter to send, Shift+Enter for new line
             </div>
