@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ChatInterface } from "@/components/chat/ChatInterface";
-import { ChatHistoryInterface } from "@/components/chat/ChatHistoryInterface";
+import { ChatHistoryInterface } from "@/components/history/ChatHistoryInterface";
 import { ModelInterface } from "@/components/models/ModelInterface";
 import { OllamaProvider } from "@/contexts/OllamaContext";
 import { OllamaStatusChecker } from "@/contexts/OllamaStatusChecker";
