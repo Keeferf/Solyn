@@ -9,12 +9,10 @@ export const OllamaVersionIndicator = () => {
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  // Check for updates when Ollama is running
   useEffect(() => {
     if (status?.running && status?.version) {
       checkForUpdates(status.version);
     } else {
-      // Reset when Ollama stops
       setIsOutdated(false);
     }
   }, [status?.running, status?.version]);
@@ -25,7 +23,6 @@ export const OllamaVersionIndicator = () => {
     setChecking(true);
 
     try {
-      // Check latest version from Ollama's GitHub API
       const response = await fetch(
         "https://api.github.com/repos/ollama/ollama/releases/latest",
       );
@@ -37,7 +34,6 @@ export const OllamaVersionIndicator = () => {
       const data = await response.json();
       const latest = data.tag_name.replace("v", "");
 
-      // Compare versions
       const isOutdated = compareVersions(currentVersion, latest) < 0;
 
       setIsOutdated(isOutdated);
@@ -49,7 +45,6 @@ export const OllamaVersionIndicator = () => {
     }
   };
 
-  // Simple semver comparison
   const compareVersions = (v1: string, v2: string): number => {
     const parts1 = v1.split(".").map(Number);
     const parts2 = v2.split(".").map(Number);
@@ -72,15 +67,11 @@ export const OllamaVersionIndicator = () => {
     setUpdating(true);
 
     try {
-      // Call the update_ollama command
       await invoke("update_ollama");
 
-      // Refresh status after update
       await refreshOllamaStatus();
 
-      // Check if update was successful
       if (status?.version) {
-        // Re-check for updates with new version
         await checkForUpdates(status.version);
       }
     } catch (error) {
@@ -90,7 +81,6 @@ export const OllamaVersionIndicator = () => {
     }
   };
 
-  // Only show if Ollama is installed, running, and an update is available
   if (!status?.installed || !status?.running || !isOutdated) {
     return null;
   }
