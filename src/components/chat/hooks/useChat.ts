@@ -1,4 +1,3 @@
-// src/components/chat/hooks/useChat.ts
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
@@ -49,7 +48,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
   const { isReady } = useOllama();
   const isOllamaReady = isReady;
 
-  // Load all sessions
   const loadSessions = useCallback(async () => {
     setIsLoadingSessions(true);
     try {
@@ -62,7 +60,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     }
   }, []);
 
-  // Load a specific session with messages
   const loadSession = useCallback(async (sessionId: number) => {
     setIsLoading(true);
     try {
@@ -71,7 +68,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
         { sessionId },
       );
       if (result) {
-        // Convert stored messages to chat messages
         const chatMessages: ChatMessage[] = result.messages.map((m) => ({
           role: m.role as "user" | "assistant" | "system",
           content: m.content,
@@ -88,7 +84,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     }
   }, []);
 
-  // Create a new session
   const createSession = useCallback(
     async (modelName: string, title?: string) => {
       try {
@@ -108,7 +103,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     [loadSessions],
   );
 
-  // Delete a session
   const deleteSession = useCallback(
     async (sessionId: number) => {
       try {
@@ -126,7 +120,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     [currentSessionId, loadSessions],
   );
 
-  // Update session title
   const updateSessionTitle = useCallback(
     async (sessionId: number, title: string) => {
       try {
@@ -140,7 +133,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     [loadSessions],
   );
 
-  // Send message with session support
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading || !modelData) {
       console.log("Cannot send message:", {
@@ -169,7 +161,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     setIsLoading(true);
     setIsStreaming(true);
 
-    // If no session exists, create one
     let sessionId = currentSessionId;
     if (!sessionId) {
       try {
@@ -183,10 +174,8 @@ export const useChat = (modelData: ChatModelData | undefined) => {
       }
     }
 
-    // Add user message
     setMessages((prev) => [...prev, { role: "user", content: content.trim() }]);
 
-    // Add placeholder assistant message
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     try {
@@ -199,11 +188,10 @@ export const useChat = (modelData: ChatModelData | undefined) => {
         request: {
           model: modelData.ollama_model_name,
           messages: chatHistory,
-          session_id: sessionId, // Pass session ID to save messages
+          session_id: sessionId,
         },
       });
 
-      // Reload sessions to update the list
       await loadSessions();
     } catch (err) {
       console.error("Error sending message:", err);
@@ -211,7 +199,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
       setIsLoading(false);
       setIsStreaming(false);
 
-      // Remove the empty assistant message on error
       setMessages((prev) => {
         const updated = [...prev];
         if (
@@ -231,19 +218,15 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     setCurrentSessionId(null);
   }, []);
 
-  // Start new chat without clearing sessions
   const startNewChat = useCallback(async () => {
     setMessages([]);
     setError(null);
     setCurrentSessionId(null);
-    // Don't clear sessions, just start a new conversation
   }, []);
 
-  // Setup event listeners
   useEffect(() => {
     const setupListeners = async () => {
       try {
-        // Clean up any existing listeners
         unlistenRefs.current.forEach((unlisten) => {
           try {
             unlisten();
@@ -255,7 +238,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
 
         console.log("Setting up chat event listeners...");
 
-        // Listen for the complete response (only one chunk with full content)
         const unlistenChunk = await listen<{ chunk: string }>(
           "chat-stream-chunk",
           (event) => {
@@ -265,7 +247,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
               fullContent.length,
             );
 
-            // Update the last message with the complete content
             setMessages((prev) => {
               const updated = [...prev];
               const lastIndex = updated.length - 1;
@@ -281,7 +262,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
         );
         unlistenRefs.current.push(unlistenChunk);
 
-        // Listen for done events
         const unlistenDone = await listen("chat-stream-done", () => {
           console.log("Chat stream completed");
           setIsLoading(false);
@@ -289,7 +269,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
         });
         unlistenRefs.current.push(unlistenDone);
 
-        // Listen for error events
         const unlistenError = await listen<{ error: string }>(
           "chat-stream-error",
           (event) => {
@@ -311,7 +290,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     setupListeners();
     loadSessions();
 
-    // Cleanup function
     return () => {
       console.log("Cleaning up chat event listeners...");
       unlistenRefs.current.forEach((unlisten) => {

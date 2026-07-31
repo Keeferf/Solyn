@@ -72,11 +72,9 @@ export const ModelSelector = ({
               if (modelVariants.length > 1) {
                 return (
                   <div key={modelId}>
-                    {/* Model name header */}
                     <div className="px-3 py-1 text-[10px] text-white/30 uppercase tracking-wider border-b border-white/5">
                       {modelVariants[0].name || modelVariants[0].author}
                     </div>
-                    {/* Each quantization variant */}
                     {modelVariants.map((model) => {
                       const isSelected = selectedModel === model.value;
                       return (

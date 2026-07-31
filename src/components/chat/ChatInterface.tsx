@@ -1,4 +1,3 @@
-// src/components/chat/ChatInterface.tsx
 import { useState, useEffect } from "react";
 import { ChatInput } from "./ChatInput";
 import { ChatControls } from "./ChatControls";
@@ -63,17 +62,11 @@ export const ChatInterface = () => {
       : undefined,
   );
 
-  // Load sessions when component mounts
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
 
   const handleSubmit = async () => {
-    console.log("Submit triggered. Input:", input.trim());
-    console.log("Chat loading:", isChatLoading);
-    console.log("Models:", models.length);
-    console.log("Selected model data:", selectedModelData);
-
     if (
       input.trim() &&
       !isChatLoading &&
@@ -83,7 +76,6 @@ export const ChatInterface = () => {
       let message = input.trim();
 
       if (attachments.length > 0) {
-        console.log("Attachments:", attachments);
         const attachmentNames = attachments.map((f) => f.name).join(", ");
         message = `${message}\n\n[Attachments: ${attachmentNames}]`;
         clearAttachments();
@@ -91,13 +83,6 @@ export const ChatInterface = () => {
 
       resetInput();
       await sendMessage(message);
-    } else {
-      console.log("Submit blocked:", {
-        hasInput: !!input.trim(),
-        isChatLoading,
-        hasModels: models.length > 0,
-        hasSelectedModelData: !!selectedModelData,
-      });
     }
   };
 
@@ -162,7 +147,6 @@ export const ChatInterface = () => {
 
   return (
     <div className="w-full max-w-3xl mx-auto h-full flex flex-col relative">
-      {/* Session History Sidebar */}
       {showHistory && (
         <div className="absolute left-0 top-0 bottom-0 w-72 bg-gray-900 border-r border-gray-700 rounded-l-2xl z-10 overflow-y-auto p-4">
           <div className="flex justify-between items-center mb-4">
@@ -218,7 +202,6 @@ export const ChatInterface = () => {
                           handleRenameSession(session.id);
                         }}
                         className="text-gray-500 hover:text-gray-300 text-xs p-1"
-                        title="Rename"
                       >
                         ✏️
                       </button>
@@ -228,7 +211,6 @@ export const ChatInterface = () => {
                           handleDeleteSession(session.id);
                         }}
                         className="text-gray-500 hover:text-red-400 text-xs p-1"
-                        title="Delete"
                       >
                         🗑️
                       </button>
@@ -262,7 +244,6 @@ export const ChatInterface = () => {
       {!hasMessages && (
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center mb-8">
-            {/* Updated to use theme gradient with consistent styling */}
             <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
               Solyn
             </h1>

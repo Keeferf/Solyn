@@ -15,7 +15,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onChange={onChange}
         onKeyDown={onKeyDown}
         placeholder="Message Solyn..."
-        className="w-full bg-transparent text-white placeholder-white/40 resize-none p-4 pr-32 min-h-[52px] max-h-[200px] outline-none rounded-2xl"
+        className="w-full bg-transparent text-white placeholder-white/40 resize-none p-4 pr-32 min-h-13 max-h-50 outline-none rounded-2xl"
         style={{
           scrollbarWidth: "thin",
           scrollbarColor: "rgba(255,255,255,0.2) transparent",

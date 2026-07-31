@@ -50,7 +50,6 @@ export const ChatControls = ({
 }: ChatControlsProps) => {
   return (
     <div className="flex items-center justify-between p-2 border-t border-white/5">
-      {/* Left side - Attachment, Search, and Code toggles */}
       <div className="flex items-center gap-1">
         <ToggleButton
           isActive={isAttachmentEnabled}
@@ -76,7 +75,6 @@ export const ChatControls = ({
         />
       </div>
 
-      {/* Right side - Model select + Mode toggle + Submit */}
       <div className="flex items-center gap-2">
         <ModelSelector
           selectedModel={selectedModel}

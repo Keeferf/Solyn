@@ -1,4 +1,3 @@
-// src/components/chat/ChatMessages.tsx
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./hooks/useChat";
 
@@ -34,7 +33,6 @@ export const ChatMessages = ({
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {messages.map((message, index) => {
-        // Check if this is the last message and it's an empty assistant message
         const isEmptyAssistant =
           index === messages.length - 1 &&
           message.role === "assistant" &&
@@ -55,7 +53,6 @@ export const ChatMessages = ({
               }`}
             >
               {isEmptyAssistant && isStreaming ? (
-                // Show loading animation while waiting for response
                 <div className="flex space-x-1">
                   <div
                     className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"

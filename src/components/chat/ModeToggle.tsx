@@ -22,7 +22,6 @@ export const ModeToggle = ({ mode, onToggle }: ModeToggleProps) => {
         }
       }}
     >
-      {/* Sliding background */}
       <div
         className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-md transition-all duration-300 ease-in-out ${
           isChat ? "right-0.5" : "left-0.5"
@@ -32,18 +31,16 @@ export const ModeToggle = ({ mode, onToggle }: ModeToggleProps) => {
         }}
       />
 
-      {/* Agent label - left */}
       <span
-        className={`relative z-10 w-[46px] text-xs font-medium rounded transition-colors duration-200 flex items-center justify-center h-full ${
+        className={`relative z-10 w-11.5 text-xs font-medium rounded transition-colors duration-200 flex items-center justify-center h-full ${
           !isChat ? "text-white" : "text-white/60 hover:text-white/80"
         }`}
       >
         Agent
       </span>
 
-      {/* Chat label - right */}
       <span
-        className={`relative z-10 w-[46px] text-xs font-medium rounded transition-colors duration-200 flex items-center justify-center h-full ${
+        className={`relative z-10 w-11.5 text-xs font-medium rounded transition-colors duration-200 flex items-center justify-center h-full ${
           isChat ? "text-white" : "text-white/60 hover:text-white/80"
         }`}
       >
