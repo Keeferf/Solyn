@@ -18,3 +18,7 @@ export interface ChatSessionWithMessages {
   session: ChatSession;
   messages: ChatMessage[];
 }
+
+export interface ChatItemWithSelection extends ChatSession {
+  selected?: boolean;
+}
