@@ -30,7 +30,6 @@ const defaultFilterOptions = [
   { value: "recent", label: "Recent", icon: FiClock },
 ];
 
-// Minimum characters required before triggering a search
 const MIN_SEARCH_CHARS = 3;
 
 export const ModelToolbar = ({
@@ -44,28 +43,20 @@ export const ModelToolbar = ({
   placeholder = "Search models by name, author, or description...",
   filterOptions = defaultFilterOptions,
 }: ModelToolbarProps) => {
-  // Local state for immediate input updates
   const [localQuery, setLocalQuery] = useState(searchQuery);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Use the maintain focus hook
   const inputRef = useMaintainFocus<HTMLInputElement>();
 
-  // Additional focus maintenance during loading/loading states
   useEffect(() => {
-    // Only run this effect when loading is true (search is in progress)
     if (loading && inputRef.current) {
-      // Store the input element reference
       const input = inputRef.current;
 
-      // Function to restore focus if lost
       const restoreFocus = () => {
         if (
           input &&
           document.activeElement !== input &&
           document.contains(input)
         ) {
-          // Small delay to let DOM settle
           setTimeout(() => {
             if (
               input &&
@@ -78,17 +69,12 @@ export const ModelToolbar = ({
         }
       };
 
-      // Listen for focusout events to catch focus loss
       const handleFocusOut = (_e: FocusEvent) => {
-        // Prefix with underscore
-        // If focus is moving to something else and we're still loading
         if (loading && input && document.activeElement !== input) {
-          // Schedule focus restoration
           restoreFocus();
         }
       };
 
-      // Also watch for DOM changes that might steal focus
       const observer = new MutationObserver(() => {
         if (
           loading &&
@@ -100,7 +86,6 @@ export const ModelToolbar = ({
         }
       });
 
-      // Observe the parent for changes
       const parent = input.parentElement?.parentElement;
       if (parent) {
         observer.observe(parent, {
@@ -110,10 +95,8 @@ export const ModelToolbar = ({
         });
       }
 
-      // Add event listener for focusout
       document.addEventListener("focusout", handleFocusOut);
 
-      // Cleanup
       return () => {
         document.removeEventListener("focusout", handleFocusOut);
         observer.disconnect();
@@ -121,44 +104,33 @@ export const ModelToolbar = ({
     }
   }, [loading, inputRef]);
 
-  // Sync local state when search is cleared externally
   useEffect(() => {
     if (searchQuery === "" && localQuery !== "") {
       setLocalQuery("");
     }
   }, [searchQuery]);
 
-  // Handle input change - updates instantly, debounces API call
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
 
-    // Update local state immediately (keeps input responsive)
     setLocalQuery(newValue);
 
-    // Clear existing debounce timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Debounce the actual search API call
     debounceTimerRef.current = setTimeout(() => {
-      // Only trigger search if:
-      // 1. We have at least MIN_SEARCH_CHARS characters, OR
-      // 2. The search is being cleared (empty string)
       if (newValue.length >= MIN_SEARCH_CHARS || newValue === "") {
         onSearchChange(newValue);
       }
     }, 300);
   };
 
-  // Handle clear search
   const handleClear = () => {
     setLocalQuery("");
     onClearSearch();
-    // Focus the input after clearing (handled by the hook)
   };
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
@@ -169,7 +141,6 @@ export const ModelToolbar = ({
 
   return (
     <div className="flex flex-col sm:flex-row gap-3">
-      {/* Search Bar */}
       <div className="relative flex-1">
         <div className="relative">
           <FiSearch
@@ -195,7 +166,6 @@ export const ModelToolbar = ({
             </button>
           )}
         </div>
-        {/* Show hint about minimum characters */}
         {localQuery.length > 0 && localQuery.length < MIN_SEARCH_CHARS && (
           <p className="text-xs text-white/30 mt-1 ml-3">
             Type at least {MIN_SEARCH_CHARS} characters to search
@@ -203,7 +173,6 @@ export const ModelToolbar = ({
         )}
       </div>
 
-      {/* Filter Buttons */}
       <div className="flex items-center gap-2 flex-wrap shrink-0">
         {filterOptions.map(({ value, label, icon: Icon }) => (
           <button

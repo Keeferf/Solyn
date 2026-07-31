@@ -1,4 +1,3 @@
-// src/components/models/ModelInterface.tsx
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -12,7 +11,6 @@ import {
   HFModelSummary,
 } from "./hooks/useHuggingFaceModels";
 
-// Match the Rust ModelAcquisitionProgress type
 interface DownloadProgress {
   model_id: string;
   filename: string;
@@ -24,7 +22,6 @@ interface DownloadProgress {
 type DownloadKey = string;
 
 export const ModelInterface = () => {
-  // Add tab state
   const [activeTab, setActiveTab] = useState<"browse" | "installed">("browse");
 
   const {
@@ -73,21 +70,18 @@ export const ModelInterface = () => {
 
     const setupListeners = async () => {
       try {
-        // Listen for progress updates
         unlistenProgress = await listen<DownloadProgress>(
           "model-download-progress",
           (event) => {
             const progress = event.payload;
             const key = getDownloadKey(progress.model_id, progress.filename);
 
-            // Remove from cancelling set when status changes
             setCancellingDownloads((prev) => {
               const newSet = new Set(prev);
               newSet.delete(key);
               return newSet;
             });
 
-            // Add to downloading set if not already present and status is active
             if (
               !downloadingModels.has(key) &&
               (progress.status === "starting" ||
@@ -98,13 +92,11 @@ export const ModelInterface = () => {
 
             setDownloadProgress((prev) => new Map(prev).set(key, progress));
 
-            // If status is complete or error or cancelled, remove after delay
             if (
               progress.status === "complete" ||
               progress.status === "error" ||
               progress.status === "cancelled"
             ) {
-              // For cancelled, keep showing the status for a bit longer
               const delay = progress.status === "cancelled" ? 5000 : 3000;
               setTimeout(() => {
                 setDownloadingModels((prev) => {
@@ -127,14 +119,12 @@ export const ModelInterface = () => {
           },
         );
 
-        // Listen for completion events
         unlistenComplete = await listen<{ model_id: string; filename: string }>(
           "model-download-complete",
           (event) => {
             const { model_id, filename } = event.payload;
             const key = getDownloadKey(model_id, filename);
 
-            // Update progress to complete if it's still in the map
             setDownloadProgress((prev) => {
               const existing = prev.get(key);
               if (existing) {
@@ -150,7 +140,6 @@ export const ModelInterface = () => {
               return prev;
             });
 
-            // Remove after delay
             setTimeout(() => {
               setDownloadingModels((prev) => {
                 const newSet = new Set(prev);
@@ -196,7 +185,6 @@ export const ModelInterface = () => {
       });
     } catch (error) {
       console.error("Download failed:", error);
-      // If error is "Download cancelled", don't show as error
       if (error !== "Download cancelled") {
         setDownloadingModels((prev) => {
           const newSet = new Set(prev);
@@ -233,7 +221,6 @@ export const ModelInterface = () => {
     <div className="w-full h-full">
       <div className="flex items-center justify-between p-6 pb-0">
         <div className="flex items-center gap-8">
-          {/* Tab buttons with cursor-pointer */}
           <button
             onClick={() => setActiveTab("browse")}
             className={`font-anton text-3xl sm:text-4xl tracking-wide transition-all cursor-pointer ${
@@ -267,7 +254,6 @@ export const ModelInterface = () => {
       </div>
 
       <div className="p-6 pt-4 space-y-6">
-        {/* Download Status - Shows at top with cancel button */}
         {Array.from(downloadProgress.entries()).map(([key, progress]) => (
           <DownloadStatusDisplay
             key={key}
@@ -284,7 +270,6 @@ export const ModelInterface = () => {
 
         {activeTab === "browse" ? (
           <>
-            {/* Toolbar - Search and Filters */}
             <ModelToolbar
               searchQuery={searchQuery}
               onSearchChange={handleSearchChange}
@@ -294,7 +279,6 @@ export const ModelInterface = () => {
               loading={loading || isSearching}
             />
 
-            {/* Models Grid */}
             <BrowseModels
               models={models}
               loading={loading}
@@ -312,14 +296,12 @@ export const ModelInterface = () => {
         ) : (
           <InstalledModels
             onModelClick={(model) => {
-              // Optional: handle clicking an installed model
               console.log("Clicked installed model:", model.model_id);
             }}
           />
         )}
       </div>
 
-      {/* Model Detail Modal - Also has cancel button for individual files */}
       <ModelDetailModal
         modelId={selectedModelId}
         isOpen={isModalOpen}

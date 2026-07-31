@@ -53,14 +53,12 @@ export const useHuggingFaceModels = (
   const isChangingFilterRef = useRef(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load all models at once (up to maxModels)
   const loadInitialModels = useCallback(
     async (
       filter: ModelFilter,
       query: string = "",
       keepExistingModels: boolean = false,
     ) => {
-      // Skip if already loaded and no changes
       if (
         initialLoadDone.current &&
         filter === currentFilter &&
@@ -78,7 +76,6 @@ export const useHuggingFaceModels = (
       try {
         let total = 0;
 
-        // Get total count (with or without search)
         try {
           if (query.trim()) {
             total = await invoke<number>("get_huggingface_search_count", {
@@ -100,7 +97,6 @@ export const useHuggingFaceModels = (
 
         let response: HFModelSummary[] = [];
 
-        // Fetch ALL models at once (up to maxModels)
         if (query.trim()) {
           const searchResult = await invoke<{
             models: HFModelSummary[];
@@ -125,7 +121,6 @@ export const useHuggingFaceModels = (
           );
         }
 
-        // Track loaded model IDs
         const ids = new Set<string>();
         response.forEach((m) => ids.add(m.model_id));
         loadedIdsRef.current = ids;
@@ -144,19 +139,15 @@ export const useHuggingFaceModels = (
     [maxModels, currentFilter, searchQuery],
   );
 
-  // Change filter - DON'T clear models, just update
   const changeFilter = useCallback(
     async (newFilter: ModelFilter) => {
       if (newFilter === currentFilter) return;
 
-      // Don't reset models - keep showing current models
-      // Only reset the loaded state
       loadedIdsRef.current = new Set();
       isChangingFilterRef.current = true;
       initialLoadDone.current = false;
 
       try {
-        // Load all models with current search query
         await loadInitialModels(newFilter, searchQuery, true);
       } catch (err) {
         setError(String(err));
@@ -168,33 +159,26 @@ export const useHuggingFaceModels = (
     [currentFilter, loadInitialModels, searchQuery],
   );
 
-  // Search models with debounce
   const searchModels = useCallback(
     async (query: string) => {
-      // Clear existing search timeout
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
         searchTimeoutRef.current = null;
       }
 
-      // If query hasn't changed, do nothing
       if (query === searchQuery) return;
 
-      // Debounce search
       searchTimeoutRef.current = setTimeout(async () => {
         setIsSearching(true);
 
         try {
-          // Only reset if we have a non-empty query or the query changed
           if (query.trim() !== "" || query !== searchQuery) {
-            // For search, we DO want to clear models since results will be different
             setModels([]);
             setTotalModels(0);
             loadedIdsRef.current = new Set();
             initialLoadDone.current = false;
             setSearchQuery(query);
 
-            // Load all models with search query
             await loadInitialModels(currentFilter, query, false);
           }
         } catch (err) {
@@ -208,14 +192,12 @@ export const useHuggingFaceModels = (
     [currentFilter, loadInitialModels, searchQuery],
   );
 
-  // Refresh models (clear cache and reload all)
   const refreshModels = useCallback(async () => {
     initialLoadDone.current = false;
     loadedIdsRef.current = new Set();
     setModels([]);
     setTotalModels(0);
 
-    // Clear cache
     try {
       await invoke("clear_models_cache", { filter: currentFilter });
     } catch (err) {
@@ -225,11 +207,9 @@ export const useHuggingFaceModels = (
     await loadInitialModels(currentFilter, searchQuery, false);
   }, [loadInitialModels, currentFilter, searchQuery]);
 
-  // Clear search
   const clearSearch = useCallback(async () => {
     if (!searchQuery) return;
 
-    // Clear search timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
       searchTimeoutRef.current = null;
@@ -238,7 +218,6 @@ export const useHuggingFaceModels = (
     setIsSearching(true);
     setSearchQuery("");
 
-    // Reset and reload without search
     setModels([]);
     setTotalModels(0);
     loadedIdsRef.current = new Set();
@@ -248,7 +227,6 @@ export const useHuggingFaceModels = (
     setIsSearching(false);
   }, [searchQuery, currentFilter, loadInitialModels]);
 
-  // Clean up timeouts on unmount
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
@@ -257,14 +235,11 @@ export const useHuggingFaceModels = (
     };
   }, []);
 
-  // Initial load
   useEffect(() => {
     loadInitialModels(initialFilter, "", false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
-    // State
     models,
     loading,
     error,
@@ -273,8 +248,6 @@ export const useHuggingFaceModels = (
     currentFilter,
     searchQuery,
     isSearching,
-
-    // Actions
     changeFilter,
     refreshModels,
     searchModels,
