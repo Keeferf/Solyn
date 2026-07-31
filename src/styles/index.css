@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Import your other stylesheets */
+@import './markdown.css';
+@import './animations.css';
+
 @theme {
   /* Base Colors */
   --color-white: #d8d4cf;
