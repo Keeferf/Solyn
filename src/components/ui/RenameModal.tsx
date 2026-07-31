@@ -20,7 +20,6 @@ export const RenameModal = ({
   useEffect(() => {
     if (isOpen) {
       setTitle(currentTitle);
-      // Focus and select the input when modal opens
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -54,7 +53,6 @@ export const RenameModal = ({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-100">
       <div className="bg-black border border-white/10 rounded-xl max-w-md w-full mx-4 p-6 shadow-2xl animate-fadeIn animate-slideUp">
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">Rename Chat</h2>
           <button
@@ -65,7 +63,6 @@ export const RenameModal = ({
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit}>
           <div className="mb-6">
             <input
@@ -79,7 +76,6 @@ export const RenameModal = ({
             />
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
             <button
               type="button"
