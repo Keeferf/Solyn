@@ -44,7 +44,6 @@ export const ChatHistoryInterface = () => {
       const chatData = await getChatSession(chatId);
       if (chatData) {
         console.log("Loaded chat:", chatData);
-        // TODO: Navigate to chat view
       }
     } catch (error) {
       console.error("Failed to load chat:", error);
