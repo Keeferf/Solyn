@@ -95,7 +95,9 @@
   margin: 0.25em 0;
 }
 
-.markdown-content code {
+/* ===== INLINE CODE STYLES ===== */
+
+.markdown-content code:not(.shiki-container code) {
   background: #374151;
   padding: 0.2em 0.4em;
   border-radius: 0.25rem;
@@ -104,7 +106,47 @@
   color: #e5e7eb;
 }
 
-.markdown-content pre {
+/* ===== SHIKI CODE BLOCK STYLES ===== */
+
+.shiki-container {
+  margin: 1em 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #2a2a3a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.shiki-container pre {
+  background: #1e1e2e !important;
+  padding: 1.25em !important;
+  margin: 0 !important;
+  overflow-x: auto;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 0.875em;
+  line-height: 1.6;
+}
+
+/* Language label for Shiki code blocks */
+.shiki-container::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 0.65rem;
+  color: #6a6a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  z-index: 1;
+  background: rgba(30, 30, 46, 0.8);
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.25rem;
+  pointer-events: none;
+}
+
+/* Fallback code block styles (when Shiki fails) */
+.markdown-content pre:not(.shiki-container pre) {
   background: #1f2937;
   padding: 1em;
   border-radius: 0.5rem;
@@ -113,13 +155,38 @@
   border: 1px solid #374151;
 }
 
-.markdown-content pre code {
+.markdown-content pre:not(.shiki-container pre) code {
   background: transparent;
   padding: 0;
   border-radius: 0;
   font-size: 0.875em;
   color: #e5e7eb;
 }
+
+/* Scrollbar styling for code blocks */
+.shiki-container pre::-webkit-scrollbar,
+.markdown-content pre::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.shiki-container pre::-webkit-scrollbar-track,
+.markdown-content pre::-webkit-scrollbar-track {
+  background: #1e1e2e;
+}
+
+.shiki-container pre::-webkit-scrollbar-thumb,
+.markdown-content pre::-webkit-scrollbar-thumb {
+  background: #4a4a6a;
+  border-radius: 3px;
+}
+
+.shiki-container pre::-webkit-scrollbar-thumb:hover,
+.markdown-content pre::-webkit-scrollbar-thumb:hover {
+  background: #5a5a8a;
+}
+
+/* ===== TABLE STYLES ===== */
 
 .markdown-content table {
   border-collapse: collapse;
@@ -148,6 +215,8 @@
 .markdown-content tr:hover {
   background: rgba(255, 255, 255, 0.05);
 }
+
+/* ===== OTHER MARKDOWN ELEMENTS ===== */
 
 .markdown-content img {
   max-width: 100%;
@@ -191,12 +260,27 @@
   accent-color: #7d7abc;
 }
 
-/* Highlight.js overrides for dark theme */
-.markdown-content .hljs {
-  background: transparent !important;
-  padding: 0 !important;
+/* Copy button for code blocks (optional) */
+.shiki-container {
+  position: relative;
 }
 
-.markdown-content pre .hljs {
-  background: transparent !important;
+.shiki-container .copy-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 5rem;
+  background: rgba(30, 30, 46, 0.8);
+  color: #6a6a8a;
+  border: none;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.25rem;
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.shiki-container .copy-button:hover {
+  color: #e5e7eb;
+  background: rgba(30, 30, 46, 0.9);
 }

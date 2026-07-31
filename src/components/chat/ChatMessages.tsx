@@ -47,29 +47,38 @@ export const ChatMessages = ({
             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`rounded-lg px-4 py-2 max-w-[85%] ${
+              className={`rounded-lg px-4 py-2 ${
                 isUser
-                  ? "bg-purple-accent text-white"
-                  : "bg-white/10 text-white/90 border border-white/10"
+                  ? "max-w-[85%] bg-purple-accent text-white"
+                  : "w-full bg-white/10 text-white/90 border border-white/10"
               }`}
             >
-              {isEmptyAssistant && isStreaming ? (
-                <div className="flex space-x-1">
-                  <div
-                    className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <div
-                    className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                    style={{ animationDelay: "200ms" }}
-                  />
-                  <div
-                    className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                    style={{ animationDelay: "400ms" }}
-                  />
-                </div>
-              ) : (
+              {isUser ? (
                 <MarkdownMessage content={message.content} isUser={isUser} />
+              ) : (
+                <div className="max-w-4xl mx-auto">
+                  {isEmptyAssistant && isStreaming ? (
+                    <div className="flex space-x-1">
+                      <div
+                        className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "200ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                        style={{ animationDelay: "400ms" }}
+                      />
+                    </div>
+                  ) : (
+                    <MarkdownMessage
+                      content={message.content}
+                      isUser={isUser}
+                    />
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -78,20 +87,22 @@ export const ChatMessages = ({
 
       {isLoading && !isStreaming && messages.length > 0 && (
         <div className="flex justify-start">
-          <div className="bg-white/10 rounded-lg px-4 py-2 border border-white/10">
-            <div className="flex space-x-1">
-              <div
-                className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                style={{ animationDelay: "0ms" }}
-              />
-              <div
-                className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                style={{ animationDelay: "200ms" }}
-              />
-              <div
-                className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
-                style={{ animationDelay: "400ms" }}
-              />
+          <div className="bg-white/10 rounded-lg px-4 py-2 border border-white/10 w-full">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex space-x-1">
+                <div
+                  className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <div
+                  className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                  style={{ animationDelay: "200ms" }}
+                />
+                <div
+                  className="w-2 h-2 bg-purple-accent/60 rounded-full animate-bounce"
+                  style={{ animationDelay: "400ms" }}
+                />
+              </div>
             </div>
           </div>
         </div>
