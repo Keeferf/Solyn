@@ -1,13 +1,21 @@
 import { SidebarItem } from "./SidebarItem";
 import { NAVIGATION_ITEMS, FOOTER_ITEMS } from "./SidebarNavigation";
 import { OllamaVersionIndicator } from "./OllamaVersionIndicator";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 interface SidebarProps {
   onNavigate?: (view: "chat" | "history" | "models") => void;
   currentView?: "chat" | "history" | "models";
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
+export const Sidebar = ({
+  onNavigate,
+  currentView = "chat",
+  isCollapsed = false,
+  onToggleCollapse,
+}: SidebarProps) => {
   const handleNavigation = (id: string) => {
     if (id === "models") {
       onNavigate?.("models");
@@ -32,11 +40,30 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
   };
 
   return (
-    <aside className="fixed left-0 top-10 h-[calc(100vh-40px)] w-64 bg-black border-r border-white/10 flex flex-col p-4 z-30">
-      <div className="mb-6 px-3">
-        <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
-          Solyn
-        </h2>
+    <aside
+      className={`fixed left-0 top-10 h-[calc(100vh-40px)] bg-black border-r border-white/10 flex flex-col p-4 z-30 transition-all duration-300 ${
+        isCollapsed ? "w-16" : "w-64"
+      }`}
+    >
+      <div
+        className={`mb-6 flex items-center ${isCollapsed ? "justify-center" : "justify-between"} px-3`}
+      >
+        {!isCollapsed && (
+          <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
+            Solyn
+          </h2>
+        )}
+        <button
+          onClick={onToggleCollapse}
+          className="text-white/40 hover:text-white transition-colors p-1.5 rounded hover:bg-white/5 cursor-pointer w-10 h-10 flex items-center justify-center"
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <FiChevronRight size={20} />
+          ) : (
+            <FiChevronLeft size={20} />
+          )}
+        </button>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto">
@@ -47,6 +74,7 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
             label={item.label}
             active={isItemActive(item.id)}
             onClick={() => handleNavigation(item.id)}
+            collapsed={isCollapsed}
           />
         ))}
 
@@ -57,17 +85,20 @@ export const Sidebar = ({ onNavigate, currentView = "chat" }: SidebarProps) => {
               icon={<item.icon size={20} />}
               label={item.label}
               disabled={item.disabled}
+              collapsed={isCollapsed}
             />
           ))}
         </div>
       </nav>
 
-      <div className="mt-auto pt-4 border-t border-white/10">
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-white/40">v0.1.0</span>
-          <OllamaVersionIndicator />
+      {!isCollapsed && (
+        <div className="mt-auto pt-4 border-t border-white/10">
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-sm text-white/40">v0.1.0</span>
+            <OllamaVersionIndicator />
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 };

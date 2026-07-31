@@ -11,6 +11,7 @@ type View = "chat" | "history" | "models";
 
 export const App = () => {
   const [currentView, setCurrentView] = useState<View>("chat");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const renderContent = () => {
     switch (currentView) {
@@ -29,9 +30,18 @@ export const App = () => {
       <OllamaStatusChecker>
         <div className="min-h-screen bg-black">
           <TitleBar />
-          <Sidebar onNavigate={setCurrentView} currentView={currentView} />
-          <main className="ml-64 pt-10 min-h-screen">
-            <div className="p-4 h-[calc(100vh-40px)] overflow-y-auto">
+          <Sidebar
+            onNavigate={setCurrentView}
+            currentView={currentView}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          />
+          <main
+            className={`min-h-screen transition-all duration-300 ${
+              isSidebarCollapsed ? "ml-16" : "ml-64"
+            }`}
+          >
+            <div className="pt-10 p-4 h-[calc(100vh-40px)] overflow-y-auto">
               {renderContent()}
             </div>
           </main>
