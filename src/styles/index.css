@@ -84,7 +84,12 @@
 [data-tauri-drag-region] a,
 [data-tauri-drag-region="false"] {
   -webkit-app-region: no-drag;
-  pointer-events: auto;
+  pointer-events: auto !important;
+}
+
+/* Explicitly ensure title bar buttons work */
+[data-tauri-drag-region] .pointer-events-auto {
+  pointer-events: auto !important;
 }
 
 /* Ensure buttons always receive pointer events */
@@ -109,7 +114,8 @@ main a {
   pointer-events: auto;
 }
 
-/* ===== SCROLLBAR STYLES  ===== */
+/* ===== SCROLLBAR STYLES (duplicate removed, keeping the better one) ===== */
+/* Keeping only the thinner scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;

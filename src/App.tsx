@@ -30,11 +30,8 @@ export const App = () => {
         <div className="min-h-screen bg-black">
           <TitleBar />
           <Sidebar onNavigate={setCurrentView} currentView={currentView} />
-          <main className="ml-64 pt-10 min-h-screen" data-tauri-drag-region>
-            <div
-              className="p-4 h-[calc(100vh-40px)] overflow-y-auto"
-              data-tauri-drag-region="false"
-            >
+          <main className="ml-64 pt-10 min-h-screen">
+            <div className="p-4 h-[calc(100vh-40px)] overflow-y-auto">
               {renderContent()}
             </div>
           </main>
