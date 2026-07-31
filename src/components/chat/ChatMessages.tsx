@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./hooks/useChat";
+import { MarkdownMessage } from "./MarkdownMessage";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -38,16 +39,16 @@ export const ChatMessages = ({
           message.role === "assistant" &&
           message.content === "";
 
+        const isUser = message.role === "user";
+
         return (
           <div
             key={index}
-            className={`flex ${
-              message.role === "user" ? "justify-end" : "justify-start"
-            }`}
+            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                message.role === "user"
+              className={`rounded-lg px-4 py-2 max-w-[85%] ${
+                isUser
                   ? "bg-purple-accent text-white"
                   : "bg-white/10 text-white/90 border border-white/10"
               }`}
@@ -68,9 +69,7 @@ export const ChatMessages = ({
                   />
                 </div>
               ) : (
-                <div className="text-sm whitespace-pre-wrap wrap-break-word">
-                  {message.content}
-                </div>
+                <MarkdownMessage content={message.content} isUser={isUser} />
               )}
             </div>
           </div>
