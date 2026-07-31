@@ -1,4 +1,3 @@
-// src/components/ui/ConfirmationModal.tsx
 import { useEffect, useRef } from "react";
 import { FiAlertTriangle, FiX } from "react-icons/fi";
 
@@ -46,7 +45,6 @@ export const ConfirmationModal = ({
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
 
-    // Prevent body scroll
     document.body.style.overflow = "hidden";
 
     return () => {
@@ -61,11 +59,11 @@ export const ConfirmationModal = ({
   const getVariantStyles = () => {
     switch (confirmVariant) {
       case "danger":
-        return "bg-error hover:bg-error/80"; // Uses theme error color
+        return "bg-error hover:bg-error/80";
       case "warning":
-        return "bg-warning hover:bg-warning/80"; // Uses theme warning color
+        return "bg-warning hover:bg-warning/80";
       case "primary":
-        return "bg-purple-accent hover:bg-purple-accent/80"; // Uses theme purple accent
+        return "bg-purple-accent hover:bg-purple-accent/80";
       default:
         return "bg-purple-accent hover:bg-purple-accent/80";
     }
@@ -77,7 +75,6 @@ export const ConfirmationModal = ({
         ref={modalRef}
         className="bg-black border border-white/10 rounded-xl max-w-md w-full mx-4 p-6 shadow-2xl animate-fadeIn animate-slideUp"
       >
-        {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-error-bg">
@@ -93,13 +90,11 @@ export const ConfirmationModal = ({
           </button>
         </div>
 
-        {/* Message */}
         <p className="text-white/60 text-sm leading-relaxed mb-6">
           {message ||
             "Are you sure you want to delete? This action cannot be undone."}
         </p>
 
-        {/* Actions */}
         <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
           <button
             onClick={onClose}

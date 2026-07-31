@@ -31,7 +31,6 @@ const formatFileSize = (size: number): string => {
   return `${size} B`;
 };
 
-// Helper to group files by quantization
 const groupFilesByQuant = (files: InstalledModel["files"]) => {
   const groups: Record<string, InstalledModel["files"]> = {};
   files.forEach((file) => {
@@ -69,7 +68,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
     setDeleting(null);
     setShowDeleteConfirm(null);
     if (!success) {
-      // Error is already set in the hook
     }
   };
 
@@ -78,7 +76,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
     const success = await deleteQuantization(modelId, quant);
     setDeletingQuant(null);
     if (!success) {
-      // Error is already set in the hook
     }
   };
 
@@ -130,7 +127,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
 
   return (
     <div className="w-full">
-      {/* Search Bar */}
       <div className="mb-6">
         <div className="relative">
           <FiSearch
@@ -155,7 +151,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 text-sm text-white/40">
           <FiHardDrive size={14} />
@@ -241,7 +236,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
                       </div>
                     </div>
 
-                    {/* Files grouped by quantization */}
                     {model.files.length > 0 && (
                       <div className="mt-3 ml-9">
                         <div className="flex flex-wrap gap-2">
@@ -273,7 +267,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
                                     {file.filename}
                                   </span>
                                 ))}
-                                {/* Delete quant button - always visible, highlights red on hover */}
                                 {hasMultipleQuants && (
                                   <button
                                     onClick={(e) => {
@@ -302,7 +295,6 @@ export const InstalledModels = ({ onModelClick }: InstalledModelsProps) => {
                     )}
                   </div>
 
-                  {/* Delete entire model button */}
                   <div className="ml-4 shrink-0">
                     {showDeleteConfirm === model.model_id ? (
                       <div className="flex items-center gap-2">

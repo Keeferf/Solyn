@@ -28,7 +28,7 @@ export const SidebarItem = ({
       <span className="shrink-0">{icon}</span>
       <span className="text-sm font-medium flex-1 text-left">{label}</span>
       {badge && (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-(--color-purple-accent)/20 text-(--color-purple-accent)">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-bg-purple-accent/20 text-purple-accent">
           {badge}
         </span>
       )}

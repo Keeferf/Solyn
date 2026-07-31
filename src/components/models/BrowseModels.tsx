@@ -63,7 +63,6 @@ export const BrowseModels = ({
   isSearching = false,
   onClearSearch,
 }: BrowseModelsProps) => {
-  // Show loading state when initially loading and no models exist yet
   if (loading && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -80,7 +79,6 @@ export const BrowseModels = ({
     );
   }
 
-  // Show error state - only if no models exist
   if (error && models.length === 0) {
     return (
       <div className="w-full space-y-6">
@@ -107,7 +105,6 @@ export const BrowseModels = ({
     );
   }
 
-  // Show empty state - only if not loading and no models
   if (!loading && models.length === 0) {
     return (
       <div className="w-full">
@@ -149,7 +146,6 @@ export const BrowseModels = ({
     );
   }
 
-  // Show models with smooth transition during search
   return (
     <div className="w-full">
       <div
@@ -217,7 +213,6 @@ export const BrowseModels = ({
           })}
         </div>
 
-        {/* Footer showing total models loaded */}
         <div className="py-8 text-center text-white/30 text-sm border-t border-white/5">
           {models.length === totalModels && totalModels > 0 ? (
             <>

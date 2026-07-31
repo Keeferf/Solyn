@@ -1,4 +1,3 @@
-// src/components/ModelDetailModal.tsx
 import { useState, useEffect } from "react";
 import { FiFolder, FiX } from "react-icons/fi";
 import { GGUFFile } from "./hooks/useHuggingFaceModels";
@@ -8,13 +7,11 @@ import {
   groupFilesByQuantization,
   getDefaultSelectedFile,
 } from "./utils/modalUtils";
-import {
-  LoadingState,
-  ErrorState,
-  ModelInfo,
-  QuantizationCard,
-  SelectedFileDetails,
-} from "./ModalDetails";
+import { LoadingState } from "./ModalDetails/LoadingState";
+import { ErrorState } from "./ModalDetails/ErrorState";
+import { ModelInfo } from "./ModalDetails/ModelInfo";
+import { QuantizationCard } from "./ModalDetails/QuantizationCard";
+import { SelectedFileDetails } from "./ModalDetails/SelectedFileDetails";
 import { invoke } from "@tauri-apps/api/core";
 
 interface ModelDetailModalProps {
@@ -51,7 +48,6 @@ export const ModelDetailModal = ({
     }
   }, [details]);
 
-  // Reset cancelling state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setCancellingFile(null);
@@ -65,7 +61,6 @@ export const ModelDetailModal = ({
         modelId,
         filename,
       });
-      // Call the parent's cancel handler if provided
       if (onCancelDownload) {
         onCancelDownload(modelId, filename);
       }
@@ -75,13 +70,11 @@ export const ModelDetailModal = ({
     }
   };
 
-  // Check if a specific file is being downloaded
   const isFileDownloading = (filename: string): boolean => {
     if (!modelId) return false;
     return isDownloading(modelId, filename);
   };
 
-  // Check if a file is being cancelled
   const isFileCancelling = (filename: string): boolean => {
     return cancellingFile === filename;
   };
@@ -166,7 +159,7 @@ export const ModelDetailModal = ({
               modelId={modelId}
               isDownloading={isFileDownloading(selectedFile.filename)}
               isCancelling={isFileCancelling(selectedFile.filename)}
-              onDownload={onDownload} // Pass onDownload directly - it expects (modelId, filename)
+              onDownload={onDownload}
               onCancel={handleCancelDownload}
             />
           )}

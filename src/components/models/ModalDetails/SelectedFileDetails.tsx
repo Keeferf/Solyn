@@ -1,4 +1,3 @@
-// src/components/ModalDetails/SelectedFileDetails.tsx
 import {
   FiFile,
   FiHardDrive,
@@ -21,7 +20,7 @@ interface SelectedFileDetailsProps {
   modelId: string;
   isDownloading: boolean;
   isCancelling?: boolean;
-  onDownload: (modelId: string, filename: string) => void; // Expects both parameters
+  onDownload: (modelId: string, filename: string) => void;
   onCancel?: (modelId: string, filename: string) => void;
 }
 
@@ -36,12 +35,12 @@ export const SelectedFileDetails = ({
   const quant = file.quantization || getQuantizationLabel(file.filename);
 
   const handleDownload = () => {
-    onDownload(modelId, file.filename); // Pass both parameters
+    onDownload(modelId, file.filename);
   };
 
   const handleCancel = () => {
     if (onCancel) {
-      onCancel(modelId, file.filename); // Pass both parameters
+      onCancel(modelId, file.filename);
     }
   };
 
@@ -73,7 +72,6 @@ export const SelectedFileDetails = ({
               </span>
             )}
           </div>
-          {/* Status messages */}
           {isDownloading && !isCancelling && (
             <span className="text-purple-accent text-xs flex items-center gap-1 mt-2">
               <FiLoader className="animate-spin" size={12} />

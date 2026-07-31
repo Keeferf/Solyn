@@ -60,7 +60,6 @@ export const useChatHistory = () => {
   }, []);
 
   const pinChat = useCallback(async (sessionId: number) => {
-    // TODO: Implement pin functionality
     console.log(`Pinning chat ${sessionId}`);
   }, []);
 

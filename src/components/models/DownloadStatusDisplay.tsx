@@ -1,4 +1,3 @@
-// src/components/DownloadStatusDisplay.tsx
 import { FiX, FiLoader, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -19,7 +18,6 @@ export const DownloadStatusDisplay = ({
   message,
   onCancel,
 }: DownloadStatusDisplayProps) => {
-  // Format filename for display
   const displayName =
     filename.length > 40 ? filename.substring(0, 37) + "..." : filename;
 
@@ -35,7 +33,6 @@ export const DownloadStatusDisplay = ({
     status === "finalizing";
   const isOllamaCreation = status === "creating_ollama_model";
 
-  // Use color names directly
   const progressColor = isError
     ? "bg-error"
     : isComplete
@@ -62,7 +59,6 @@ export const DownloadStatusDisplay = ({
     }
   };
 
-  // Determine status icon
   const StatusIcon = () => {
     if (isComplete)
       return <FiCheckCircle className="text-success shrink-0" size={16} />;
@@ -82,10 +78,7 @@ export const DownloadStatusDisplay = ({
     return null;
   };
 
-  // Determine if cancel button should be shown
   const showCancelButton = isActive && !isComplete && !isError && !isCancelled;
-
-  // Determine if progress bar should show indeterminate state
   const isIndeterminate = isProcessing && !isOllamaCreation;
 
   return (
@@ -110,14 +103,12 @@ export const DownloadStatusDisplay = ({
         </div>
       </div>
 
-      {/* Message */}
       {message && (
         <div className="ml-6 mb-2">
           <span className="font-inter text-white/40 text-xs">{message}</span>
         </div>
       )}
 
-      {/* Progress bar */}
       <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
         <div
           className={`h-full transition-all duration-300 ${progressColor} ${isIndeterminate ? "w-full animate-pulse" : ""}`}

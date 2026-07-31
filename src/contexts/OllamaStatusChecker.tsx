@@ -16,20 +16,18 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
   const { status, loading, startOllama, isReady, refreshOllamaStatus } =
     useOllama();
 
-  // Track retry attempts (replaced boolean startAttempted with counter)
   const startAttemptCount = useRef(0);
   const [showDownloadPage, setShowDownloadPage] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [attemptingStart, setAttemptingStart] = useState(false);
 
-  // Auto-start logic with RETRY + EXPONENTIAL BACKOFF
   useEffect(() => {
     if (
       status?.installed &&
       !status?.running &&
       !loading &&
       !attemptingStart &&
-      startAttemptCount.current < 3 // Allow up to 3 retries
+      startAttemptCount.current < 3
     ) {
       const attemptNumber = startAttemptCount.current + 1;
       setAttemptingStart(true);
@@ -40,21 +38,19 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
       startOllama()
         .then(() => {
           console.log("Ollama started successfully");
-          startAttemptCount.current = 0; // Reset on success
+          startAttemptCount.current = 0;
           setAttemptingStart(false);
         })
         .catch((error) => {
           console.error(`Attempt ${attemptNumber} failed:`, error);
           startAttemptCount.current += 1;
 
-          // Exponential backoff: 500ms → 1s → 2s
           const backoffMs = 500 * Math.pow(2, startAttemptCount.current - 1);
 
           if (startAttemptCount.current < 3) {
             setStartError(
               `Failed to start. Retrying in ${(backoffMs / 1000).toFixed(1)}s...`,
             );
-            // Wait before retrying
             setTimeout(() => setAttemptingStart(false), backoffMs);
           } else {
             setStartError(
@@ -66,7 +62,6 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     }
   }, [status, loading, startOllama, attemptingStart]);
 
-  // Reset retry count when running
   useEffect(() => {
     if (status?.running) {
       startAttemptCount.current = 0;
@@ -75,7 +70,6 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     }
   }, [status?.running]);
 
-  // Not installed → show download page
   if (!loading && status?.installed === false && !showDownloadPage) {
     return (
       <div className="flex items-center justify-center h-screen bg-black">
@@ -124,7 +118,6 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     );
   }
 
-  // Show download page after user clicked download
   if (showDownloadPage) {
     return (
       <OllamaDownloadPage
@@ -145,7 +138,6 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     );
   }
 
-  // Initial status check loading
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -157,7 +149,6 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     );
   }
 
-  // Starting state: installed but not yet running
   if (!isReady && status?.installed) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -165,14 +156,12 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-accent mx-auto"></div>
           <p className="mt-4 text-white/60">Starting Ollama...</p>
 
-          {/* Show current attempt number */}
           {attemptingStart ? (
             <p className="text-white/40 text-sm mt-2">
               Attempt {startAttemptCount.current + 1} of 3
             </p>
           ) : null}
 
-          {/* Show error or waiting message */}
           {startError ? (
             <div className="mt-4 p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg flex items-start gap-2">
               <FiAlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
@@ -186,7 +175,6 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
             </p>
           )}
 
-          {/* Show manual retry button if all attempts failed */}
           {startAttemptCount.current >= 3 && !status?.running ? (
             <button
               onClick={() => {
@@ -204,6 +192,5 @@ export const OllamaStatusChecker = ({ children }: OllamaStatusCheckerProps) => {
     );
   }
 
-  // Ollama is ready → render children
   return <>{children}</>;
 };
