@@ -1,4 +1,3 @@
-// src/contexts/OllamaContext.tsx
 import {
   createContext,
   useContext,
@@ -20,7 +19,7 @@ interface OllamaContextType {
   refreshing: boolean;
   refreshOllamaStatus: () => Promise<void>;
   startOllama: () => Promise<void>;
-  isReady: boolean; // Changed from `boolean | undefined` to just `boolean`
+  isReady: boolean;
 }
 
 const OllamaContext = createContext<OllamaContextType | undefined>(undefined);
@@ -54,13 +53,12 @@ export const OllamaProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (status.running) {
-      return; // Already running
+      return;
     }
 
     setLoading(true);
     try {
       await invoke<string>("start_ollama_service");
-      // Refresh status after starting
       await refreshOllamaStatus();
     } catch (error) {
       console.error("Failed to start Ollama:", error);
@@ -70,17 +68,14 @@ export const OllamaProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Check Ollama status when the app launches
   useEffect(() => {
     refreshOllamaStatus();
 
-    // Check status every 30 seconds
     const interval = setInterval(refreshOllamaStatus, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate isReady - ensure it's always a boolean
   const isReady = (status?.installed && status?.running) ?? false;
 
   return (
@@ -91,7 +86,7 @@ export const OllamaProvider = ({ children }: { children: ReactNode }) => {
         refreshing,
         refreshOllamaStatus,
         startOllama,
-        isReady, // Now this is always a boolean
+        isReady,
       }}
     >
       {children}

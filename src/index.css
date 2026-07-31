@@ -1,30 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  /* Colors */
+  /* Base Colors */
   --color-white: #d8d4cf;
   --color-black: #121212;
   --color-purple-accent: #7d7abc;
   
-  /* Status Colors - Success (Green) */
+  /* Status Colors */
   --color-success: #22c55e;
-  --color-success-bg: #22c55e26; /* 15% opacity */
-  --color-success-border: #22c55e33; /* 20% opacity */
+  --color-success-bg: #22c55e26;
+  --color-success-border: #22c55e33;
   
-  /* Status Colors - Error (Red) */
   --color-error: #ef4444;
-  --color-error-bg: #ef444426; /* 15% opacity */
-  --color-error-border: #ef444433; /* 20% opacity */
+  --color-error-bg: #ef444426;
+  --color-error-border: #ef444433;
   
-  /* Status Colors - Warning (Yellow) */
   --color-warning: #eab308;
-  --color-warning-bg: #eab30826; /* 15% opacity */
-  --color-warning-border: #eab30833; /* 20% opacity */
+  --color-warning-bg: #eab30826;
+  --color-warning-border: #eab30833;
   
-  /* Status Colors - Info (Blue) */
   --color-info: #3b82f6;
-  --color-info-bg: #3b82f626; /* 15% opacity */
-  --color-info-border: #3b82f633; /* 20% opacity */
+  --color-info-bg: #3b82f626;
+  --color-info-border: #3b82f633;
 }
 
 @utility font-anton {
@@ -45,14 +42,14 @@
   }
 }
 
-/* Smooth transitions for sidebar */
+/* Transitions */
 * {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
 
-/* Scrollbar styling */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -72,14 +69,10 @@
   opacity: 0.8;
 }
 
-/* Modal animations */
+/* Animations */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideUp {
@@ -104,6 +97,17 @@
   }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Animation Utilities */
 .animate-fadeIn {
   animation: fadeIn 0.25s ease-out;
 }
@@ -116,28 +120,8 @@
   animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Optional: Add a subtle pulse for loading states */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
 .animate-pulse-slow {
   animation: pulse 2s ease-in-out infinite;
-}
-
-/* Optional: Add a shimmer effect for loading skeletons */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
 }
 
 .shimmer {
