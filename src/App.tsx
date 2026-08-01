@@ -5,11 +5,13 @@ import { ChatHistoryInterface } from "@/components/history/ChatHistoryInterface"
 import { ModelInterface } from "@/components/models/ModelInterface";
 import { OllamaProvider } from "@/contexts/OllamaContext";
 import { OllamaStatusChecker } from "@/contexts/OllamaStatusChecker";
+import { TitleBar } from "@/components/ui/TitleBar";
 
 type View = "chat" | "history" | "models";
 
 export const App = () => {
   const [currentView, setCurrentView] = useState<View>("chat");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const renderContent = () => {
     switch (currentView) {
@@ -26,10 +28,22 @@ export const App = () => {
   return (
     <OllamaProvider>
       <OllamaStatusChecker>
-        <div className="flex min-h-screen bg-black">
-          <Sidebar onNavigate={setCurrentView} currentView={currentView} />
-          <main className="flex-1 ml-64 min-h-screen flex items-center justify-center p-4">
-            {renderContent()}
+        <div className="min-h-screen bg-black">
+          <TitleBar />
+          <Sidebar
+            onNavigate={setCurrentView}
+            currentView={currentView}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          />
+          <main
+            className={`min-h-screen transition-all duration-300 ${
+              isSidebarCollapsed ? "ml-16" : "ml-64"
+            }`}
+          >
+            <div className="pt-10 p-4 h-[calc(100vh-40px)] overflow-y-auto">
+              {renderContent()}
+            </div>
           </main>
         </div>
       </OllamaStatusChecker>

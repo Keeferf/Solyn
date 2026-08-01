@@ -72,3 +72,65 @@
   background: var(--color-purple-accent);
   opacity: 0.8;
 }
+
+/* ===== WINDOW DRAG REGION ===== */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+/* Buttons and interactive elements inside drag region shouldn't be draggable */
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] a,
+[data-tauri-drag-region="false"] {
+  -webkit-app-region: no-drag;
+  pointer-events: auto !important;
+}
+
+/* Explicitly ensure title bar buttons work */
+[data-tauri-drag-region] .pointer-events-auto {
+  pointer-events: auto !important;
+}
+
+/* Ensure buttons always receive pointer events */
+button[data-tauri-drag-region="false"] {
+  pointer-events: auto !important;
+}
+
+/* Sidebar shouldn't be draggable */
+aside {
+  -webkit-app-region: no-drag;
+}
+
+/* Ensure all buttons in sidebar receive pointer events */
+aside button {
+  pointer-events: auto;
+}
+
+/* Ensure all buttons in main content area receive pointer events */
+main button,
+main input,
+main a {
+  pointer-events: auto;
+}
+
+/* ===== SCROLLBAR STYLES (duplicate removed, keeping the better one) ===== */
+/* Keeping only the thinner scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-purple-accent);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-purple-accent);
+  opacity: 0.8;
+}
