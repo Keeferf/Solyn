@@ -41,9 +41,7 @@ export const App = () => {
               isSidebarCollapsed ? "ml-16" : "ml-64"
             }`}
           >
-            <div className="pt-10 h-[calc(100vh-40px)] overflow-y-auto">
-              {renderContent()}
-            </div>
+            <div className="pt-10 h-[calc(100vh-40px)]">{renderContent()}</div>
           </main>
         </div>
       </OllamaStatusChecker>
