@@ -232,7 +232,7 @@ export const ChatInterface = () => {
       )}
 
       {hasMessages && (
-        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+        <div className="flex-1">
           <ChatMessages
             messages={messages}
             isLoading={isChatLoading}
@@ -244,19 +244,23 @@ export const ChatInterface = () => {
       )}
 
       {!hasMessages && (
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="text-center mb-8">
-            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
-              Solyn
-            </h1>
-            <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
-              A clarity-driven AI for solving complex problems and simplifying
-              everyday work.
-            </p>
+        <div className="flex flex-col h-full">
+          {/* Centered content - takes up available space */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center mb-8">
+              <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
+                Solyn
+              </h1>
+              <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
+                A clarity-driven AI for solving complex problems and simplifying
+                everyday work.
+              </p>
+            </div>
           </div>
 
-          <div className="w-full">
-            <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
+          {/* Input area at bottom */}
+          <div className="shrink-0 w-full">
+            <div className="relative bg-black rounded-2xl border border-white/5 transition-colors">
               <ChatInput
                 ref={textareaRef}
                 value={input}
@@ -304,9 +308,9 @@ export const ChatInterface = () => {
       )}
 
       {hasMessages && (
-        <div className="shrink-0 w-full sticky bottom-0 bg-black/80 backdrop-blur-sm">
+        <div className="shrink-0 w-full sticky bottom-0 bg-black">
           {attachmentCount > 0 && (
-            <div className="px-4 py-2 text-xs text-white/60 bg-white/5 border-t border-white/5">
+            <div className="px-4 py-2 text-xs text-white/60 bg-black border-t border-white/5">
               {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached
               <button
                 onClick={clearAttachments}
@@ -317,7 +321,7 @@ export const ChatInterface = () => {
             </div>
           )}
 
-          <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
+          <div className="relative bg-black rounded-2xl border border-white/5 transition-colors">
             <ChatInput
               ref={textareaRef}
               value={input}
@@ -349,7 +353,6 @@ export const ChatInterface = () => {
             />
           </div>
 
-          {/* Only show the keyboard shortcut hint, no history button */}
           <div className="flex justify-center mt-3 px-1">
             <div className="text-xs text-white/30">
               Press Enter to send, Shift+Enter for new line

@@ -41,7 +41,7 @@ export const App = () => {
               isSidebarCollapsed ? "ml-16" : "ml-64"
             }`}
           >
-            <div className="pt-10 p-4 h-[calc(100vh-40px)] overflow-y-auto">
+            <div className="h-[calc(100vh-40px)] overflow-y-auto">
               {renderContent()}
             </div>
           </main>
