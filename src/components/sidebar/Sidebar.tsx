@@ -46,16 +46,16 @@ export const Sidebar = ({
       }`}
     >
       <div
-        className={`mb-6 flex items-center ${isCollapsed ? "justify-center" : "justify-between"} px-3`}
+        className={`mb-6 flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}
       >
         {!isCollapsed && (
-          <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent px-3">
             Solyn
           </h2>
         )}
         <button
           onClick={onToggleCollapse}
-          className="text-white/40 hover:text-white transition-colors p-1.5 rounded hover:bg-white/5 cursor-pointer w-10 h-10 flex items-center justify-center"
+          className="text-white/40 hover:text-white transition-colors rounded hover:bg-white/5 cursor-pointer flex items-center justify-center h-10 w-10"
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? (
