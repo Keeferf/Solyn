@@ -231,35 +231,31 @@ export const ChatInterface = () => {
         </div>
       )}
 
-      {hasMessages && (
-        <div className="flex-1">
-          <ChatMessages
-            messages={messages}
-            isLoading={isChatLoading}
-            isStreaming={isStreaming}
-            error={error}
-            isOllamaReady={isOllamaReady}
-          />
-        </div>
-      )}
-
-      {!hasMessages && (
-        <div className="flex flex-col h-full">
-          {/* Centered content - takes up available space */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center mb-8">
-              <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
-                Solyn
-              </h1>
-              <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
-                A clarity-driven AI for solving complex problems and simplifying
-                everyday work.
-              </p>
-            </div>
+      {hasMessages ? (
+        <>
+          <div className="flex-1">
+            <ChatMessages
+              messages={messages}
+              isLoading={isChatLoading}
+              isStreaming={isStreaming}
+              error={error}
+              isOllamaReady={isOllamaReady}
+            />
           </div>
 
-          {/* Input area at bottom */}
-          <div className="shrink-0 w-full">
+          <div className="shrink-0 w-full sticky bottom-0 bg-black">
+            {attachmentCount > 0 && (
+              <div className="px-4 py-2 text-xs text-white/60 bg-black border-t border-white/5">
+                {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached
+                <button
+                  onClick={clearAttachments}
+                  className="ml-2 text-red-400 hover:text-red-300"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
             <div className="relative bg-black rounded-2xl border border-white/5 transition-colors">
               <ChatInput
                 ref={textareaRef}
@@ -292,70 +288,84 @@ export const ChatInterface = () => {
               />
             </div>
 
-            <div className="mt-3 text-xs text-white/30 text-center">
-              {!isOllamaReady
-                ? "Ollama is not running. Please install and start Ollama."
-                : !hasValidModels && !isModelsLoading
-                  ? "No models installed. Please download a model from the Hugging Face page."
-                  : isModelsLoading
-                    ? "Loading models..."
-                    : !selectedModelData?.ollama_model_name
-                      ? "Selected model is not registered with Ollama. Please reinstall."
-                      : "Press Enter to send, Shift+Enter for new line"}
+            <div className="flex justify-center mt-3 px-1">
+              <div className="text-xs text-white/30">
+                Press Enter to send, Shift+Enter for new line
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {hasMessages && (
-        <div className="shrink-0 w-full sticky bottom-0 bg-black">
-          {attachmentCount > 0 && (
-            <div className="px-4 py-2 text-xs text-white/60 bg-black border-t border-white/5">
-              {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached
-              <button
-                onClick={clearAttachments}
-                className="ml-2 text-red-400 hover:text-red-300"
-              >
-                Clear
-              </button>
+        </>
+      ) : (
+        <div className="flex flex-col h-full">
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
+                Solyn
+              </h1>
+              <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
+                A clarity-driven AI for solving complex problems and simplifying
+                everyday work.
+              </p>
             </div>
-          )}
 
-          <div className="relative bg-black rounded-2xl border border-white/5 transition-colors">
-            <ChatInput
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={!hasValidModels || !isOllamaReady}
-            />
+            {/* Input area centered below the title */}
+            <div className="w-full max-w-3xl mt-8">
+              {attachmentCount > 0 && (
+                <div className="px-4 py-2 text-xs text-white/60 bg-black border-t border-white/5">
+                  {attachmentCount} file{attachmentCount > 1 ? "s" : ""}{" "}
+                  attached
+                  <button
+                    onClick={clearAttachments}
+                    className="ml-2 text-red-400 hover:text-red-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
 
-            <ChatControls
-              isSearchEnabled={isSearchEnabled}
-              onSearchToggle={() => setIsSearchEnabled(!isSearchEnabled)}
-              isCodeEnabled={isCodeEnabled}
-              onCodeToggle={() => setIsCodeEnabled(!isCodeEnabled)}
-              isAttachmentEnabled={isAttachmentEnabled}
-              onAttachmentClick={handleAttachmentClick}
-              selectedModel={selectedModel}
-              models={models}
-              isModelDropdownOpen={isModelDropdownOpen}
-              isLoading={isModelsLoading}
-              onModelToggle={toggleDropdown}
-              onModelSelect={selectModel}
-              onModelClose={closeDropdown}
-              mode={mode}
-              onModeToggle={toggleMode}
-              onSubmit={handleSubmit}
-              isSubmitDisabled={isSubmitDisabled}
-              fileInputRef={fileInputRef}
-              onFileChange={handleFileChange}
-            />
-          </div>
+              <div className="relative bg-black rounded-2xl border border-white/5 transition-colors">
+                <ChatInput
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={!hasValidModels || !isOllamaReady}
+                />
 
-          <div className="flex justify-center mt-3 px-1">
-            <div className="text-xs text-white/30">
-              Press Enter to send, Shift+Enter for new line
+                <ChatControls
+                  isSearchEnabled={isSearchEnabled}
+                  onSearchToggle={() => setIsSearchEnabled(!isSearchEnabled)}
+                  isCodeEnabled={isCodeEnabled}
+                  onCodeToggle={() => setIsCodeEnabled(!isCodeEnabled)}
+                  isAttachmentEnabled={isAttachmentEnabled}
+                  onAttachmentClick={handleAttachmentClick}
+                  selectedModel={selectedModel}
+                  models={models}
+                  isModelDropdownOpen={isModelDropdownOpen}
+                  isLoading={isModelsLoading}
+                  onModelToggle={toggleDropdown}
+                  onModelSelect={selectModel}
+                  onModelClose={closeDropdown}
+                  mode={mode}
+                  onModeToggle={toggleMode}
+                  onSubmit={handleSubmit}
+                  isSubmitDisabled={isSubmitDisabled}
+                  fileInputRef={fileInputRef}
+                  onFileChange={handleFileChange}
+                />
+              </div>
+
+              <div className="mt-3 text-xs text-white/30 text-center">
+                {!isOllamaReady
+                  ? "Ollama is not running. Please install and start Ollama."
+                  : !hasValidModels && !isModelsLoading
+                    ? "No models installed. Please download a model from the Hugging Face page."
+                    : isModelsLoading
+                      ? "Loading models..."
+                      : !selectedModelData?.ollama_model_name
+                        ? "Selected model is not registered with Ollama. Please reinstall."
+                        : "Press Enter to send, Shift+Enter for new line"}
+              </div>
             </div>
           </div>
         </div>
