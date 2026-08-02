@@ -55,7 +55,9 @@ export const Sidebar = ({
         )}
         <button
           onClick={onToggleCollapse}
-          className="text-white/40 hover:text-white transition-colors rounded hover:bg-white/5 cursor-pointer flex items-center justify-center h-10 w-10"
+          className={`rounded-lg transition-all duration-200 text-white/40 hover:bg-white/5 hover:text-white flex items-center justify-center cursor-pointer ${
+            isCollapsed ? "w-10 h-10 mx-auto" : "h-10 w-10"
+          }`}
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? (

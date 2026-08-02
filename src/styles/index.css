@@ -43,6 +43,13 @@
     color: var(--color-white);
     margin: 0;
     padding: 0;
+    overflow: hidden; /* Prevent body scrolling */
+    height: 100vh;
+  }
+
+  #root {
+    height: 100vh;
+    overflow: hidden;
   }
 }
 
@@ -54,23 +61,43 @@
 }
 
 /* ===== SCROLLBAR STYLES ===== */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Global scrollbar styles for all scrollable elements */
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--color-black);
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
   background: var(--color-purple-accent);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: var(--color-purple-accent);
   opacity: 0.8;
+}
+
+/* Remove scrollbar buttons (arrows) for WebKit browsers */
+*::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+  background: transparent;
+}
+
+/* For Firefox - global scrollbar styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-purple-accent) transparent;
+}
+
+/* For Edge/IE */
+* {
+  -ms-overflow-style: -ms-autohiding-scrollbar;
 }
 
 /* ===== WINDOW DRAG REGION ===== */
@@ -112,25 +139,4 @@ main button,
 main input,
 main a {
   pointer-events: auto;
-}
-
-/* ===== SCROLLBAR STYLES (duplicate removed, keeping the better one) ===== */
-/* Keeping only the thinner scrollbar */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-purple-accent);
-  border-radius: 2px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-purple-accent);
-  opacity: 0.8;
 }

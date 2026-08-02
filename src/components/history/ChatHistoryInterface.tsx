@@ -208,8 +208,8 @@ export const ChatHistoryInterface = () => {
 
   return (
     <>
-      <div className="flex flex-col h-full w-full max-w-6xl mx-auto">
-        <div className="px-4 pt-8 pb-4 flex items-center justify-between">
+      <div className="flex flex-col h-full w-full max-w-6xl mx-auto px-4">
+        <div className="pt-4 pb-4 flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent mb-1">
               Chat History
@@ -271,7 +271,7 @@ export const ChatHistoryInterface = () => {
           </div>
         </div>
 
-        <div className="px-4 pb-4">
+        <div className="pb-4">
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4" />
             <input
@@ -295,7 +295,7 @@ export const ChatHistoryInterface = () => {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col flex-1 overflow-y-auto pb-4">
+          <div className="flex flex-col flex-1 overflow-y-auto pb-4 -mx-4 px-4">
             {filteredChats.map((chat) => (
               <ChatItem
                 key={chat.id}
@@ -314,7 +314,7 @@ export const ChatHistoryInterface = () => {
         )}
 
         {chats.length > 0 && (
-          <div className="px-4 pt-4 pb-8 border-t border-white/10 text-white/30 text-xs flex justify-between">
+          <div className="pt-4 pb-8 border-t border-white/10 text-white/30 text-xs flex justify-between">
             <span>Total: {chats.length} conversations</span>
             <span>
               Showing {filteredChats.length} of {chats.length}
