@@ -28,21 +28,25 @@ export const App = () => {
   return (
     <OllamaProvider>
       <OllamaStatusChecker>
-        <div className="min-h-screen bg-black">
+        <div className="h-screen overflow-hidden bg-black">
           <TitleBar />
-          <Sidebar
-            onNavigate={setCurrentView}
-            currentView={currentView}
-            isCollapsed={isSidebarCollapsed}
-            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          />
-          <main
-            className={`min-h-screen transition-all duration-300 ${
-              isSidebarCollapsed ? "ml-16" : "ml-64"
-            }`}
-          >
-            <div className="pt-10 h-[calc(100vh-40px)]">{renderContent()}</div>
-          </main>
+          <div className="flex h-full pt-10">
+            <Sidebar
+              onNavigate={setCurrentView}
+              currentView={currentView}
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={() =>
+                setIsSidebarCollapsed(!isSidebarCollapsed)
+              }
+            />
+            <main
+              className={`flex-1 transition-all duration-300 scrollable-content overflow-y-auto ${
+                isSidebarCollapsed ? "ml-16" : "ml-64"
+              }`}
+            >
+              {renderContent()}
+            </main>
+          </div>
         </div>
       </OllamaStatusChecker>
     </OllamaProvider>
