@@ -1,3 +1,4 @@
+// ConfirmationModal.tsx
 import { useEffect, useRef } from "react";
 import { FiAlertTriangle, FiX } from "react-icons/fi";
 
@@ -6,7 +7,7 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message?: string;
+  message?: string | React.ReactNode; // Now supports React nodes
   confirmText?: string;
   cancelText?: string;
   confirmVariant?: "danger" | "warning" | "primary";
@@ -90,10 +91,14 @@ export const ConfirmationModal = ({
           </button>
         </div>
 
-        <p className="text-white/60 text-sm leading-relaxed mb-6">
-          {message ||
-            "Are you sure you want to delete? This action cannot be undone."}
-        </p>
+        <div className="text-white/60 text-sm leading-relaxed mb-6">
+          {typeof message === "string" ? (
+            <p>{message}</p>
+          ) : (
+            message ||
+            "Are you sure you want to delete? This action cannot be undone."
+          )}
+        </div>
 
         <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
           <button

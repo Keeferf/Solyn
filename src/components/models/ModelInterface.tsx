@@ -218,8 +218,8 @@ export const ModelInterface = () => {
   };
 
   return (
-    <div className="w-full h-full">
-      <div className="flex items-center justify-between p-6 pb-0">
+    <div className="w-full h-full px-4">
+      <div className="flex items-center justify-between pt-4 pb-2">
         <div className="flex items-center gap-8">
           <button
             onClick={() => setActiveTab("browse")}
@@ -253,7 +253,7 @@ export const ModelInterface = () => {
         )}
       </div>
 
-      <div className="p-6 pt-4 space-y-6">
+      <div className="pb-6 space-y-6">
         {Array.from(downloadProgress.entries()).map(([key, progress]) => (
           <DownloadStatusDisplay
             key={key}

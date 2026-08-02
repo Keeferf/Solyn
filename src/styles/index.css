@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+/* Import your other stylesheets */
+@import './markdown.css';
+@import './animations.css';
+
+@theme {
+  /* Base Colors */
+  --color-white: #d8d4cf;
+  --color-black: #121212;
+  --color-purple-accent: #7d7abc;
+  
+  /* Status Colors */
+  --color-success: #22c55e;
+  --color-success-bg: #22c55e26;
+  --color-success-border: #22c55e33;
+  
+  --color-error: #ef4444;
+  --color-error-bg: #ef444426;
+  --color-error-border: #ef444433;
+  
+  --color-warning: #eab308;
+  --color-warning-bg: #eab30826;
+  --color-warning-border: #eab30833;
+  
+  --color-info: #3b82f6;
+  --color-info-bg: #3b82f626;
+  --color-info-border: #3b82f633;
+}
+
+@utility font-anton {
+  font-family: 'Anton', sans-serif;
+}
+
+@utility font-inter {
+  font-family: 'Inter', Avenir, Helvetica, Arial, sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: 'Inter', Avenir, Helvetica, Arial, sans-serif;
+    background-color: var(--color-black);
+    color: var(--color-white);
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent body scrolling */
+    height: 100vh;
+  }
+
+  #root {
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+/* ===== GLOBAL TRANSITIONS ===== */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* ===== SCROLLBAR STYLES ===== */
+/* Global scrollbar styles for all scrollable elements */
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-purple-accent);
+  border-radius: 2px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-purple-accent);
+  opacity: 0.8;
+}
+
+/* Remove scrollbar buttons (arrows) for WebKit browsers */
+*::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+  background: transparent;
+}
+
+/* For Firefox - global scrollbar styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-purple-accent) transparent;
+}
+
+/* For Edge/IE */
+* {
+  -ms-overflow-style: -ms-autohiding-scrollbar;
+}
+
+/* ===== WINDOW DRAG REGION ===== */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+/* Buttons and interactive elements inside drag region shouldn't be draggable */
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] a,
+[data-tauri-drag-region="false"] {
+  -webkit-app-region: no-drag;
+  pointer-events: auto !important;
+}
+
+/* Explicitly ensure title bar buttons work */
+[data-tauri-drag-region] .pointer-events-auto {
+  pointer-events: auto !important;
+}
+
+/* Ensure buttons always receive pointer events */
+button[data-tauri-drag-region="false"] {
+  pointer-events: auto !important;
+}
+
+/* Sidebar shouldn't be draggable */
+aside {
+  -webkit-app-region: no-drag;
+}
+
+/* Ensure all buttons in sidebar receive pointer events */
+aside button {
+  pointer-events: auto;
+}
+
+/* Ensure all buttons in main content area receive pointer events */
+main button,
+main input,
+main a {
+  pointer-events: auto;
+}

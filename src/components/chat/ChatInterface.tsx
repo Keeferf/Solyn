@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FiX, FiPlus, FiEdit2, FiTrash2, FiFolder } from "react-icons/fi";
+import { FiX, FiPlus, FiEdit2, FiTrash2 } from "react-icons/fi";
 import { ChatInput } from "./ChatInput";
 import { ChatControls } from "./ChatControls";
 import { ChatMessages } from "./ChatMessages";
@@ -231,32 +231,32 @@ export const ChatInterface = () => {
         </div>
       )}
 
-      {hasMessages && (
-        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-          <ChatMessages
-            messages={messages}
-            isLoading={isChatLoading}
-            isStreaming={isStreaming}
-            error={error}
-            isOllamaReady={isOllamaReady}
-          />
-        </div>
-      )}
-
-      {!hasMessages && (
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="text-center mb-8">
-            <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
-              Solyn
-            </h1>
-            <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
-              A clarity-driven AI for solving complex problems and simplifying
-              everyday work.
-            </p>
+      {hasMessages ? (
+        <>
+          <div className="flex-1">
+            <ChatMessages
+              messages={messages}
+              isLoading={isChatLoading}
+              isStreaming={isStreaming}
+              error={error}
+              isOllamaReady={isOllamaReady}
+            />
           </div>
 
-          <div className="w-full">
-            <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
+          <div className="shrink-0 w-full sticky bottom-0 bg-black pb-4">
+            {attachmentCount > 0 && (
+              <div className="px-4 py-2 text-xs text-white/60 bg-black border-t border-white/5">
+                {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached
+                <button
+                  onClick={clearAttachments}
+                  className="ml-2 text-red-400 hover:text-red-300"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
+            <div className="relative bg-black rounded-2xl border border-white/5 transition-colors">
               <ChatInput
                 ref={textareaRef}
                 value={input}
@@ -288,83 +288,84 @@ export const ChatInterface = () => {
               />
             </div>
 
-            <div className="mt-3 text-xs text-white/30 text-center">
-              {!isOllamaReady
-                ? "Ollama is not running. Please install and start Ollama."
-                : !hasValidModels && !isModelsLoading
-                  ? "No models installed. Please download a model from the Hugging Face page."
-                  : isModelsLoading
-                    ? "Loading models..."
-                    : !selectedModelData?.ollama_model_name
-                      ? "Selected model is not registered with Ollama. Please reinstall."
-                      : "Press Enter to send, Shift+Enter for new line"}
+            <div className="flex justify-center mt-3 px-1">
+              <div className="text-xs text-white/30">
+                Press Enter to send, Shift+Enter for new line
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {hasMessages && (
-        <div className="shrink-0 w-full sticky bottom-0 bg-black/80 backdrop-blur-sm">
-          {attachmentCount > 0 && (
-            <div className="px-4 py-2 text-xs text-white/60 bg-white/5 border-t border-white/5">
-              {attachmentCount} file{attachmentCount > 1 ? "s" : ""} attached
-              <button
-                onClick={clearAttachments}
-                className="ml-2 text-red-400 hover:text-red-300"
-              >
-                Clear
-              </button>
+        </>
+      ) : (
+        <div className="flex flex-col h-full -mt-10">
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-7xl md:text-8xl font-bold tracking-wide font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent">
+                Solyn
+              </h1>
+              <p className="text-lg md:text-xl leading-relaxed text-white/80 mt-4">
+                A clarity-driven AI for solving complex problems and simplifying
+                everyday work.
+              </p>
             </div>
-          )}
 
-          <div className="relative bg-white/5 rounded-2xl border border-white/10 transition-colors">
-            <ChatInput
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={!hasValidModels || !isOllamaReady}
-            />
-
-            <ChatControls
-              isSearchEnabled={isSearchEnabled}
-              onSearchToggle={() => setIsSearchEnabled(!isSearchEnabled)}
-              isCodeEnabled={isCodeEnabled}
-              onCodeToggle={() => setIsCodeEnabled(!isCodeEnabled)}
-              isAttachmentEnabled={isAttachmentEnabled}
-              onAttachmentClick={handleAttachmentClick}
-              selectedModel={selectedModel}
-              models={models}
-              isModelDropdownOpen={isModelDropdownOpen}
-              isLoading={isModelsLoading}
-              onModelToggle={toggleDropdown}
-              onModelSelect={selectModel}
-              onModelClose={closeDropdown}
-              mode={mode}
-              onModeToggle={toggleMode}
-              onSubmit={handleSubmit}
-              isSubmitDisabled={isSubmitDisabled}
-              fileInputRef={fileInputRef}
-              onFileChange={handleFileChange}
-            />
-          </div>
-
-          <div className="flex justify-between items-center mt-3 px-1">
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1.5"
-            >
-              <FiFolder size={14} />
-              {showHistory ? "Hide History" : "Show History"}
-              {sessions.length > 0 && !showHistory && (
-                <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded-full text-[10px]">
-                  {sessions.length}
-                </span>
+            {/* Input area centered below the title */}
+            <div className="w-full max-w-3xl mt-8">
+              {attachmentCount > 0 && (
+                <div className="px-4 py-2 text-xs text-white/60 bg-black border-t border-white/5">
+                  {attachmentCount} file{attachmentCount > 1 ? "s" : ""}{" "}
+                  attached
+                  <button
+                    onClick={clearAttachments}
+                    className="ml-2 text-red-400 hover:text-red-300"
+                  >
+                    Clear
+                  </button>
+                </div>
               )}
-            </button>
 
-            <div className="text-xs text-white/30">
-              Press Enter to send, Shift+Enter for new line
+              <div className="relative bg-black rounded-2xl border border-white/5 transition-colors">
+                <ChatInput
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={!hasValidModels || !isOllamaReady}
+                />
+
+                <ChatControls
+                  isSearchEnabled={isSearchEnabled}
+                  onSearchToggle={() => setIsSearchEnabled(!isSearchEnabled)}
+                  isCodeEnabled={isCodeEnabled}
+                  onCodeToggle={() => setIsCodeEnabled(!isCodeEnabled)}
+                  isAttachmentEnabled={isAttachmentEnabled}
+                  onAttachmentClick={handleAttachmentClick}
+                  selectedModel={selectedModel}
+                  models={models}
+                  isModelDropdownOpen={isModelDropdownOpen}
+                  isLoading={isModelsLoading}
+                  onModelToggle={toggleDropdown}
+                  onModelSelect={selectModel}
+                  onModelClose={closeDropdown}
+                  mode={mode}
+                  onModeToggle={toggleMode}
+                  onSubmit={handleSubmit}
+                  isSubmitDisabled={isSubmitDisabled}
+                  fileInputRef={fileInputRef}
+                  onFileChange={handleFileChange}
+                />
+              </div>
+
+              <div className="mt-3 text-xs text-white/30 text-center">
+                {!isOllamaReady
+                  ? "Ollama is not running. Please install and start Ollama."
+                  : !hasValidModels && !isModelsLoading
+                    ? "No models installed. Please download a model from the Hugging Face page."
+                    : isModelsLoading
+                      ? "Loading models..."
+                      : !selectedModelData?.ollama_model_name
+                        ? "Selected model is not registered with Ollama. Please reinstall."
+                        : "Press Enter to send, Shift+Enter for new line"}
+              </div>
             </div>
           </div>
         </div>
