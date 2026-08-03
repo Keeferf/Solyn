@@ -31,6 +31,8 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     createSession: createSessionStore,
     setError: setStoreError,
     startNewChat,
+    currentModelName,
+    setCurrentModelName,
   } = useChatStore();
 
   const unlistenRefs = useRef<UnlistenFn[]>([]);
@@ -92,8 +94,15 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     let sessionId = currentSessionId;
     if (!sessionId) {
       try {
-        sessionId = await createSessionStore(modelData.ollama_model_name);
-        console.log("Created new session with ID:", sessionId);
+        // Use the first message as the title (truncated to 50 chars)
+        const title =
+          content.trim().slice(0, 50) +
+          (content.trim().length > 50 ? "..." : "");
+        sessionId = await createSessionStore(
+          modelData.ollama_model_name,
+          title,
+        );
+        console.log("Created new session with ID:", sessionId, "Title:", title);
       } catch (err) {
         const errorMsg = "Failed to create chat session";
         setError(errorMsg);
@@ -317,6 +326,7 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     error,
     isOllamaReady,
     currentSessionId,
+    currentModelName,
     sendMessage,
     clearMessages,
     startNewChat,

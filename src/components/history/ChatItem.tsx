@@ -1,3 +1,4 @@
+// src/components/history/ChatItem.tsx
 import { useState, useRef } from "react";
 import { FiCheck } from "react-icons/fi";
 import type { ChatSession } from "./types";
@@ -58,6 +59,10 @@ export const ChatItem = ({
     }
   };
 
+  // Truncate preview if too long
+  const truncatedPreview =
+    preview.length > 60 ? preview.slice(0, 60) + "..." : preview;
+
   return (
     <div
       onClick={handleChatClick}
@@ -92,11 +97,11 @@ export const ChatItem = ({
           )}
           <div className="flex-1 min-w-0">
             <p
-              className={`font-medium text-lg mb-1 truncate ${isActive ? "text-purple-accent" : "text-white"}`}
+              className={`font-medium text-base truncate ${isActive ? "text-purple-accent" : "text-white"}`}
             >
-              {preview}
+              {truncatedPreview || "New Chat"}
             </p>
-            <div className="flex items-center gap-3 text-xs text-white/30">
+            <div className="flex items-center gap-3 text-xs text-white/30 mt-0.5">
               <span>Model: {chat.model_name}</span>
               {isActive && (
                 <span className="text-purple-accent/60">● Active</span>
@@ -106,7 +111,7 @@ export const ChatItem = ({
         </div>
 
         {!isSelectionMode && (
-          <div className="flex items-center h-full shrink-0 relative">
+          <div className="flex items-center h-full shrink-0 relative ml-3">
             <div className="flex flex-col text-xs text-white/30 min-w-17.5">
               <ChatDate
                 createdAt={chat.created_at}

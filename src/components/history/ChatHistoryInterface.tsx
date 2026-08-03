@@ -7,7 +7,6 @@ import {
   FiSquare,
   FiTrash2,
   FiX,
-  FiArrowLeft,
 } from "react-icons/fi";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { RenameModal } from "@/components/ui/RenameModal";
@@ -64,7 +63,9 @@ export const ChatHistoryInterface = ({
 
   const handleSelectChat = async (chatId: number) => {
     try {
+      // Load the session - this will also set currentModelName in the store
       await loadSession(chatId);
+
       // Navigate back to chat view
       onNavigateToChat?.();
     } catch (error) {
@@ -219,19 +220,10 @@ export const ChatHistoryInterface = ({
     <>
       <div className="flex flex-col h-full w-full max-w-6xl mx-auto px-4">
         <div className="pt-4 pb-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onNavigateToChat}
-              className="text-white/40 hover:text-white transition-colors cursor-pointer p-2 rounded-lg hover:bg-white/5"
-              title="Back to Chat"
-            >
-              <FiArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-4xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent mb-1">
-                Chat History
-              </h1>
-            </div>
+          <div>
+            <h1 className="text-4xl font-bold font-anton bg-linear-to-r from-purple-accent to-white/80 bg-clip-text text-transparent mb-1">
+              Chat History
+            </h1>
           </div>
 
           <div className="flex gap-2">
