@@ -1,3 +1,4 @@
+// src/components/history/ChatItem.tsx
 import { useState, useRef } from "react";
 import { FiCheck } from "react-icons/fi";
 import type { ChatSession } from "./types";
@@ -13,6 +14,7 @@ interface ChatItemProps {
   onDelete: (chatId: number) => void;
   isSelectionMode?: boolean;
   isSelected?: boolean;
+  isActive?: boolean;
   onToggleSelect?: (chatId: number) => void;
 }
 
@@ -25,6 +27,7 @@ export const ChatItem = ({
   onDelete,
   isSelectionMode = false,
   isSelected = false,
+  isActive = false,
   onToggleSelect,
 }: ChatItemProps) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -56,6 +59,10 @@ export const ChatItem = ({
     }
   };
 
+  // Truncate preview if too long
+  const truncatedPreview =
+    preview.length > 60 ? preview.slice(0, 60) + "..." : preview;
+
   return (
     <div
       onClick={handleChatClick}
@@ -65,8 +72,9 @@ export const ChatItem = ({
         group relative transition-all duration-200 cursor-pointer
         rounded-lg px-4 py-3 mx-4 mb-2
         ${isSelected ? "bg-purple-accent/20 border border-purple-accent/30" : ""}
-        ${isHovered && !isSelected ? "bg-white/10" : ""}
-        ${!isHovered && !isSelected ? "bg-white/5" : ""}
+        ${isActive ? "bg-purple-accent/10 border border-purple-accent/20" : ""}
+        ${isHovered && !isSelected && !isActive ? "bg-white/10" : ""}
+        ${!isHovered && !isSelected && !isActive ? "bg-white/5" : ""}
       `}
     >
       <div className="flex items-center justify-between">
@@ -88,17 +96,22 @@ export const ChatItem = ({
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-white font-medium text-lg mb-1 truncate">
-              {preview}
+            <p
+              className={`font-medium text-base truncate ${isActive ? "text-purple-accent" : "text-white"}`}
+            >
+              {truncatedPreview || "New Chat"}
             </p>
-            <div className="flex items-center gap-3 text-xs text-white/30">
+            <div className="flex items-center gap-3 text-xs text-white/30 mt-0.5">
               <span>Model: {chat.model_name}</span>
+              {isActive && (
+                <span className="text-purple-accent/60">● Active</span>
+              )}
             </div>
           </div>
         </div>
 
         {!isSelectionMode && (
-          <div className="flex items-center h-full shrink-0 relative">
+          <div className="flex items-center h-full shrink-0 relative ml-3">
             <div className="flex flex-col text-xs text-white/30 min-w-17.5">
               <ChatDate
                 createdAt={chat.created_at}

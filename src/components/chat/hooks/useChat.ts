@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { useOllama } from "@/contexts/OllamaContext";
+import { useChatStore } from "@/stores/chatStore";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -14,123 +15,48 @@ export interface ChatModelData {
   ollama_model_name: string;
 }
 
-export interface ChatSession {
-  id: number;
-  title: string;
-  model_name: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface StoredChatMessage {
-  id: number;
-  session_id: number;
-  role: string;
-  content: string;
-  created_at: string;
-}
-
-export interface ChatSessionWithMessages {
-  session: ChatSession;
-  messages: StoredChatMessage[];
-}
-
 export const useChat = (modelData: ChatModelData | undefined) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+
+  // Get Zustand state and actions
+  const {
+    currentSessionId,
+    currentMessages,
+    setCurrentMessages,
+    setStreaming,
+    addMessage,
+    loadSessions,
+    loadSession,
+    createSession: createSessionStore,
+    setError: setStoreError,
+    startNewChat,
+    currentModelName,
+    setCurrentModelName,
+  } = useChatStore();
 
   const unlistenRefs = useRef<UnlistenFn[]>([]);
   const { isReady } = useOllama();
   const isOllamaReady = isReady;
+  const currentMessagesRef = useRef(currentMessages);
 
-  const loadSessions = useCallback(async () => {
-    setIsLoadingSessions(true);
-    try {
-      const result = await invoke<ChatSession[]>("get_chat_sessions");
-      setSessions(result);
-    } catch (err) {
-      console.error("Failed to load sessions:", err);
-    } finally {
-      setIsLoadingSessions(false);
-    }
-  }, []);
+  // Keep ref in sync with currentMessages
+  useEffect(() => {
+    currentMessagesRef.current = currentMessages;
+  }, [currentMessages]);
 
-  const loadSession = useCallback(async (sessionId: number) => {
-    setIsLoading(true);
-    try {
-      const result = await invoke<ChatSessionWithMessages | null>(
-        "get_chat_session",
-        { sessionId },
-      );
-      if (result) {
-        const chatMessages: ChatMessage[] = result.messages.map((m) => ({
-          role: m.role as "user" | "assistant" | "system",
-          content: m.content,
-        }));
-        setMessages(chatMessages);
-        setCurrentSessionId(sessionId);
-        setError(null);
-      }
-    } catch (err) {
-      console.error("Failed to load session:", err);
-      setError(err as string);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const loadSessionWithMessages = useCallback(
+    async (sessionId: number) => {
+      await loadSession(sessionId);
+    },
+    [loadSession],
+  );
 
   const createSession = useCallback(
     async (modelName: string, title?: string) => {
-      try {
-        const sessionId = await invoke<number>("create_chat_session", {
-          request: {
-            model_name: modelName,
-            title: title || `Chat with ${modelName}`,
-          },
-        });
-        await loadSessions();
-        return sessionId;
-      } catch (err) {
-        console.error("Failed to create session:", err);
-        throw err;
-      }
+      return await createSessionStore(modelName, title);
     },
-    [loadSessions],
-  );
-
-  const deleteSession = useCallback(
-    async (sessionId: number) => {
-      try {
-        await invoke("delete_chat_session", { sessionId });
-        await loadSessions();
-        if (currentSessionId === sessionId) {
-          setMessages([]);
-          setCurrentSessionId(null);
-        }
-      } catch (err) {
-        console.error("Failed to delete session:", err);
-        throw err;
-      }
-    },
-    [currentSessionId, loadSessions],
-  );
-
-  const updateSessionTitle = useCallback(
-    async (sessionId: number, title: string) => {
-      try {
-        await invoke("update_chat_session_title", { sessionId, title });
-        await loadSessions();
-      } catch (err) {
-        console.error("Failed to update session title:", err);
-        throw err;
-      }
-    },
-    [loadSessions],
+    [createSessionStore],
   );
 
   const sendMessage = async (content: string) => {
@@ -144,45 +70,81 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     }
 
     if (!isOllamaReady) {
-      setError("Ollama is not running. Please wait for it to start.");
+      const errorMsg = "Ollama is not running. Please wait for it to start.";
+      setError(errorMsg);
+      setStoreError(errorMsg);
       return;
     }
 
     if (!modelData.ollama_model_name) {
-      setError(
-        "Selected model has no Ollama name. Please reinstall the model.",
-      );
+      const errorMsg =
+        "Selected model has no Ollama name. Please reinstall the model.";
+      setError(errorMsg);
+      setStoreError(errorMsg);
       return;
     }
 
     console.log("Sending message with model:", modelData.ollama_model_name);
 
     setError(null);
+    setStoreError(null);
     setIsLoading(true);
-    setIsStreaming(true);
+    setStreaming(true);
 
     let sessionId = currentSessionId;
     if (!sessionId) {
       try {
-        sessionId = await createSession(modelData.ollama_model_name);
-        setCurrentSessionId(sessionId);
+        // Use the first message as the title (truncated to 50 chars)
+        const title =
+          content.trim().slice(0, 50) +
+          (content.trim().length > 50 ? "..." : "");
+        sessionId = await createSessionStore(
+          modelData.ollama_model_name,
+          title,
+        );
+        console.log("Created new session with ID:", sessionId, "Title:", title);
       } catch (err) {
-        setError("Failed to create chat session");
+        const errorMsg = "Failed to create chat session";
+        setError(errorMsg);
+        setStoreError(errorMsg);
         setIsLoading(false);
-        setIsStreaming(false);
+        setStreaming(false);
         return;
       }
     }
 
-    setMessages((prev) => [...prev, { role: "user", content: content.trim() }]);
+    // Add user message to Zustand store
+    const userMessage: ChatMessage = { role: "user", content: content.trim() };
 
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    // Update local state first
+    setCurrentMessages([...currentMessagesRef.current, userMessage]);
+
+    // Then save to database
+    try {
+      await invoke("add_message_to_session", {
+        sessionId,
+        message: {
+          role: userMessage.role,
+          content: userMessage.content,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to save user message:", err);
+      // Don't block the flow if saving fails
+    }
+
+    // Add empty assistant message
+    const assistantMessage: ChatMessage = { role: "assistant", content: "" };
+    setCurrentMessages([...currentMessagesRef.current, assistantMessage]);
 
     try {
-      const chatHistory = [
-        ...messages,
-        { role: "user", content: content.trim() },
-      ];
+      // Get all messages for the chat history
+      const chatHistory = currentMessagesRef.current.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      console.log("Sending chat history with", chatHistory.length, "messages");
 
       await invoke("send_chat_stream", {
         request: {
@@ -195,38 +157,36 @@ export const useChat = (modelData: ChatModelData | undefined) => {
       await loadSessions();
     } catch (err) {
       console.error("Error sending message:", err);
-      setError(err as string);
+      const errorMsg = err as string;
+      setError(errorMsg);
+      setStoreError(errorMsg);
       setIsLoading(false);
-      setIsStreaming(false);
+      setStreaming(false);
 
-      setMessages((prev) => {
-        const updated = [...prev];
-        if (
-          updated.length > 0 &&
-          updated[updated.length - 1].role === "assistant"
-        ) {
-          updated.pop();
-        }
-        return updated;
-      });
+      // Remove the empty assistant message on error
+      const messages = currentMessagesRef.current;
+      if (
+        messages.length > 0 &&
+        messages[messages.length - 1].role === "assistant" &&
+        messages[messages.length - 1].content === ""
+      ) {
+        const updatedMessages = messages.slice(0, -1);
+        setCurrentMessages(updatedMessages);
+      }
     }
   };
 
   const clearMessages = useCallback(() => {
-    setMessages([]);
+    setCurrentMessages([]);
     setError(null);
-    setCurrentSessionId(null);
-  }, []);
+    setStoreError(null);
+  }, [setCurrentMessages, setStoreError]);
 
-  const startNewChat = useCallback(async () => {
-    setMessages([]);
-    setError(null);
-    setCurrentSessionId(null);
-  }, []);
-
+  // Set up event listeners for streaming
   useEffect(() => {
     const setupListeners = async () => {
       try {
+        // Clean up old listeners
         unlistenRefs.current.forEach((unlisten) => {
           try {
             unlisten();
@@ -238,45 +198,102 @@ export const useChat = (modelData: ChatModelData | undefined) => {
 
         console.log("Setting up chat event listeners...");
 
+        // Listen for streaming chunks
         const unlistenChunk = await listen<{ chunk: string }>(
           "chat-stream-chunk",
           (event) => {
             const fullContent = event.payload.chunk;
+            console.log("Received chunk, length:", fullContent.length);
             console.log(
-              "Received complete response, length:",
-              fullContent.length,
+              "Chunk content preview:",
+              fullContent.substring(0, 100) + "...",
             );
 
-            setMessages((prev) => {
-              const updated = [...prev];
-              const lastIndex = updated.length - 1;
-              if (lastIndex >= 0 && updated[lastIndex].role === "assistant") {
-                updated[lastIndex] = {
-                  ...updated[lastIndex],
-                  content: fullContent,
-                };
-              }
-              return updated;
-            });
+            // Get current messages from the store
+            const currentMessages = useChatStore.getState().currentMessages;
+            const updatedMessages = [...currentMessages];
+            const lastIndex = updatedMessages.length - 1;
+
+            console.log("Current messages length:", currentMessages.length);
+            console.log("Last index:", lastIndex);
+
+            if (
+              lastIndex >= 0 &&
+              updatedMessages[lastIndex].role === "assistant"
+            ) {
+              updatedMessages[lastIndex] = {
+                ...updatedMessages[lastIndex],
+                content: fullContent,
+              };
+              console.log(
+                "Updated assistant message, new length:",
+                fullContent.length,
+              );
+              // Update the store
+              useChatStore.getState().setCurrentMessages(updatedMessages);
+            } else {
+              console.warn(
+                "No assistant message found to update. Messages:",
+                currentMessages.map((m) => m.role),
+              );
+            }
           },
         );
         unlistenRefs.current.push(unlistenChunk);
 
+        // Listen for stream completion
         const unlistenDone = await listen("chat-stream-done", () => {
           console.log("Chat stream completed");
           setIsLoading(false);
-          setIsStreaming(false);
+          setStreaming(false);
         });
         unlistenRefs.current.push(unlistenDone);
 
+        // Listen for stream complete with final response
+        const unlistenComplete = await listen<{ response: string }>(
+          "chat-stream-complete",
+          (event) => {
+            const response = event.payload.response;
+            console.log(
+              "Chat stream complete with response length:",
+              response.length,
+            );
+
+            // Ensure the final response is in the store
+            const currentMessages = useChatStore.getState().currentMessages;
+            const updatedMessages = [...currentMessages];
+            const lastIndex = updatedMessages.length - 1;
+
+            if (
+              lastIndex >= 0 &&
+              updatedMessages[lastIndex].role === "assistant"
+            ) {
+              // If the content is different, update it
+              if (updatedMessages[lastIndex].content !== response) {
+                updatedMessages[lastIndex] = {
+                  ...updatedMessages[lastIndex],
+                  content: response,
+                };
+                useChatStore.getState().setCurrentMessages(updatedMessages);
+              }
+            }
+
+            setIsLoading(false);
+            setStreaming(false);
+          },
+        );
+        unlistenRefs.current.push(unlistenComplete);
+
+        // Listen for stream errors
         const unlistenError = await listen<{ error: string }>(
           "chat-stream-error",
           (event) => {
             const { error: errorMsg } = event.payload;
             console.error("Chat stream error:", errorMsg);
             setError(errorMsg);
+            setStoreError(errorMsg);
             setIsLoading(false);
-            setIsStreaming(false);
+            setStreaming(false);
           },
         );
         unlistenRefs.current.push(unlistenError);
@@ -288,7 +305,6 @@ export const useChat = (modelData: ChatModelData | undefined) => {
     };
 
     setupListeners();
-    loadSessions();
 
     return () => {
       console.log("Cleaning up chat event listeners...");
@@ -301,24 +317,23 @@ export const useChat = (modelData: ChatModelData | undefined) => {
       });
       unlistenRefs.current = [];
     };
-  }, [loadSessions]);
+  }, [setStreaming, setStoreError]);
 
   return {
-    messages,
+    messages: currentMessages,
     isLoading,
-    isStreaming,
+    isStreaming: useChatStore.getState().isStreaming,
     error,
     isOllamaReady,
-    sessions,
-    isLoadingSessions,
     currentSessionId,
+    currentModelName,
     sendMessage,
     clearMessages,
     startNewChat,
     loadSessions,
-    loadSession,
+    loadSession: loadSessionWithMessages,
     createSession,
-    deleteSession,
-    updateSessionTitle,
+    deleteSession: useChatStore.getState().deleteSession,
+    updateSessionTitle: useChatStore.getState().updateSessionTitle,
   };
 };

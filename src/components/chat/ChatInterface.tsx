@@ -1,3 +1,4 @@
+// src/components/chat/ChatInterface.tsx
 import { useState, useEffect } from "react";
 import { FiX, FiPlus, FiEdit2, FiTrash2 } from "react-icons/fi";
 import { ChatInput } from "./ChatInput";
@@ -7,6 +8,7 @@ import { useChatInput } from "./hooks/useChatInput";
 import { useFileAttachment } from "./hooks/useFileAttachment";
 import { useModelSelection } from "./hooks/useModelSelection";
 import { useChat } from "./hooks/useChat";
+import { useChatStore } from "@/stores/chatStore";
 
 export type ModeType = "chat" | "agent";
 
@@ -15,6 +17,22 @@ export const ChatInterface = () => {
   const [isCodeEnabled, setIsCodeEnabled] = useState(false);
   const [mode, setMode] = useState<ModeType>("chat");
   const [showHistory, setShowHistory] = useState(false);
+
+  // Zustand state
+  const {
+    sessions,
+    currentSessionId,
+    currentMessages,
+    isLoadingSessions,
+    error: storeError,
+    isStreaming: storeIsStreaming,
+    loadSessions,
+    loadSession,
+    deleteSession: deleteSessionStore,
+    updateSessionTitle: updateSessionTitleStore,
+    startNewChat: startNewChatStore,
+    currentModelName,
+  } = useChatStore();
 
   const { input, setInput, textareaRef, resetInput } = useChatInput();
   const {
@@ -34,25 +52,18 @@ export const ChatInterface = () => {
     toggleDropdown,
     closeDropdown,
     getSelectedModelData,
+    loadModels,
   } = useModelSelection();
 
   const selectedModelData = getSelectedModelData();
 
+  // Use the chat hook
   const {
-    messages,
     isLoading: isChatLoading,
-    isStreaming,
-    error,
+    error: hookError,
     isOllamaReady,
-    sessions,
-    isLoadingSessions,
-    currentSessionId,
     sendMessage,
     startNewChat,
-    loadSessions,
-    loadSession,
-    deleteSession,
-    updateSessionTitle,
   } = useChat(
     selectedModelData && selectedModelData.ollama_model_name
       ? {
@@ -63,9 +74,26 @@ export const ChatInterface = () => {
       : undefined,
   );
 
+  // Load sessions and models on mount
   useEffect(() => {
     loadSessions();
-  }, [loadSessions]);
+    loadModels();
+  }, []);
+
+  // When currentModelName changes, select the matching model
+  useEffect(() => {
+    if (currentModelName && models.length > 0) {
+      const matchedModel = models.find(
+        (m) =>
+          m.ollama_model_name === currentModelName ||
+          m.value === currentModelName ||
+          m.label === currentModelName,
+      );
+      if (matchedModel && matchedModel.value !== selectedModel) {
+        selectModel(matchedModel.value);
+      }
+    }
+  }, [currentModelName, models, selectedModel, selectModel]);
 
   const handleSubmit = async () => {
     if (
@@ -105,7 +133,7 @@ export const ChatInterface = () => {
 
   const handleDeleteSession = async (sessionId: number) => {
     if (confirm("Delete this chat session?")) {
-      await deleteSession(sessionId);
+      await deleteSessionStore(sessionId);
     }
   };
 
@@ -115,8 +143,13 @@ export const ChatInterface = () => {
 
     const newTitle = prompt("Enter new title:", session.title);
     if (newTitle && newTitle.trim()) {
-      await updateSessionTitle(sessionId, newTitle.trim());
+      await updateSessionTitleStore(sessionId, newTitle.trim());
     }
+  };
+
+  const handleStartNewChat = () => {
+    startNewChatStore();
+    startNewChat();
   };
 
   const formatDate = (dateStr: string) => {
@@ -144,7 +177,8 @@ export const ChatInterface = () => {
     !selectedModelData?.ollama_model_name;
 
   const attachmentCount = attachments.length;
-  const hasMessages = messages.length > 0;
+  const hasMessages = currentMessages.length > 0;
+  const combinedError = storeError || hookError;
 
   return (
     <div className="w-full max-w-3xl mx-auto h-full flex flex-col relative">
@@ -166,7 +200,7 @@ export const ChatInterface = () => {
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  startNewChat();
+                  handleStartNewChat();
                   setShowHistory(false);
                 }}
                 className="w-full text-left px-3 py-2 text-sm bg-purple-accent hover:bg-purple-accent/80 text-white rounded-lg transition-colors flex items-center gap-2"
@@ -235,10 +269,10 @@ export const ChatInterface = () => {
         <>
           <div className="flex-1">
             <ChatMessages
-              messages={messages}
+              messages={currentMessages}
               isLoading={isChatLoading}
-              isStreaming={isStreaming}
-              error={error}
+              isStreaming={storeIsStreaming}
+              error={combinedError}
               isOllamaReady={isOllamaReady}
             />
           </div>
@@ -308,7 +342,6 @@ export const ChatInterface = () => {
               </p>
             </div>
 
-            {/* Input area centered below the title */}
             <div className="w-full max-w-3xl mt-8">
               {attachmentCount > 0 && (
                 <div className="px-4 py-2 text-xs text-white/60 bg-black border-t border-white/5">

@@ -73,6 +73,7 @@ pub fn run() {
             api::chat::commands::get_chat_session,
             api::chat::commands::delete_chat_session,
             api::chat::commands::update_chat_session_title,
+            api::chat::commands::add_message_to_session,  
             
             // Chat commands
             api::chat::commands::send_chat_message,

@@ -1,4 +1,5 @@
-import { useState } from "react";
+// src/components/history/ChatHistoryInterface.tsx
+import { useState, useEffect } from "react";
 import {
   FiSearch,
   FiMessageSquare,
@@ -10,10 +11,15 @@ import {
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { RenameModal } from "@/components/ui/RenameModal";
 import { ChatItem } from "./ChatItem";
-import { useChatHistory } from "./hooks/useChatHistory.ts";
-import { useChatPreviews } from "./hooks/useChatPreview.ts";
+import { useChatStore } from "@/stores/chatStore";
 
-export const ChatHistoryInterface = () => {
+interface ChatHistoryInterfaceProps {
+  onNavigateToChat?: () => void;
+}
+
+export const ChatHistoryInterface = ({
+  onNavigateToChat,
+}: ChatHistoryInterfaceProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedChats, setSelectedChats] = useState<Set<number>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -29,48 +35,52 @@ export const ChatHistoryInterface = () => {
     currentTitle: "",
   });
 
+  // Use Zustand store
   const {
-    chats,
-    loading: chatsLoading,
+    sessions: chats,
+    isLoadingSessions: loading,
     error: chatsError,
-    loadChats,
-    getChatSession,
-    renameChat,
-    deleteChat,
-    pinChat,
-  } = useChatHistory();
+    loadSessions,
+    loadSession,
+    deleteSession,
+    updateSessionTitle,
+    currentSessionId,
+  } = useChatStore();
 
-  const {
-    previews,
-    loading: previewsLoading,
-    updatePreview,
-    removePreview,
-  } = useChatPreviews(chats);
+  // Load chats on mount
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
 
-  const loading = chatsLoading || previewsLoading;
-
+  // Filter chats based on search term
   const filteredChats = chats.filter((chat) => {
-    const preview = previews.get(chat.id) || "";
-    return preview.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      chat.title.toLowerCase().includes(searchLower) ||
+      chat.model_name.toLowerCase().includes(searchLower)
+    );
   });
 
   const handleSelectChat = async (chatId: number) => {
     try {
-      const chatData = await getChatSession(chatId);
-      if (chatData) {
-        console.log("Loaded chat:", chatData);
-      }
+      // Load the session - this will also set currentModelName in the store
+      await loadSession(chatId);
+
+      // Navigate back to chat view
+      onNavigateToChat?.();
     } catch (error) {
       console.error("Failed to load chat:", error);
     }
   };
 
   const handleRename = (chatId: number) => {
-    const preview = previews.get(chatId) || "Untitled";
+    const chat = chats.find((c) => c.id === chatId);
+    if (!chat) return;
+
     setRenameModal({
       isOpen: true,
       chatId,
-      currentTitle: preview,
+      currentTitle: chat.title,
     });
   };
 
@@ -79,8 +89,7 @@ export const ChatHistoryInterface = () => {
     if (chatId === null) return;
 
     try {
-      await renameChat(chatId, newTitle);
-      updatePreview(chatId, newTitle);
+      await updateSessionTitle(chatId, newTitle);
       setRenameModal({ isOpen: false, chatId: null, currentTitle: "" });
     } catch (error) {
       alert("Failed to rename conversation. Please try again.");
@@ -88,11 +97,14 @@ export const ChatHistoryInterface = () => {
   };
 
   const handleDelete = (chatId: number) => {
-    const preview = previews.get(chatId) || "Untitled";
+    const chat = chats.find((c) => c.id === chatId);
+    if (!chat) return;
+
     setConfirmModal({
       isOpen: true,
       chatId,
-      chatTitle: preview.length > 30 ? preview.slice(0, 30) + "..." : preview,
+      chatTitle:
+        chat.title.length > 30 ? chat.title.slice(0, 30) + "..." : chat.title,
       isMassDelete: false,
     });
   };
@@ -102,8 +114,7 @@ export const ChatHistoryInterface = () => {
     if (chatId === null) return;
 
     try {
-      await deleteChat(chatId);
-      removePreview(chatId);
+      await deleteSession(chatId);
       setConfirmModal({
         isOpen: false,
         chatId: null,
@@ -153,11 +164,10 @@ export const ChatHistoryInterface = () => {
   const performMassDelete = async () => {
     try {
       const deletePromises = Array.from(selectedChats).map((chatId) =>
-        deleteChat(chatId),
+        deleteSession(chatId),
       );
       await Promise.all(deletePromises);
 
-      // Clear selected chats after deletion
       setSelectedChats(new Set());
       setIsSelectionMode(false);
 
@@ -196,7 +206,7 @@ export const ChatHistoryInterface = () => {
           <p className="text-lg font-medium mb-2">Error loading chats</p>
           <p className="text-white/40 text-sm">{chatsError}</p>
           <button
-            onClick={loadChats}
+            onClick={loadSessions}
             className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors cursor-pointer"
           >
             Retry
@@ -300,14 +310,15 @@ export const ChatHistoryInterface = () => {
               <ChatItem
                 key={chat.id}
                 chat={chat}
-                preview={previews.get(chat.id) || "No messages yet"}
+                preview={chat.title}
                 onSelect={handleSelectChat}
-                onPin={pinChat}
+                onPin={() => {}}
                 onRename={handleRename}
                 onDelete={handleDelete}
                 isSelectionMode={isSelectionMode}
                 isSelected={selectedChats.has(chat.id)}
                 onToggleSelect={toggleChatSelection}
+                isActive={currentSessionId === chat.id}
               />
             ))}
           </div>
@@ -320,7 +331,7 @@ export const ChatHistoryInterface = () => {
               Showing {filteredChats.length} of {chats.length}
             </span>
             <button
-              onClick={loadChats}
+              onClick={loadSessions}
               className="text-white/40 hover:text-white/70 transition-colors cursor-pointer"
             >
               Refresh
