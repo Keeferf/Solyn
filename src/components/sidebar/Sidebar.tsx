@@ -2,6 +2,7 @@ import { SidebarItem } from "./SidebarItem";
 import { NAVIGATION_ITEMS, FOOTER_ITEMS } from "./SidebarNavigation";
 import { OllamaVersionIndicator } from "./OllamaVersionIndicator";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { useChatStore } from "@/stores/chatStore";
 
 interface SidebarProps {
   onNavigate?: (view: "chat" | "history" | "models") => void;
@@ -16,26 +17,32 @@ export const Sidebar = ({
   isCollapsed = false,
   onToggleCollapse,
 }: SidebarProps) => {
+  const { startNewChat } = useChatStore();
+
   const handleNavigation = (id: string) => {
     if (id === "models") {
       onNavigate?.("models");
     } else if (id === "chats") {
       onNavigate?.("history");
-    } else if (id === "new-chat" || id === "search") {
+    } else if (id === "new-chat") {
+      // Create a new chat
+      startNewChat();
+      onNavigate?.("chat");
+    } else if (id === "search") {
+      // Search functionality
       onNavigate?.("chat");
     }
   };
 
   const isItemActive = (itemId: string) => {
+    // Only highlight the current view, not "New Chat" or "Search"
     if (itemId === "models") {
       return currentView === "models";
     }
     if (itemId === "chats") {
       return currentView === "history";
     }
-    if (itemId === "new-chat") {
-      return currentView === "chat";
-    }
+    // "New Chat" and "Search" should never be highlighted
     return false;
   };
 

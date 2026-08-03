@@ -83,6 +83,21 @@ pub async fn update_chat_session_title(
 }
 
 #[tauri::command]
+pub async fn add_message_to_session(
+    app_handle: AppHandle,
+    session_id: i64,
+    message: ChatMessageData,
+) -> Result<i64, String> {
+    let db = get_db(&app_handle).await?;
+    let msg_id = db.add_message(
+        session_id,
+        &message.role,
+        &message.content
+    ).await?;
+    Ok(msg_id)
+}
+
+#[tauri::command]
 pub async fn send_chat_message(
     app_handle: AppHandle,
     request: ChatRequestData,
@@ -175,6 +190,9 @@ pub async fn send_chat_stream(
                 ChatEvent::Done(response) => {
                     println!("✅ Chat stream completed for model: {}", request.model);
                     let _ = window.emit("chat-stream-done", json!({ "response": response }));
+                    
+                    // Emit complete event with full response
+                    let _ = window.emit("chat-stream-complete", json!({ "response": full_response }));
                     
                     // Save to database if we have a session
                     if let Some(sid) = session_id_clone {

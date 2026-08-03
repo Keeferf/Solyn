@@ -13,12 +13,20 @@ export const App = () => {
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  const handleNavigate = (view: View) => {
+    setCurrentView(view);
+  };
+
   const renderContent = () => {
     switch (currentView) {
       case "models":
         return <ModelInterface />;
       case "history":
-        return <ChatHistoryInterface />;
+        return (
+          <ChatHistoryInterface
+            onNavigateToChat={() => handleNavigate("chat")}
+          />
+        );
       case "chat":
       default:
         return <ChatInterface />;
@@ -32,7 +40,7 @@ export const App = () => {
           <TitleBar />
           <div className="flex h-full pt-10">
             <Sidebar
-              onNavigate={setCurrentView}
+              onNavigate={handleNavigate}
               currentView={currentView}
               isCollapsed={isSidebarCollapsed}
               onToggleCollapse={() =>

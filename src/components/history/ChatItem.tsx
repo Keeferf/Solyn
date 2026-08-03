@@ -13,6 +13,7 @@ interface ChatItemProps {
   onDelete: (chatId: number) => void;
   isSelectionMode?: boolean;
   isSelected?: boolean;
+  isActive?: boolean;
   onToggleSelect?: (chatId: number) => void;
 }
 
@@ -25,6 +26,7 @@ export const ChatItem = ({
   onDelete,
   isSelectionMode = false,
   isSelected = false,
+  isActive = false,
   onToggleSelect,
 }: ChatItemProps) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -65,8 +67,9 @@ export const ChatItem = ({
         group relative transition-all duration-200 cursor-pointer
         rounded-lg px-4 py-3 mx-4 mb-2
         ${isSelected ? "bg-purple-accent/20 border border-purple-accent/30" : ""}
-        ${isHovered && !isSelected ? "bg-white/10" : ""}
-        ${!isHovered && !isSelected ? "bg-white/5" : ""}
+        ${isActive ? "bg-purple-accent/10 border border-purple-accent/20" : ""}
+        ${isHovered && !isSelected && !isActive ? "bg-white/10" : ""}
+        ${!isHovered && !isSelected && !isActive ? "bg-white/5" : ""}
       `}
     >
       <div className="flex items-center justify-between">
@@ -88,11 +91,16 @@ export const ChatItem = ({
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-white font-medium text-lg mb-1 truncate">
+            <p
+              className={`font-medium text-lg mb-1 truncate ${isActive ? "text-purple-accent" : "text-white"}`}
+            >
               {preview}
             </p>
             <div className="flex items-center gap-3 text-xs text-white/30">
               <span>Model: {chat.model_name}</span>
+              {isActive && (
+                <span className="text-purple-accent/60">● Active</span>
+              )}
             </div>
           </div>
         </div>
