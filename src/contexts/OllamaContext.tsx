@@ -6,6 +6,7 @@ import {
   ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 interface OllamaStatus {
   installed: boolean;
@@ -32,7 +33,7 @@ export const OllamaProvider = ({ children }: { children: ReactNode }) => {
   const refreshOllamaStatus = async () => {
     setRefreshing(true);
     try {
-      const result = await invoke<OllamaStatus>("get_ollama_status");
+      const result = await invoke<OllamaStatus>("refresh_ollama_status");
       setStatus(result);
     } catch (error) {
       console.error("Failed to check Ollama status:", error);
@@ -68,12 +69,22 @@ export const OllamaProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Listen for status updates from the backend
   useEffect(() => {
+    // Initial status check
     refreshOllamaStatus();
 
-    const interval = setInterval(refreshOllamaStatus, 30000);
+    // Listen for status updates via events
+    const unlisten = listen<OllamaStatus>("ollama-status-update", (event) => {
+      console.log("Received status update from backend:", event.payload);
+      setStatus(event.payload);
+      setLoading(false);
+      setRefreshing(false);
+    });
 
-    return () => clearInterval(interval);
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   const isReady = (status?.installed && status?.running) ?? false;

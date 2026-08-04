@@ -11,10 +11,21 @@ use tauri;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Create status monitor
+    let status_monitor = events::OllamaStatusMonitor::new();
+    
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(move |app| {
             // Initialize chat state
             api::chat::commands::init_chat_state(app);
+            
+            // Start the status monitor using Tauri's async runtime
+            let app_handle = app.handle().clone();
+            let monitor = status_monitor.clone();
+            tauri::async_runtime::spawn(async move {
+                monitor.start(app_handle).await;
+            });
+            
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -24,6 +35,7 @@ pub fn run() {
             api::ollama::commands::download_ollama,
             api::ollama::commands::start_ollama_service,
             api::ollama::commands::update_ollama,
+            api::ollama::commands::refresh_ollama_status,
             api::ollama::queries::check_ollama_installed,
             api::ollama::queries::check_ollama_running,  
             api::ollama::queries::get_ollama_status,    
