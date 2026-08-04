@@ -106,46 +106,90 @@
   color: #e5e7eb;
 }
 
-/* ===== SHIKI CODE BLOCK STYLES ===== */
+/* ===== CODE BLOCK WRAPPER ===== */
 
-.shiki-container {
+.shiki-wrapper {
   margin: 1em 0;
   border-radius: 0.75rem;
   overflow: hidden;
-  position: relative;
-  background: #1e1e2e !important; /* Dark purple background */
+  background: #1e1e2e;
+}
+
+/* ===== CODE BLOCK HEADER ===== */
+
+.shiki-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: #161625;
+  border-bottom: 1px solid #2a2a3e;
+  user-select: none;
+}
+
+.shiki-language {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6a6a8a;
+  font-family: 'Inter', sans-serif;
+}
+
+.shiki-copy-button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  color: #6a6a8a;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.shiki-copy-button:hover {
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.shiki-copy-button:active {
+  transform: scale(0.95);
+}
+
+.shiki-copy-button svg {
+  flex-shrink: 0;
+}
+
+/* ===== SHIKI CODE BLOCK STYLES ===== */
+
+.shiki-container {
+  background: #1e1e2e !important;
+  overflow: hidden;
 }
 
 .shiki-container pre {
-  background: transparent !important; /* Remove duplicate background */
+  background: transparent !important;
   padding: 1.25em !important;
   margin: 0 !important;
   overflow-x: auto;
   font-family: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
   font-size: 0.875em;
   line-height: 1.6;
-  border-radius: 0; /* Remove border-radius since parent has it */
+  border-radius: 0;
 }
 
-/* Language label for Shiki code blocks */
+/* Remove the old language label since we now have a header */
 .shiki-container::before {
-  content: attr(data-language);
-  position: absolute;
-  top: 0.5rem;
-  right: 0.75rem;
-  font-size: 0.65rem;
-  color: #6a6a8a;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  z-index: 1;
-  background: rgba(30, 30, 46, 0.8);
-  padding: 0.2rem 0.6rem;
-  border-radius: 0.25rem;
-  pointer-events: none;
+  display: none;
 }
 
-/* Fallback code block styles (when Shiki fails or hasn't loaded) */
+/* ===== FALLBACK CODE BLOCK STYLES ===== */
+
 .shiki-container-fallback {
   background: #1f2937 !important;
 }
@@ -169,27 +213,30 @@
   color: #e5e7eb;
 }
 
-/* Scrollbar styling for code blocks */
-.shiki-container pre::-webkit-scrollbar,
-.markdown-content pre::-webkit-scrollbar {
+/* ===== SCROLLBAR STYLING FOR CODE BLOCKS ===== */
+
+.shiki-container pre::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-.shiki-container pre::-webkit-scrollbar-track,
-.markdown-content pre::-webkit-scrollbar-track {
+.shiki-container pre::-webkit-scrollbar-track {
   background: #1e1e2e;
 }
 
-.shiki-container pre::-webkit-scrollbar-thumb,
-.markdown-content pre::-webkit-scrollbar-thumb {
+.shiki-container pre::-webkit-scrollbar-thumb {
   background: #4a4a6a;
   border-radius: 3px;
 }
 
-.shiki-container pre::-webkit-scrollbar-thumb:hover,
-.markdown-content pre::-webkit-scrollbar-thumb:hover {
+.shiki-container pre::-webkit-scrollbar-thumb:hover {
   background: #5a5a8a;
+}
+
+/* ===== COPY BUTTON ANIMATION ===== */
+
+.shiki-copy-button span {
+  transition: opacity 0.2s ease;
 }
 
 /* ===== TABLE STYLES ===== */
@@ -264,29 +311,4 @@
 .markdown-content input[type="checkbox"] {
   margin-right: 0.5em;
   accent-color: #7d7abc;
-}
-
-/* Copy button for code blocks (optional) */
-.shiki-container {
-  position: relative;
-}
-
-.shiki-container .copy-button {
-  position: absolute;
-  top: 0.5rem;
-  right: 5rem;
-  background: rgba(30, 30, 46, 0.8);
-  color: #6a6a8a;
-  border: none;
-  padding: 0.2rem 0.6rem;
-  border-radius: 0.25rem;
-  font-size: 0.65rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: inherit;
-}
-
-.shiki-container .copy-button:hover {
-  color: #e5e7eb;
-  background: rgba(30, 30, 46, 0.9);
 }
