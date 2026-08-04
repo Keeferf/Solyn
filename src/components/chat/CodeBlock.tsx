@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { FiCopy, FiCheck } from "react-icons/fi";
 import { type Highlighter } from "shiki";
+import { useThemeStore } from "@/stores/themeStore";
+import { getThemeColors } from "@/utils/themeColors";
 
 interface CodeBlockProps {
   className?: string;
@@ -16,6 +18,10 @@ export const CodeBlock = ({
   inline = false,
 }: CodeBlockProps) => {
   const [copied, setCopied] = useState(false);
+  const { theme } = useThemeStore();
+
+  // Get theme-aware colors
+  const themeColors = useMemo(() => getThemeColors(theme), [theme]);
 
   const match = /language-(\w+)/.exec(className || "");
   const lang = match ? match[1] : "";
@@ -36,13 +42,37 @@ export const CodeBlock = ({
     return inline ? (
       <code className={className}>{children}</code>
     ) : (
-      <div className="shiki-wrapper">
-        <div className="shiki-header">
-          <span className="shiki-language">{lang || "code"}</span>
+      <div
+        className="shiki-wrapper"
+        style={{
+          backgroundColor: themeColors.background,
+          borderColor: themeColors.border,
+        }}
+      >
+        <div
+          className="shiki-header"
+          style={{
+            backgroundColor: themeColors.headerBackground,
+            borderBottomColor: themeColors.border,
+          }}
+        >
+          <span
+            className="shiki-language"
+            style={{ color: themeColors.languageLabel }}
+          >
+            {lang || "code"}
+          </span>
           <button
             onClick={handleCopy}
             className="shiki-copy-button"
+            style={{ color: themeColors.copyButton }}
             aria-label="Copy code"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = themeColors.copyButtonHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = themeColors.copyButton;
+            }}
           >
             {copied ? (
               <>
@@ -57,7 +87,10 @@ export const CodeBlock = ({
             )}
           </button>
         </div>
-        <div className="shiki-container shiki-container-fallback">
+        <div
+          className="shiki-container shiki-container-fallback"
+          style={{ backgroundColor: themeColors.background }}
+        >
           <pre className={className}>
             <code className={className}>{children}</code>
           </pre>
@@ -67,20 +100,44 @@ export const CodeBlock = ({
   }
 
   try {
-    // Use Shiki to highlight the code
+    // Use Shiki to highlight the code with the selected theme
     const html = highlighter.codeToHtml(codeContent, {
       lang,
-      theme: "github-dark",
+      theme: theme,
     });
 
     return (
-      <div className="shiki-wrapper">
-        <div className="shiki-header">
-          <span className="shiki-language">{lang}</span>
+      <div
+        className="shiki-wrapper"
+        style={{
+          backgroundColor: themeColors.background,
+          borderColor: themeColors.border,
+        }}
+      >
+        <div
+          className="shiki-header"
+          style={{
+            backgroundColor: themeColors.headerBackground,
+            borderBottomColor: themeColors.border,
+          }}
+        >
+          <span
+            className="shiki-language"
+            style={{ color: themeColors.languageLabel }}
+          >
+            {lang}
+          </span>
           <button
             onClick={handleCopy}
             className="shiki-copy-button"
+            style={{ color: themeColors.copyButton }}
             aria-label="Copy code"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = themeColors.copyButtonHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = themeColors.copyButton;
+            }}
           >
             {copied ? (
               <>
@@ -98,6 +155,7 @@ export const CodeBlock = ({
         <div
           className="shiki-container"
           data-language={lang}
+          style={{ backgroundColor: themeColors.background }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       </div>
@@ -105,13 +163,37 @@ export const CodeBlock = ({
   } catch (error) {
     console.warn(`Failed to highlight code for language: ${lang}`, error);
     return (
-      <div className="shiki-wrapper">
-        <div className="shiki-header">
-          <span className="shiki-language">{lang}</span>
+      <div
+        className="shiki-wrapper"
+        style={{
+          backgroundColor: themeColors.background,
+          borderColor: themeColors.border,
+        }}
+      >
+        <div
+          className="shiki-header"
+          style={{
+            backgroundColor: themeColors.headerBackground,
+            borderBottomColor: themeColors.border,
+          }}
+        >
+          <span
+            className="shiki-language"
+            style={{ color: themeColors.languageLabel }}
+          >
+            {lang}
+          </span>
           <button
             onClick={handleCopy}
             className="shiki-copy-button"
+            style={{ color: themeColors.copyButton }}
             aria-label="Copy code"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = themeColors.copyButtonHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = themeColors.copyButton;
+            }}
           >
             {copied ? (
               <>
@@ -126,7 +208,10 @@ export const CodeBlock = ({
             )}
           </button>
         </div>
-        <div className="shiki-container shiki-container-fallback">
+        <div
+          className="shiki-container shiki-container-fallback"
+          style={{ backgroundColor: themeColors.background }}
+        >
           <pre className={className}>
             <code className={className}>{children}</code>
           </pre>

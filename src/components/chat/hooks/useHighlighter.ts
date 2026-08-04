@@ -1,6 +1,6 @@
-// src/components/chat/hooks/useHighlighter.ts
 import { useEffect, useState } from "react";
 import { createHighlighter, type Highlighter } from "shiki";
+import { useThemeStore } from "@/stores/themeStore";
 
 const SUPPORTED_LANGUAGES = [
   "javascript",
@@ -39,13 +39,25 @@ const SUPPORTED_LANGUAGES = [
 
 export const useHighlighter = () => {
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
+  const { theme } = useThemeStore();
 
   useEffect(() => {
+    let isMounted = true;
+
     createHighlighter({
-      themes: ["github-dark"],
+      themes: [theme],
       langs: SUPPORTED_LANGUAGES,
-    }).then(setHighlighter);
-  }, []);
+    }).then((hl) => {
+      if (isMounted) {
+        setHighlighter(hl);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      setHighlighter(null);
+    };
+  }, [theme]);
 
   return highlighter;
 };
