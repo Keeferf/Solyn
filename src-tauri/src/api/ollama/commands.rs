@@ -5,7 +5,9 @@ use crate::core::ollama::client::*;
 use crate::core::installation::executor::execute_ollama_installation;
 use crate::core::platform::detector::detect_operating_system;
 use crate::events::progress_broadcaster::broadcast_download_progress;
+use crate::events::ollama_status_monitor::OllamaStatusMonitor;
 use crate::data::download_state::DownloadStatus;
+use super::contracts::OllamaStatus;
 
 #[tauri::command]
 pub async fn start_ollama_service(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -39,6 +41,10 @@ pub async fn download_ollama(app_handle: tauri::AppHandle) -> Result<String, Str
         );
         return Err(e);
     }
+
+    // Trigger a status update after successful installation
+    let monitor = OllamaStatusMonitor::new();
+    monitor.trigger_status_check(&app_handle).await;
 
     broadcast_download_progress(
         &window,
@@ -80,6 +86,10 @@ pub async fn update_ollama(app_handle: tauri::AppHandle) -> Result<String, Strin
         return Err(e);
     }
 
+    // Trigger a status update after successful update
+    let monitor = OllamaStatusMonitor::new();
+    monitor.trigger_status_check(&app_handle).await;
+
     broadcast_download_progress(
         &window,
         DownloadStatus::Complete,
@@ -88,6 +98,28 @@ pub async fn update_ollama(app_handle: tauri::AppHandle) -> Result<String, Strin
         None,
     );
 
-    // Refresh the status after update
     Ok("Ollama updated successfully".to_string())
+}
+
+#[tauri::command]
+pub async fn refresh_ollama_status(app_handle: tauri::AppHandle) -> Result<OllamaStatus, String> {
+    let monitor = OllamaStatusMonitor::new();
+    monitor.trigger_status_check(&app_handle).await;
+    
+    // Also return the current status immediately
+    let installed = is_ollama_installed().await?;
+    let (running, version) = if installed {
+        match fetch_ollama_version().await {
+            Ok(v) => (true, Some(v)),
+            Err(_) => (false, None),
+        }
+    } else {
+        (false, None)
+    };
+    
+    Ok(OllamaStatus {
+        installed,
+        running,
+        version,
+    })
 }
