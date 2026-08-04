@@ -30,11 +30,8 @@ impl OllamaStatusMonitor {
         let app_handle_clone = app_handle.clone();
         
         let handle = tokio::spawn(async move {
-            // Initial check immediately
             Self::check_and_emit_status(&app_handle_clone).await;
-            
-            // Then check every 30 seconds
-            let mut interval = interval(Duration::from_secs(30));
+            let mut interval = interval(Duration::from_secs(21600));
             loop {
                 interval.tick().await;
                 Self::check_and_emit_status(&app_handle_clone).await;
