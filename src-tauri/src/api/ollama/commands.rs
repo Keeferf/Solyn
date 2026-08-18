@@ -2,7 +2,7 @@ use tauri;
 use tauri::Manager;
 
 use crate::core::ollama::client::*;
-use crate::core::installation::executor::execute_ollama_installation;
+use crate::core::installation::executor::{execute_ollama_installation, execute_ollama_update}; // Add execute_ollama_update
 use crate::core::platform::detector::detect_operating_system;
 use crate::events::progress_broadcaster::broadcast_download_progress;
 use crate::events::ollama_status_monitor::OllamaStatusMonitor;
@@ -59,6 +59,8 @@ pub async fn download_ollama(app_handle: tauri::AppHandle) -> Result<String, Str
 
 #[tauri::command]
 pub async fn update_ollama(app_handle: tauri::AppHandle) -> Result<String, String> {
+    println!("🔄 Starting Ollama update process...");
+    
     let window = app_handle
         .get_webview_window("main")
         .ok_or("Main window not found")?;
@@ -72,10 +74,12 @@ pub async fn update_ollama(app_handle: tauri::AppHandle) -> Result<String, Strin
         None,
     );
 
-    // Use the same installation process for updates
-    let download_result = execute_ollama_installation(&app_handle, &window, &platform).await;
+    // Use the DEDICATED update function instead of installation
+    println!("📥 Executing Ollama update...");
+    let update_result = execute_ollama_update(&app_handle, &window, &platform).await;
 
-    if let Err(e) = download_result {
+    if let Err(e) = update_result {
+        println!("❌ Update failed: {}", e);
         broadcast_download_progress(
             &window,
             DownloadStatus::Error,
@@ -86,7 +90,12 @@ pub async fn update_ollama(app_handle: tauri::AppHandle) -> Result<String, Strin
         return Err(e);
     }
 
-    // Trigger a status update after successful update
+    println!("✅ Update completed successfully");
+
+    // Wait a moment for the update to fully settle
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // Trigger a status update after successful installation
     let monitor = OllamaStatusMonitor::new();
     monitor.trigger_status_check(&app_handle).await;
 
@@ -98,6 +107,7 @@ pub async fn update_ollama(app_handle: tauri::AppHandle) -> Result<String, Strin
         None,
     );
 
+    println!("🎉 Ollama update completed successfully");
     Ok("Ollama updated successfully".to_string())
 }
 
