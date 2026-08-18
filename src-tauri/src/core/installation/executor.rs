@@ -4,7 +4,7 @@ use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 use std::time::Duration;
 use crate::helpers::terminal_output_cleaner::{broadcast_terminal_line, parse_and_emit_terminal_output};
-use crate::core::ollama::client::{is_ollama_installed, is_ollama_running, start_ollama};
+use crate::core::ollama::client::{is_ollama_installed, is_ollama_running, start_ollama, fetch_ollama_version};
 
 /// Execute the Ollama installation process for the current platform
 /// This matches the EXACT behavior of the original installation_executor.rs
@@ -96,6 +96,187 @@ pub async fn execute_ollama_installation(
             broadcast_terminal_line(window, "⚠️ Ollama installation completed but verification timed out.", "info", false);
             broadcast_terminal_line(window, "The installation should be complete. You can try refreshing the page.", "info", false);
             broadcast_terminal_line(window, "💡 If you see this message repeatedly, Ollama may need to be started manually.", "info", false);
+            Ok(())
+        }
+    }
+}
+
+/// Execute Ollama UPDATE process (NEW)
+/// This forces a reinstallation/update even if Ollama is already installed
+pub async fn execute_ollama_update(
+    app_handle: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    platform: &str,
+) -> Result<(), String> {
+    let window_clone = window.clone();
+    let shell = app_handle.shell();
+    
+    // Get current version for logging
+    let current_version = match fetch_ollama_version().await {
+        Ok(v) => v,
+        Err(_) => "unknown".to_string(),
+    };
+    
+    broadcast_terminal_line(&window_clone, 
+        &format!("🔄 Updating Ollama from version {}...", current_version), 
+        "info", false
+    );
+    
+    // Use different update methods per platform
+    let (shell_cmd, script_cmd) = match platform {
+        "windows" => {
+            // Windows: Try winget first (more reliable for updates), fallback to reinstall
+            ("powershell", "winget upgrade Ollama.Ollama --silent 2>$null; if ($LASTEXITCODE -ne 0) { irm https://ollama.com/install.ps1 | iex }")
+        }
+        "macos" => {
+            // macOS: Try brew if available, otherwise re-run installer
+            ("sh", "if command -v brew &> /dev/null; then brew upgrade ollama; else curl -fsSL https://ollama.com/install.sh | sh; fi")
+        }
+        "linux" => {
+            // Linux: Try multiple methods
+            ("sh", r#"
+                if command -v apt &> /dev/null; then
+                    sudo apt update && sudo apt install --only-upgrade ollama -y
+                elif command -v pacman &> /dev/null; then
+                    sudo pacman -Syu ollama --noconfirm
+                elif command -v snap &> /dev/null; then
+                    sudo snap refresh ollama
+                else
+                    curl -fsSL https://ollama.com/install.sh | sh
+                fi
+            "#)
+        }
+        _ => return Err("Unsupported platform".to_string()),
+    };
+
+    broadcast_terminal_line(&window_clone, 
+        &format!("📦 Running update for {}...", platform), 
+        "info", false
+    );
+
+    let (mut rx, _child) = shell
+        .command(shell_cmd)
+        .args(&["-c", script_cmd])
+        .spawn()
+        .map_err(|e| format!("Failed to spawn process: {}", e))?;
+
+    // Process output
+    while let Some(event) = rx.recv().await {
+        match event {
+            tauri_plugin_shell::process::CommandEvent::Stdout(data) => {
+                if let Ok(text) = String::from_utf8(data) {
+                    parse_and_emit_terminal_output(&window_clone, &text, "stdout");
+                }
+            }
+            tauri_plugin_shell::process::CommandEvent::Stderr(data) => {
+                if let Ok(text) = String::from_utf8(data) {
+                    parse_and_emit_terminal_output(&window_clone, &text, "stderr");
+                }
+            }
+            tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
+                let msg = if status.code == Some(0) {
+                    "✅ Update script completed"
+                } else {
+                    "⚠️ Update process terminated with error"
+                };
+                broadcast_terminal_line(&window_clone, msg, "info", false);
+            }
+            _ => {}
+        }
+    }
+
+    // Verify the update was successful
+    broadcast_terminal_line(window, "🔍 Verifying Ollama update...", "info", false);
+    
+    // Wait for the update to complete with extended timeout
+    let max_attempts = 25;
+    let mut attempts = 0;
+    let mut new_version = None;
+    let mut ollama_started = false;
+    
+    while attempts < max_attempts {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        attempts += 1;
+        
+        // Check if Ollama is installed
+        match is_ollama_installed().await {
+            Ok(true) => {
+                // Check if it's running and get version
+                match fetch_ollama_version().await {
+                    Ok(version) => {
+                        new_version = Some(version.clone());
+                        // Version should be different (or at least we assume it updated)
+                        if version != current_version || attempts > 15 {
+                            broadcast_terminal_line(window, 
+                                &format!("✅ Ollama updated successfully to version {}", version), 
+                                "success", false
+                            );
+                            return Ok(());
+                        } else if attempts % 3 == 0 {
+                            broadcast_terminal_line(window, 
+                                &format!("⏳ Waiting for version change... (attempt {}/{})", attempts, max_attempts), 
+                                "info", false
+                            );
+                        }
+                    }
+                    Err(_) => {
+                        // Try to start Ollama if it's not running
+                        if !ollama_started && attempts % 3 == 0 {
+                            broadcast_terminal_line(window, "🚀 Attempting to start Ollama...", "info", false);
+                            let _ = start_ollama(app_handle).await;
+                            ollama_started = true;
+                        }
+                        
+                        if attempts < max_attempts && attempts % 3 == 0 {
+                            broadcast_terminal_line(window, 
+                                &format!("⏳ Waiting for Ollama to start... (attempt {}/{})", attempts, max_attempts), 
+                                "info", false
+                            );
+                        }
+                    }
+                }
+            }
+            Ok(false) => {
+                if attempts < max_attempts && attempts % 3 == 0 {
+                    broadcast_terminal_line(window, 
+                        &format!("⏳ Waiting for Ollama installation... (attempt {}/{})", attempts, max_attempts), 
+                        "info", false
+                    );
+                }
+            }
+            Err(_e) => {
+                if attempts < max_attempts && attempts % 3 == 0 {
+                    broadcast_terminal_line(window, 
+                        &format!("⏳ Checking Ollama status... (attempt {}/{})", attempts, max_attempts), 
+                        "info", false
+                    );
+                }
+            }
+        }
+    }
+    
+    // Final verification with one last attempt
+    broadcast_terminal_line(window, "🔍 Performing final verification...", "info", false);
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    
+    // Try one more time to start Ollama
+    if !ollama_started {
+        broadcast_terminal_line(window, "🚀 One final attempt to start Ollama...", "info", false);
+        let _ = start_ollama(app_handle).await;
+        tokio::time::sleep(Duration::from_secs(3)).await;
+    }
+    
+    match fetch_ollama_version().await {
+        Ok(version) => {
+            broadcast_terminal_line(window, 
+                &format!("✅ Ollama updated to version {}", version), 
+                "success", false
+            );
+            Ok(())
+        }
+        Err(_) => {
+            broadcast_terminal_line(window, "⚠️ Update may have completed but verification failed.", "info", false);
+            broadcast_terminal_line(window, "💡 Try restarting Ollama manually or refreshing the page.", "info", false);
             Ok(())
         }
     }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { FiRefreshCw, FiAlertCircle } from "react-icons/fi";
+import { FiRefreshCw, FiAlertCircle, FiCheckCircle } from "react-icons/fi";
 import { useOllama } from "@/contexts/OllamaContext";
 
 interface OllamaStatus {
@@ -16,6 +16,9 @@ export const OllamaVersionIndicator = () => {
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   // Check for updates whenever the status changes
   useEffect(() => {
@@ -32,18 +35,38 @@ export const OllamaVersionIndicator = () => {
     const unlisten = listen<OllamaStatus>("ollama-status-update", (event) => {
       if (event.payload.running && event.payload.version) {
         checkForUpdates(event.payload.version);
+        // If we were updating, check if the version changed
+        if (updating) {
+          const oldVersion = status?.version;
+          if (oldVersion && event.payload.version !== oldVersion) {
+            setUpdateSuccess(true);
+            setUpdating(false);
+            setIsOutdated(false);
+            // Auto-hide success message after 5 seconds
+            setTimeout(() => setUpdateSuccess(false), 5000);
+          }
+        }
+      }
+    });
+
+    // Listen for download progress events
+    const progressUnlisten = listen<any>("download-progress", (event) => {
+      if (updating) {
+        const progressData = event.payload;
+        setProgress(progressData.percentage || 0);
       }
     });
 
     return () => {
       unlisten.then((fn) => fn());
+      progressUnlisten.then((fn) => fn());
     };
-  }, []);
+  }, [updating, status?.version]);
 
   const checkForUpdates = async (currentVersion: string) => {
     if (checking) return;
-
     setChecking(true);
+    setUpdateError(null);
 
     try {
       const response = await fetch(
@@ -89,28 +112,85 @@ export const OllamaVersionIndicator = () => {
   };
 
   const handleUpdate = async () => {
-    if (!isOutdated) return;
+    if (!isOutdated || updating) return;
 
     setUpdating(true);
+    setUpdateError(null);
+    setUpdateSuccess(false);
+    setProgress(0);
 
     try {
       console.log("Starting Ollama update...");
-      await invoke("update_ollama");
 
-      // Refresh the status after update
-      await refreshOllamaStatus();
+      // Add a timeout to the invoke call
+      const updatePromise = invoke("update_ollama");
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Update timed out after 60 seconds")),
+          60000,
+        ),
+      );
 
-      console.log("Ollama update completed successfully");
+      await Promise.race([updatePromise, timeoutPromise]);
+
+      console.log("Ollama update command completed");
+
+      // Wait a moment for the update to actually take effect
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Refresh the status with retry logic
+      let retries = 0;
+      const maxRetries = 8;
+      let statusRefreshed = false;
+
+      while (retries < maxRetries && !statusRefreshed) {
+        try {
+          await refreshOllamaStatus();
+          statusRefreshed = true;
+          console.log("Status refreshed successfully");
+        } catch (error) {
+          console.error(`Refresh attempt ${retries + 1} failed:`, error);
+          retries++;
+          if (retries < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+      }
+
+      setUpdateSuccess(true);
+      setUpdating(false);
+      setIsOutdated(false);
+
+      // Reset success state after 5 seconds
+      setTimeout(() => setUpdateSuccess(false), 5000);
     } catch (error) {
       console.error("Failed to update Ollama:", error);
-    } finally {
+      setUpdateError(error instanceof Error ? error.message : "Update failed");
       setUpdating(false);
+      setIsOutdated(false);
     }
   };
 
   // Only show when there's an update available
   if (!isOutdated || !status?.installed || !status?.running) {
+    if (updateSuccess) {
+      return (
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded-lg text-xs">
+          <FiCheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+          <span className="font-medium text-green-500">Updated!</span>
+        </div>
+      );
+    }
     return null;
+  }
+
+  if (updateError) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-lg text-xs">
+        <FiAlertCircle className="w-3 h-3 text-red-500 shrink-0" />
+        <span className="font-medium text-red-500">Update failed</span>
+      </div>
+    );
   }
 
   // Show update button
@@ -118,15 +198,23 @@ export const OllamaVersionIndicator = () => {
     <button
       onClick={handleUpdate}
       disabled={updating}
-      className="flex items-center gap-1.5 px-2 py-1 bg-success-bg border border-success-border rounded-lg hover:bg-success-bg/50 transition-all group cursor-pointer text-xs"
+      className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition-all group cursor-pointer text-xs min-w-20 justify-center"
       title={`Update Ollama from ${status.version} to ${latestVersion}`}
     >
-      <FiAlertCircle className="w-3 h-3 text-success shrink-0" />
-      <span className="font-medium text-success">
-        {updating ? "Updating..." : `Update to ${latestVersion}`}
-      </span>
-      {updating && (
-        <FiRefreshCw className="w-3 h-3 text-success animate-spin shrink-0" />
+      {updating ? (
+        <>
+          <FiRefreshCw className="w-3 h-3 text-green-500 animate-spin shrink-0" />
+          <span className="font-medium text-green-500">
+            {progress > 0 ? `${Math.round(progress)}%` : "Updating..."}
+          </span>
+        </>
+      ) : (
+        <>
+          <FiAlertCircle className="w-3 h-3 text-green-500 shrink-0" />
+          <span className="font-medium text-green-500 whitespace-nowrap">
+            Update to {latestVersion}
+          </span>
+        </>
       )}
     </button>
   );

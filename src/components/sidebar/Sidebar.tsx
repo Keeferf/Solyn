@@ -1,6 +1,7 @@
 import { SidebarItem } from "./SidebarItem";
 import { NAVIGATION_ITEMS, FOOTER_ITEMS } from "./SidebarNavigation";
 import { OllamaVersionIndicator } from "./OllamaVersionIndicator";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useChatStore } from "@/stores/chatStore";
 
@@ -25,24 +26,20 @@ export const Sidebar = ({
     } else if (id === "chats") {
       onNavigate?.("history");
     } else if (id === "new-chat") {
-      // Create a new chat
       startNewChat();
       onNavigate?.("chat");
     } else if (id === "search") {
-      // Search functionality
       onNavigate?.("chat");
     }
   };
 
   const isItemActive = (itemId: string) => {
-    // Only highlight the current view, not "New Chat" or "Search"
     if (itemId === "models") {
       return currentView === "models";
     }
     if (itemId === "chats") {
       return currentView === "history";
     }
-    // "New Chat" and "Search" should never be highlighted
     return false;
   };
 
@@ -88,6 +85,9 @@ export const Sidebar = ({
         ))}
 
         <div className="pt-4 mt-4 border-t border-white/10">
+          {/* Theme Switcher */}
+          <ThemeSwitcher collapsed={isCollapsed} />
+
           {FOOTER_ITEMS.map((item) => (
             <SidebarItem
               key={item.id}
